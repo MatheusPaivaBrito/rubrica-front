@@ -1,6 +1,7 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
+import Swal from 'sweetalert2';
 
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
@@ -39,11 +40,22 @@ export class SigningPageComponent implements OnInit {
   async login(): Promise<void> { await this.router.navigate(['/login'], { queryParams: { returnUrl: `/signing/${this.token}` } }); }
   download(): void { const item = this.context(); if (item) window.open(`/documents/${item.request.document_id}/download?version=${item.request.document_version}`, '_blank', 'noopener'); }
 
-  async sign(): Promise<void> { await this.answer('/sign', { consent: true }); }
-  async decline(): Promise<void> { await this.answer('/decline', {}); }
+  async sign(): Promise<void> {
+    const confirmation = await Swal.fire({ icon: 'warning', title: 'Confirmar assinatura?', text: 'Sua identidade, data e a versão protegida do documento serão registradas.', showCancelButton: true, confirmButtonText: 'Assinar documento', cancelButtonText: 'Voltar' });
+    if (confirmation.isConfirmed) await this.answer('/sign', { consent: true });
+  }
+
+  async decline(): Promise<void> {
+    const confirmation = await Swal.fire({ icon: 'question', title: 'Recusar assinatura?', text: 'Esta ação será registrada na solicitação.', showCancelButton: true, confirmButtonText: 'Recusar', cancelButtonText: 'Voltar' });
+    if (confirmation.isConfirmed) await this.answer('/decline', {});
+  }
   private async answer(action: string, body: unknown): Promise<void> {
     this.signing.set(true); this.error.set(''); this.message.set('');
-    try { await firstValueFrom(this.api.post(`/signing/${this.token}${action}`, body)); this.completed.set(true); this.message.set(action === '/sign' ? 'Assinatura concluída com sucesso.' : 'Assinatura recusada.'); }
+    try {
+      await firstValueFrom(this.api.post(`/signing/${this.token}${action}`, body));
+      this.completed.set(true); this.message.set(action === '/sign' ? 'Assinatura concluída com sucesso.' : 'Assinatura recusada.');
+      await Swal.fire({ icon: action === '/sign' ? 'success' : 'info', title: this.message(), confirmButtonText: 'Concluir' });
+    }
     catch (error: any) { this.error.set(error?.error?.detail || 'Não foi possível concluir sua resposta.'); }
     finally { this.signing.set(false); }
   }
