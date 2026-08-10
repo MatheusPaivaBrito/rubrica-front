@@ -6,6 +6,8 @@ export class ApiService {
   private readonly http = inject(HttpClient);
 
   get<T>(path: string) { return this.http.get<T>(path); }
+  getArrayBuffer(path: string) { return this.http.get(path, { responseType: 'arraybuffer' }); }
+  getBlob(path: string) { return this.http.get(path, { responseType: 'blob', observe: 'response' }); }
   post<T>(path: string, body: unknown) { return this.http.post<T>(path, body); }
   delete(path: string) { return this.http.delete(path); }
 
