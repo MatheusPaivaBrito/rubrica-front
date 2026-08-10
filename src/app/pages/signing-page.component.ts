@@ -22,7 +22,7 @@ import { Signer, SigningContext, StampPosition } from '../core/models';
         <section class="signing-document-pane" aria-label="Documento para assinatura">
           <header class="signing-document-header">
             <div><p class="eyebrow">Documento para assinatura</p><h1>{{ context()!.document_title }}</h1><p>{{ context()!.original_filename }}</p></div>
-            <span class="page-hint">{{ administrativeView() ? 'Visualização administrativa somente leitura' : 'Clique no PDF e arraste o carimbo para posicioná-lo' }}</span>
+            <span class="page-hint">{{ pageHint() }}</span>
           </header>
           <app-pdf-stamp-viewer
             [token]="token"
@@ -106,9 +106,7 @@ export class SigningPageComponent implements OnInit {
     if (!await this.auth.restore()) { await this.login(); return; }
     try {
       const context = await firstValueFrom(this.api.get<SigningContext>(`/signing/links/${this.token}`));
-      this.context.set(context);
-      this.placement.set(context.stamp);
-      this.completed.set(context.viewer_mode === 'administrator' || ['signed', 'declined'].includes(context.signer.status));
+      this.applyContext(context);
       if (context.viewer_mode === 'signer' && context.signer.status === 'pending') {
         const signer = await firstValueFrom(this.api.post<Signer>(`/signing/links/${this.token}/view`, {}));
         this.context.update(current => current ? { ...current, signer } : current);
@@ -204,7 +202,13 @@ export class SigningPageComponent implements OnInit {
   }
 
   administrativeView(): boolean { return this.context()?.viewer_mode === 'administrator'; }
-  documentEndpoint(): string { return this.administrativeView() && (this.context()?.request.signed_count ?? 0) > 0 ? 'signed-document' : 'document'; }
+  documentEndpoint(): string { return (this.context()?.request.signed_count ?? 0) > 0 ? 'signed-document' : 'document'; }
+  pageHint(): string {
+    if (this.administrativeView()) return 'Visualização administrativa somente leitura';
+    const signed = this.context()?.request.signed_count ?? 0;
+    if (this.completed()) return signed ? `Versão consolidada com ${signed} assinatura(s)` : 'Documento finalizado';
+    return signed ? `Exibindo ${signed} assinatura(s) anterior(es) · posicione a sua` : 'Clique no PDF e arraste o carimbo para posicioná-lo';
+  }
 
   private async collectGeolocation(): Promise<{ status: string; latitude: number | null; longitude: number | null; accuracy_meters: number | null }> {
     if (!navigator.geolocation) return { status: 'unavailable', latitude: null, longitude: null, accuracy_meters: null };
@@ -226,9 +230,9 @@ export class SigningPageComponent implements OnInit {
     this.signing.set(true);
     this.message.set('');
     try {
-      const signer = await firstValueFrom(this.api.post<Signer>(`/signing/links/${this.token}${action}`, body));
-      this.context.update(current => current ? { ...current, signer } : current);
-      this.completed.set(true);
+      await firstValueFrom(this.api.post<Signer>(`/signing/links/${this.token}${action}`, body));
+      const refreshed = await firstValueFrom(this.api.get<SigningContext>(`/signing/links/${this.token}`));
+      this.applyContext(refreshed);
       this.message.set(action === '/sign' ? 'Assinatura concluída com sucesso.' : 'Assinatura recusada.');
       await Swal.fire({ icon: action === '/sign' ? 'success' : 'info', title: this.message(), confirmButtonText: 'Concluir' });
     } catch (error) {
@@ -236,5 +240,12 @@ export class SigningPageComponent implements OnInit {
     } finally {
       this.signing.set(false);
     }
+  }
+
+  private applyContext(context: SigningContext): void {
+    this.context.set(context);
+    const stampAlreadyRendered = context.request.signed_count > 0 && context.signer.status === 'signed';
+    this.placement.set(stampAlreadyRendered ? null : context.stamp);
+    this.completed.set(context.viewer_mode === 'administrator' || ['signed', 'declined'].includes(context.signer.status));
   }
 }
