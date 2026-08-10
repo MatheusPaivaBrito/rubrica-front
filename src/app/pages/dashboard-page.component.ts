@@ -139,6 +139,11 @@ export class DashboardPageComponent implements OnInit {
   }
 
   private async loadSigners(requestId: string): Promise<void> { this.signers.set(await firstValueFrom(this.api.get<Signer[]>(`/signature-requests/${requestId}/signers`))); }
-  private async run(action: () => Promise<void>): Promise<void> { this.submitting.set(true); this.error.set(''); try { await action(); } catch (error: any) { this.error.set(error?.error?.detail || 'Não foi possível concluir a operação.'); } finally { this.submitting.set(false); } }
+  private async run(action: () => Promise<void>): Promise<void> { this.submitting.set(true); this.error.set(''); try { await action(); } catch (error: any) { this.error.set(this.errorMessage(error)); } finally { this.submitting.set(false); } }
+  private errorMessage(error: any): string {
+    const detail = error?.error?.detail;
+    if (Array.isArray(detail)) return detail.map((item) => `${item.loc?.at(-1) || 'campo'}: ${item.msg}`).join(' · ');
+    return detail || 'Não foi possível concluir a operação.';
+  }
   private setFile(file: File | null): void { if (!file) return; if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) { this.error.set('Selecione um arquivo PDF.'); return; } this.error.set(''); this.file = file; }
 }
