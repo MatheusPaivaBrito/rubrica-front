@@ -39,14 +39,23 @@ import { Signer, SigningContext, StampPosition } from '../core/models';
           <div>
             <p class="eyebrow">Rubrica · assinatura segura</p>
             <h2>{{ administrativeView() ? 'Visualização administrativa' : 'Olá, ' + context()!.signer.name }}</h2>
-            <p class="muted">{{ administrativeView() ? 'Consulte o documento sem assinar no lugar do signatário.' : 'Leia o documento e escolha onde seu comprovante de assinatura deve aparecer.' }}</p>
+            <p class="muted">{{ administrativeView() ? 'Você não é um signatário deste documento.' : 'Leia o documento e escolha onde seu comprovante de assinatura deve aparecer.' }}</p>
           </div>
 
-          <section class="signing-summary">
-            <small>{{ administrativeView() ? 'Signatário do documento' : 'Assinando como' }}</small>
-            <strong>{{ context()!.signer.name }}</strong>
-            <span>{{ context()!.signer.email }}</span>
-          </section>
+          @if (administrativeView()) {
+            <section class="signing-summary">
+              <small>Conta atual</small>
+              <strong>{{ auth.context()?.subject }}</strong>
+              <span>Não cadastrada como signatária nesta solicitação</span>
+            </section>
+            <p class="notice">Entre com uma conta cadastrada nesta solicitação para assinar. O administrador também pode assinar, desde que adicione a própria conta enquanto a solicitação ainda estiver em rascunho.</p>
+          } @else {
+            <section class="signing-summary">
+              <small>Assinando como</small>
+              <strong>{{ context()!.signer.name }}</strong>
+              <span>{{ context()!.signer.email }}</span>
+            </section>
+          }
 
           @if (!administrativeView()) { <section class="stamp-instructions" [class.ready]="placement()">
             <div class="mini-stamp"><span>Assinado por</span><strong>{{ context()!.signer.name }}</strong><small>{{ stampDateLabel() }}</small></div>
@@ -66,6 +75,7 @@ import { Signer, SigningContext, StampPosition } from '../core/models';
             </button> }
             <button class="button secondary" [disabled]="signing()" (click)="download()">{{ context()!.request.signed_count > 0 ? 'Baixar PDF assinado' : 'Baixar PDF' }}</button>
             @if (!administrativeView()) { <button class="button subtle" [disabled]="signing() || completed()" (click)="decline()">Recusar</button> }
+            @if (administrativeView()) { <button class="button" (click)="switchAccount()">Entrar como signatário</button><button class="button subtle" (click)="goToDashboard()">Voltar ao dashboard</button> }
           </div>
         </aside>
       </main>
@@ -84,7 +94,7 @@ export class SigningPageComponent implements OnInit {
   token = '';
 
   constructor(
-    private readonly auth: AuthService,
+    readonly auth: AuthService,
     private readonly api: ApiService,
     private readonly route: ActivatedRoute,
     private readonly router: Router,
@@ -114,6 +124,13 @@ export class SigningPageComponent implements OnInit {
   async login(): Promise<void> {
     await this.router.navigate(['/login'], { queryParams: { returnUrl: `/signing/${this.token}` } });
   }
+
+  async switchAccount(): Promise<void> {
+    try { await this.auth.logout(); } catch { /* The local session is cleared by AuthService. */ }
+    await this.login();
+  }
+
+  async goToDashboard(): Promise<void> { await this.router.navigate(['/dashboard']); }
 
   async download(): Promise<void> {
     try {
