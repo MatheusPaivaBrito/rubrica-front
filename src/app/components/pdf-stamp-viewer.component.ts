@@ -7,7 +7,7 @@ import { ApiService } from '../core/api.service';
 import { FeedbackService } from '../core/feedback.service';
 import { StampPosition } from '../core/models';
 
-GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs?v=6.2.108';
 
 interface PdfPageView {
   number: number;
