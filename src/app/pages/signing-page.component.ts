@@ -116,11 +116,13 @@ export class SigningPageComponent implements OnInit {
 
   async download(): Promise<void> {
     try {
-      const response = await firstValueFrom(this.api.getBlob(`/signing/links/${this.token}/download`));
+      const signed = this.context()?.signer.status === 'signed';
+      const endpoint = signed ? `/signing/links/${this.token}/signed-document` : `/signing/links/${this.token}/download`;
+      const response = await firstValueFrom(this.api.getBlob(endpoint));
       const url = URL.createObjectURL(response.body!);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = this.context()?.original_filename || 'documento.pdf';
+      anchor.download = signed ? `rubrica-${this.context()?.document_title || 'documento'}-assinado.pdf` : (this.context()?.original_filename || 'documento.pdf');
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (error) {
@@ -134,15 +136,27 @@ export class SigningPageComponent implements OnInit {
       await this.feedback.warning('Clique no PDF para escolher onde o carimbo da assinatura deve aparecer.', 'Posicione sua assinatura');
       return;
     }
-    const confirmation = await Swal.fire({
-      icon: 'warning',
-      title: 'Confirmar assinatura?',
-      text: `O carimbo será registrado na página ${stamp.page}.`,
+    const consent = await Swal.fire({
+      icon: 'info',
+      title: 'Registro de evidências',
+      html: `<p style="text-align:left">Para proteger esta assinatura, registraremos:</p><ul style="text-align:left"><li>identificador pseudonimizado da sua conta;</li><li>data, IP, navegador, plataforma e tamanho de tela;</li><li>hash do documento e posição do carimbo;</li><li>localização somente se você autorizar no próximo passo.</li></ul>`,
+      input: 'checkbox',
+      inputPlaceholder: 'Li e concordo com o registro dessas evidências',
+      inputValidator: value => value ? undefined : 'Confirme o consentimento para continuar.',
       showCancelButton: true,
-      confirmButtonText: 'Assinar documento',
+      confirmButtonText: 'Continuar',
       cancelButtonText: 'Voltar',
     });
-    if (confirmation.isConfirmed) await this.answer('/sign', { consent: true, stamp });
+    if (!consent.isConfirmed) return;
+    const geolocation = await this.collectGeolocation();
+    const client = {
+      platform: navigator.platform || 'unknown',
+      language: navigator.language || 'unknown',
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'unknown',
+      screen_width: window.screen?.width || null,
+      screen_height: window.screen?.height || null,
+    };
+    await this.answer('/sign', { consent: true, consent_version: 'rubrica-evidence-v1', stamp, client, geolocation });
   }
 
   async decline(): Promise<void> {
@@ -164,6 +178,22 @@ export class SigningPageComponent implements OnInit {
 
   statusLabel(): string {
     return this.context()?.signer.status === 'declined' ? 'Assinatura recusada' : 'Documento assinado';
+  }
+
+  private async collectGeolocation(): Promise<{ status: string; latitude: number | null; longitude: number | null; accuracy_meters: number | null }> {
+    if (!navigator.geolocation) return { status: 'unavailable', latitude: null, longitude: null, accuracy_meters: null };
+    const choice = await Swal.fire({ icon: 'question', title: 'Compartilhar localização?', text: 'A localização aumenta a rastreabilidade, mas é opcional e não impede sua assinatura.', showCancelButton: true, confirmButtonText: 'Compartilhar localização', cancelButtonText: 'Assinar sem localização' });
+    if (!choice.isConfirmed) return { status: 'denied', latitude: null, longitude: null, accuracy_meters: null };
+    Swal.fire({ title: 'Obtendo localização…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    const result = await new Promise<{ status: string; latitude: number | null; longitude: number | null; accuracy_meters: number | null }>(resolve => {
+      navigator.geolocation.getCurrentPosition(
+        position => resolve({ status: 'granted', latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy_meters: position.coords.accuracy }),
+        error => resolve({ status: error.code === error.PERMISSION_DENIED ? 'denied' : error.code === error.TIMEOUT ? 'timeout' : 'unavailable', latitude: null, longitude: null, accuracy_meters: null }),
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
+      );
+    });
+    Swal.close();
+    return result;
   }
 
   private async answer(action: '/sign' | '/decline', body: unknown): Promise<void> {

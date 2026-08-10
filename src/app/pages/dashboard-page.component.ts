@@ -9,7 +9,7 @@ import Swal from 'sweetalert2';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { FeedbackService } from '../core/feedback.service';
-import { DocumentItem, SignatureRequest, Signer, SignerOption, SigningLink, UserCreated } from '../core/models';
+import { DocumentItem, SignatureEvidence, SignatureRequest, Signer, SignerOption, SigningLink, UserCreated } from '../core/models';
 
 @Component({
   standalone: true,
@@ -45,8 +45,9 @@ import { DocumentItem, SignatureRequest, Signer, SignerOption, SigningLink, User
                   @if (selectedRequest()!.status === 'draft') {
                     <hr /><form class="form" (ngSubmit)="addSigner()"><label>Signatário registrado<div class="autocomplete"><input name="signerSearch" [(ngModel)]="signerSearch" (focus)="signerPickerOpen = true" (input)="selectedSigner.set(null)" placeholder="Pesquise por nome ou e-mail" autocomplete="off" />@if (signerPickerOpen) { <div class="autocomplete-menu">@for (user of filteredSignerOptions(); track user.id) { <button type="button" (click)="selectSigner(user)"><strong>{{ user.name }}</strong><small>{{ user.email }}</small></button> } @empty { <p>Nenhum signatário encontrado.</p> }</div> }</div></label>@if (selectedSigner()) { <p class="selected-option">Selecionado: {{ selectedSigner()!.name }} · {{ selectedSigner()!.email }}</p> }<button class="button" [disabled]="submitting() || !selectedSigner()">Adicionar signatário</button></form><button class="button secondary" (click)="openRequest()" [disabled]="submitting() || !signers().length">Abrir para assinatura</button>
                   }
-                  @if (selectedRequest()!.status === 'open') { <hr /><button class="button secondary" (click)="generateLink()" [disabled]="submitting()">{{ requestLink() ? 'Rotacionar link seguro' : 'Gerar link seguro' }}</button> }
+                  @if (selectedRequest()!.status === 'open' || (isAdmin() && selectedRequest()!.status === 'completed' && !requestLink())) { <hr /><button class="button secondary" (click)="generateLink()" [disabled]="submitting()">{{ requestLink() ? 'Rotacionar link seguro' : selectedRequest()!.status === 'completed' ? 'Gerar link histórico' : 'Gerar link seguro' }}</button> }
                   @if (requestLink()) { <p class="eyebrow">Link único da solicitação</p><p class="url-box">{{ requestLink() }}</p><p class="muted">Exige login e vínculo como signatário.</p><button class="button secondary" (click)="copyInvite()">Copiar link</button> }
+                  @if (isAdmin() && selectedRequest()!.signed_count > 0) { <hr /><div class="button-row"><button class="button secondary" (click)="previewSignedRequest()">Ver PDF carimbado</button><button class="button secondary" (click)="showEvidence()">Ver evidências</button></div> }
                 } @else { <p class="muted">Selecione uma solicitação para ver os detalhes.</p> }
               </article>
 
@@ -56,14 +57,14 @@ import { DocumentItem, SignatureRequest, Signer, SignerOption, SigningLink, User
         }
       </section>
 
-      @if (previewDocument()) { <div class="modal-backdrop" (click)="closePreview()"><section class="pdf-modal" (click)="$event.stopPropagation()"><header><div><strong>{{ previewDocument()!.title }}</strong><small>{{ previewDocument()!.original_filename }}</small></div><button class="modal-close" (click)="closePreview()" aria-label="Fechar">×</button></header><iframe [src]="previewUrl()" title="Visualização do PDF"></iframe></section></div> }
+      @if (previewDocument()) { <div class="modal-backdrop" (click)="closePreview()"><section class="pdf-modal" (click)="$event.stopPropagation()"><header><div><strong>{{ previewHeading() }} · {{ previewDocument()!.title }}</strong><small>{{ previewDocument()!.original_filename }}</small></div><button class="modal-close" (click)="closePreview()" aria-label="Fechar">×</button></header><iframe [src]="previewUrl()" title="Visualização do PDF"></iframe></section></div> }
     </main>
   `,
 })
 export class DashboardPageComponent implements OnInit {
   readonly documents = signal<DocumentItem[]>([]); readonly requests = signal<SignatureRequest[]>([]); readonly signers = signal<Signer[]>([]); readonly signerOptions = signal<SignerOption[]>([]);
   readonly selectedDocument = signal<DocumentItem | null>(null); readonly selectedRequest = signal<SignatureRequest | null>(null); readonly selectedSigner = signal<SignerOption | null>(null);
-  readonly requestLinks = signal<Record<string, string>>({}); readonly previewDocument = signal<DocumentItem | null>(null); readonly previewUrl = signal<SafeResourceUrl>('');
+  readonly requestLinks = signal<Record<string, string>>({}); readonly requestEvidence = signal<SignatureEvidence[]>([]); readonly previewDocument = signal<DocumentItem | null>(null); readonly previewUrl = signal<SafeResourceUrl>(''); readonly previewHeading = signal('Documento original');
   readonly loading = signal(true); readonly submitting = signal(false);
   requestFilter = 'open'; signerSearch = ''; signerPickerOpen = false; title = ''; organization = 'default'; expiresAt = ''; userName = ''; userCpf = ''; userEmail = ''; userPassword = ''; userRole = 'signature_signer'; file: File | null = null;
 
@@ -80,9 +81,10 @@ export class DashboardPageComponent implements OnInit {
   dropFile(event: DragEvent): void { event.preventDefault(); this.setFile(event.dataTransfer?.files.item(0) ?? null); }
   selectSigner(user: SignerOption): void { this.selectedSigner.set(user); this.signerSearch = `${user.name} · ${user.email}`; this.signerPickerOpen = false; }
   prepareRequest(document: DocumentItem): void { this.selectedDocument.set(document); this.selectedRequest.set(null); this.signers.set([]); }
-  async selectRequest(request: SignatureRequest): Promise<void> { this.selectedRequest.set(request); this.selectedDocument.set(null); this.selectedSigner.set(null); this.signerSearch = ''; await this.run(() => this.loadSigners(request.id)); }
+  async selectRequest(request: SignatureRequest): Promise<void> { this.selectedRequest.set(request); this.selectedDocument.set(null); this.selectedSigner.set(null); this.signerSearch = ''; this.requestEvidence.set([]); await this.run(() => this.loadSigners(request.id)); if (this.isAdmin()) await this.loadAdminRequestDetails(request); }
 
-  preview(document: DocumentItem): void { this.previewDocument.set(document); this.previewUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(`/documents/${document.id}/preview?version=${document.version}`)); }
+  preview(document: DocumentItem): void { this.previewHeading.set('Documento original'); this.previewDocument.set(document); this.previewUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(`/documents/${document.id}/preview?version=${document.version}`)); }
+  previewSignedRequest(): void { const request = this.selectedRequest(); const document = this.documents().find(item => item.id === request?.document_id); if (!request || !document) return; this.previewHeading.set('PDF assinado e carimbado'); this.previewDocument.set(document); this.previewUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(`/signature-requests/${request.id}/signed-document`)); }
   closePreview(): void { this.previewDocument.set(null); this.previewUrl.set(''); }
   async deleteDocument(document: DocumentItem): Promise<void> { const result = await Swal.fire({ icon: 'warning', title: 'Excluir documento?', text: 'Ele sairá da lista, mas a trilha de auditoria e o arquivo serão preservados.', showCancelButton: true, confirmButtonText: 'Excluir', cancelButtonText: 'Cancelar', confirmButtonColor: '#b42318' }); if (!result.isConfirmed) return; await this.run(async () => { await firstValueFrom(this.api.delete(`/documents/${document.id}`)); this.documents.update((items) => items.filter((item) => item.id !== document.id)); }); }
 
@@ -93,11 +95,13 @@ export class DashboardPageComponent implements OnInit {
   async generateLink(): Promise<void> { const request = this.selectedRequest(); if (!request) return; if (this.requestLink()) { const result = await Swal.fire({ icon: 'warning', title: 'Rotacionar link?', text: 'O link anterior deixará de funcionar.', showCancelButton: true, confirmButtonText: 'Rotacionar', cancelButtonText: 'Cancelar' }); if (!result.isConfirmed) return; } await this.run(async () => { const link = await firstValueFrom(this.api.post<SigningLink>(`/signature-requests/${request.id}/signing-link`, {})); this.requestLinks.update((items) => ({ ...items, [request.id]: link.signing_url })); }); }
   async createUser(): Promise<void> { await this.run(async () => { const user = await firstValueFrom(this.api.post<UserCreated>('/users', { name: this.userName, cpf: this.userCpf, email: this.userEmail, password: this.userPassword, role: this.userRole })); if (user.role === 'signature_signer') await this.loadSignerOptions(); this.userName = ''; this.userCpf = ''; this.userEmail = ''; this.userPassword = ''; await Swal.fire({ icon: 'success', title: 'Usuário criado', text: `${user.name} já pode acessar o Rubrica.`, timer: 1800, showConfirmButton: false }); }); }
   async copyInvite(): Promise<void> { await this.run(async () => { await navigator.clipboard.writeText(this.requestLink()); await Swal.fire({ icon: 'success', title: 'Link copiado', toast: true, position: 'top-end', timer: 1500, showConfirmButton: false }); }); }
+  async showEvidence(): Promise<void> { const rows = this.requestEvidence(); if (!rows.length) { await this.feedback.warning('Ainda não há evidências disponíveis para esta solicitação.'); return; } const escape = (value: unknown) => String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]!)); const html = rows.map(row => `<section style="text-align:left;margin-bottom:1rem"><strong>${escape(row.signer_name)}</strong><br><small>${escape(row.signed_at)}</small><pre style="white-space:pre-wrap;max-height:260px;overflow:auto;background:#f4f6f8;padding:.75rem">${escape(JSON.stringify(row, null, 2))}</pre></section>`).join(''); await Swal.fire({ title: 'Evidências da assinatura', html, width: 850, confirmButtonText: 'Fechar' }); }
   async logout(): Promise<void> { try { await this.auth.logout(); } catch (error) { await this.feedback.error(error, 'Não foi possível encerrar a sessão no servidor'); } finally { await this.router.navigate(['/login']); } }
 
   private async reload(): Promise<void> { const [documents, requests] = await Promise.all([firstValueFrom(this.api.get<DocumentItem[]>('/documents')), firstValueFrom(this.api.get<SignatureRequest[]>('/signature-requests'))]); this.documents.set(documents); this.requests.set(requests.sort((a, b) => b.id.localeCompare(a.id, undefined, { numeric: true }))); }
   private async loadSigners(requestId: string): Promise<void> { this.signers.set(await firstValueFrom(this.api.get<Signer[]>(`/signature-requests/${requestId}/signers`))); }
   private async loadSignerOptions(): Promise<void> { this.signerOptions.set(await firstValueFrom(this.api.get<SignerOption[]>('/users/signers'))); }
+  private async loadAdminRequestDetails(request: SignatureRequest): Promise<void> { const [link, evidence] = await Promise.allSettled([firstValueFrom(this.api.get<SigningLink>(`/signature-requests/${request.id}/signing-link`)), firstValueFrom(this.api.get<SignatureEvidence[]>(`/signature-requests/${request.id}/evidence`))]); if (link.status === 'fulfilled') this.requestLinks.update(items => ({ ...items, [request.id]: link.value.signing_url })); if (evidence.status === 'fulfilled') this.requestEvidence.set(evidence.value); }
   private async run(action: () => Promise<void>): Promise<void> { this.submitting.set(true); try { await action(); } catch (error) { await this.feedback.error(error); } finally { this.submitting.set(false); } }
   private setFile(file: File | null): void { if (!file) return; if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) { void this.feedback.warning('Somente arquivos PDF podem ser enviados.', 'Arquivo inválido'); return; } this.file = file; }
 }
