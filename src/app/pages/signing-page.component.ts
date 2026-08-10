@@ -1,4 +1,5 @@
 import { Component, OnInit, signal } from '@angular/core';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import Swal from 'sweetalert2';
@@ -14,7 +15,7 @@ import { SigningContext } from '../core/models';
       <p class="eyebrow">Rubrica · assinatura segura</p>
       @if (loading()) { <h1>Carregando convite…</h1> }
       @else if (error()) { <h1>Não foi possível abrir este convite</h1><p class="error">{{ error() }}</p><button class="button" (click)="login()">Entrar</button> }
-      @else if (context()) { <h1>Olá, {{ context()!.signer.name }}</h1><p class="muted">Você está prestes a assinar este documento.</p><div class="document"><strong>{{ context()!.document_title }}</strong><p class="muted">{{ context()!.original_filename }}</p><button class="button secondary" (click)="download()">Baixar documento</button></div><p class="notice">Ao confirmar, registraremos sua identidade, data e o hash desta versão do documento.</p>@if (message()) { <p class="notice">{{ message() }}</p> }<div class="button-row"><button class="button" [disabled]="signing() || completed()" (click)="sign()">{{ signing() ? 'Assinando…' : 'Assinar documento' }}</button><button class="button secondary" [disabled]="signing() || completed()" (click)="decline()">Recusar</button></div> }
+      @else if (context()) { <h1>Olá, {{ context()!.signer.name }}</h1><p class="muted">Leia o documento antes de decidir.</p><div class="document"><strong>{{ context()!.document_title }}</strong><p class="muted">{{ context()!.original_filename }}</p><iframe class="pdf-viewer" [src]="pdfUrl" title="Prévia segura do documento"></iframe><button class="button secondary" (click)="download()">Baixar documento</button></div><p class="notice">Ao confirmar, registraremos sua identidade, data e o hash desta versão do documento.</p>@if (message()) { <p class="notice">{{ message() }}</p> }<div class="button-row"><button class="button" [disabled]="signing() || completed()" (click)="sign()">{{ signing() ? 'Assinando…' : 'Assinar documento' }}</button><button class="button secondary" [disabled]="signing() || completed()" (click)="decline()">Recusar</button></div> }
     </section></main>
   `,
 })
@@ -26,19 +27,21 @@ export class SigningPageComponent implements OnInit {
   readonly message = signal('');
   readonly error = signal('');
   private requestId = '';
+  pdfUrl: SafeResourceUrl = '';
 
-  constructor(private readonly auth: AuthService, private readonly api: ApiService, private readonly route: ActivatedRoute, private readonly router: Router) {}
+  constructor(private readonly auth: AuthService, private readonly api: ApiService, private readonly route: ActivatedRoute, private readonly router: Router, private readonly sanitizer: DomSanitizer) {}
 
   async ngOnInit(): Promise<void> {
     this.requestId = this.route.snapshot.paramMap.get('requestId') || '';
+    this.pdfUrl = this.sanitizer.bypassSecurityTrustResourceUrl(`/signing/links/${this.requestId}/document`);
     if (!await this.auth.restore()) { await this.login(); return; }
-    try { this.context.set(await firstValueFrom(this.api.get<SigningContext>(`/signing/requests/${this.requestId}`))); }
+    try { this.context.set(await firstValueFrom(this.api.get<SigningContext>(`/signing/links/${this.requestId}`))); }
     catch (error: any) { this.error.set(error?.error?.detail || 'Convite inválido ou indisponível.'); }
     finally { this.loading.set(false); }
   }
 
   async login(): Promise<void> { await this.router.navigate(['/login'], { queryParams: { returnUrl: `/signing/${this.requestId}` } }); }
-  download(): void { const item = this.context(); if (item) window.open(`/documents/${item.request.document_id}/download?version=${item.request.document_version}`, '_blank', 'noopener'); }
+  download(): void { window.open(`/signing/links/${this.requestId}/download`, '_blank', 'noopener'); }
 
   async sign(): Promise<void> {
     const confirmation = await Swal.fire({ icon: 'warning', title: 'Confirmar assinatura?', text: 'Sua identidade, data e a versão protegida do documento serão registradas.', showCancelButton: true, confirmButtonText: 'Assinar documento', cancelButtonText: 'Voltar' });
@@ -52,7 +55,7 @@ export class SigningPageComponent implements OnInit {
   private async answer(action: string, body: unknown): Promise<void> {
     this.signing.set(true); this.error.set(''); this.message.set('');
     try {
-      await firstValueFrom(this.api.post(`/signing/requests/${this.requestId}${action}`, body));
+      await firstValueFrom(this.api.post(`/signing/links/${this.requestId}${action}`, body));
       this.completed.set(true); this.message.set(action === '/sign' ? 'Assinatura concluída com sucesso.' : 'Assinatura recusada.');
       await Swal.fire({ icon: action === '/sign' ? 'success' : 'info', title: this.message(), confirmButtonText: 'Concluir' });
     }

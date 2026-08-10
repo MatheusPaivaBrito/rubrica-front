@@ -7,6 +7,7 @@ export class ApiService {
 
   get<T>(path: string) { return this.http.get<T>(path); }
   post<T>(path: string, body: unknown) { return this.http.post<T>(path, body); }
+  delete(path: string) { return this.http.delete(path); }
 
   postFile<T>(path: string, file: File, parameters: Record<string, string>) {
     const params = new HttpParams({ fromObject: parameters });
