@@ -7,7 +7,7 @@ import Swal from 'sweetalert2';
 
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
-import { DocumentItem, SignatureRequest, Signer, SignerCreated } from '../core/models';
+import { DocumentItem, SignatureRequest, Signer, SignerCreated, UserCreated } from '../core/models';
 
 @Component({
   standalone: true,
@@ -33,7 +33,8 @@ import { DocumentItem, SignatureRequest, Signer, SignerCreated } from '../core/m
             </section>
             <aside class="grid">
               <article class="card"><h2>Nova solicitação</h2>@if (selectedDocument()) { <p class="muted">{{ selectedDocument()!.title }}</p><form class="form" (ngSubmit)="createRequest()"><label>Expira em <input type="datetime-local" name="expires" [(ngModel)]="expiresAt" required /></label><button class="button" [disabled]="submitting()">Criar solicitação</button></form> } @else { <p class="muted">Escolha um documento para iniciar.</p> }</article>
-              <article class="card"><h2>Detalhe da solicitação</h2>@if (selectedRequest()) { <p class="muted">#{{ selectedRequest()!.id }} · {{ selectedRequest()!.status }}</p><div class="signer-list">@for (signer of signers(); track signer.id) { <div class="signer-row"><div><strong>{{ signer.name }}</strong><small>{{ signer.email }}</small>@if (signer.signed_at) { <small>Assinou em {{ signer.signed_at | date:'dd/MM HH:mm' }}</small> }</div><span class="badge" [class.pending]="signer.status === 'pending' || signer.status === 'viewed'" [class.complete]="signer.status === 'signed'">{{ signer.status }}</span></div> } @empty { <p class="muted">Nenhum signatário adicionado.</p> }</div>@if (selectedRequest()!.status === 'draft') { <hr /><form class="form" (ngSubmit)="addSigner()"><label>Nome <input name="signerName" [(ngModel)]="signerName" required /></label><label>E-mail <input name="signerEmail" type="email" [(ngModel)]="signerEmail" required /></label><button class="button" [disabled]="submitting()">Gerar link</button></form><button class="button secondary" (click)="openRequest()" [disabled]="submitting() || !signers().length">Abrir para assinatura</button> } } @else { <p class="muted">Selecione uma solicitação para ver quem assinou ou adicionar convidados.</p> } @if (inviteUrl()) { <hr /><p class="eyebrow">Envio manual</p><p class="url-box">{{ inviteUrl() }}</p><p class="muted">Copie este link e envie pelo canal que preferir.</p><button class="button secondary" (click)="copyInvite()">Copiar link</button> }</article>
+              <article class="card"><h2>Detalhe da solicitação</h2>@if (selectedRequest()) { <p class="muted">#{{ selectedRequest()!.id }} · {{ selectedRequest()!.status }}</p><div class="signer-list">@for (signer of signers(); track signer.id) { <div class="signer-row"><div><strong>{{ signer.name }}</strong><small>{{ signer.email }}</small>@if (signer.signed_at) { <small>Assinou em {{ signer.signed_at | date:'dd/MM HH:mm' }}</small> }</div><span class="badge" [class.pending]="signer.status === 'pending' || signer.status === 'viewed'" [class.complete]="signer.status === 'signed'">{{ signer.status }}</span></div> } @empty { <p class="muted">Nenhum signatário adicionado.</p> }</div>@if (selectedRequest()!.status === 'draft') { <hr /><form class="form" (ngSubmit)="addSigner()"><label>Nome <input name="signerName" [(ngModel)]="signerName" required /></label><label>E-mail <input name="signerEmail" type="email" [(ngModel)]="signerEmail" required /></label><button class="button" [disabled]="submitting()">Adicionar signatário</button></form><button class="button secondary" (click)="openRequest()" [disabled]="submitting() || !signers().length">Abrir para assinatura</button> } @if (requestLink()) { <hr /><p class="eyebrow">Link único da solicitação</p><p class="url-box">{{ requestLink() }}</p><p class="muted">O acesso exige login e somente os signatários cadastrados podem assinar.</p><button class="button secondary" (click)="copyInvite()">Copiar link</button> } } @else { <p class="muted">Selecione uma solicitação para ver quem assinou ou adicionar convidados.</p> }</article>
+              @if (isAdmin()) { <article class="card"><h2>Novo usuário</h2><p class="muted">Crie o acesso do signatário antes de incluí-lo em uma solicitação.</p><form class="form" (ngSubmit)="createUser()"><label>E-mail <input name="userEmail" type="email" [(ngModel)]="userEmail" required /></label><label>Senha inicial <input name="userPassword" type="password" [(ngModel)]="userPassword" minlength="8" required /></label><label>Perfil <select name="userRole" [(ngModel)]="userRole"><option value="signature_signer">Signatário</option><option value="signature_operator">Operador</option><option value="signature_auditor">Auditor</option></select></label><button class="button" [disabled]="submitting()">Criar usuário</button></form></article> }
             </aside>
           </div>
           @if (error()) { <p class="error">{{ error() }}</p> }
@@ -48,7 +49,7 @@ export class DashboardPageComponent implements OnInit {
   readonly signers = signal<Signer[]>([]);
   readonly selectedDocument = signal<DocumentItem | null>(null);
   readonly selectedRequest = signal<SignatureRequest | null>(null);
-  readonly inviteUrl = signal('');
+  readonly requestLinks = signal<Record<string, string>>({});
   readonly loading = signal(true);
   readonly submitting = signal(false);
   readonly error = signal('');
@@ -58,6 +59,9 @@ export class DashboardPageComponent implements OnInit {
   expiresAt = '';
   signerName = '';
   signerEmail = '';
+  userEmail = '';
+  userPassword = '';
+  userRole = 'signature_signer';
   file: File | null = null;
 
   constructor(readonly auth: AuthService, private readonly api: ApiService, private readonly router: Router) {}
@@ -70,14 +74,16 @@ export class DashboardPageComponent implements OnInit {
   }
 
   canManage(): boolean { return this.auth.can('documents:write') && this.auth.can('signature_requests:write'); }
+  isAdmin(): boolean { return this.auth.context()?.roles.includes('signature_admin') ?? false; }
   openRequestsCount(): number { return this.requests().filter((request) => request.status === 'open').length; }
   visibleRequests(): SignatureRequest[] { return this.requests().filter((request) => this.requestFilter === 'all' || request.status === this.requestFilter); }
   selectFile(event: Event): void { this.setFile((event.target as HTMLInputElement).files?.item(0) ?? null); }
   dropFile(event: DragEvent): void { event.preventDefault(); this.setFile(event.dataTransfer?.files.item(0) ?? null); }
-  prepareRequest(document: DocumentItem): void { this.selectedDocument.set(document); this.selectedRequest.set(null); this.signers.set([]); this.inviteUrl.set(''); }
+  prepareRequest(document: DocumentItem): void { this.selectedDocument.set(document); this.selectedRequest.set(null); this.signers.set([]); }
+  requestLink(): string { const request = this.selectedRequest(); return request ? this.requestLinks()[request.id] || request.signing_url || '' : ''; }
 
   async selectRequest(request: SignatureRequest): Promise<void> {
-    this.selectedRequest.set(request); this.selectedDocument.set(null); this.inviteUrl.set('');
+    this.selectedRequest.set(request); this.selectedDocument.set(null);
     await this.loadSigners(request.id);
   }
 
@@ -105,7 +111,7 @@ export class DashboardPageComponent implements OnInit {
     if (!request) return;
     await this.run(async () => {
       const invitation = await firstValueFrom(this.api.post<SignerCreated>(`/signature-requests/${request.id}/signers`, { name: this.signerName, email: this.signerEmail }));
-      this.inviteUrl.set(invitation.signing_url); this.signerName = ''; this.signerEmail = '';
+      this.requestLinks.update((items) => ({ ...items, [request.id]: invitation.signing_url })); this.signerName = ''; this.signerEmail = '';
       await this.loadSigners(request.id);
     });
   }
@@ -123,7 +129,8 @@ export class DashboardPageComponent implements OnInit {
     });
   }
 
-  async copyInvite(): Promise<void> { await navigator.clipboard.writeText(this.inviteUrl()); await Swal.fire({ icon: 'success', title: 'Link copiado', toast: true, position: 'top-end', timer: 1800, showConfirmButton: false }); }
+  async createUser(): Promise<void> { await this.run(async () => { const user = await firstValueFrom(this.api.post<UserCreated>('/users', { email: this.userEmail, password: this.userPassword, role: this.userRole })); this.userEmail = ''; this.userPassword = ''; await Swal.fire({ icon: 'success', title: 'Usuário criado', text: `${user.email} já pode entrar e assinar documentos.`, timer: 2200, showConfirmButton: false }); }); }
+  async copyInvite(): Promise<void> { await navigator.clipboard.writeText(this.requestLink()); await Swal.fire({ icon: 'success', title: 'Link copiado', toast: true, position: 'top-end', timer: 1800, showConfirmButton: false }); }
   async logout(): Promise<void> { await this.auth.logout(); await this.router.navigate(['/login']); }
 
   private async reload(): Promise<void> {

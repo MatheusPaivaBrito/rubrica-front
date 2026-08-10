@@ -25,19 +25,19 @@ export class SigningPageComponent implements OnInit {
   readonly completed = signal(false);
   readonly message = signal('');
   readonly error = signal('');
-  private token = '';
+  private requestId = '';
 
   constructor(private readonly auth: AuthService, private readonly api: ApiService, private readonly route: ActivatedRoute, private readonly router: Router) {}
 
   async ngOnInit(): Promise<void> {
-    this.token = this.route.snapshot.paramMap.get('token') || '';
+    this.requestId = this.route.snapshot.paramMap.get('requestId') || '';
     if (!await this.auth.restore()) { await this.login(); return; }
-    try { this.context.set(await firstValueFrom(this.api.get<SigningContext>(`/signing/${this.token}`))); }
+    try { this.context.set(await firstValueFrom(this.api.get<SigningContext>(`/signing/requests/${this.requestId}`))); }
     catch (error: any) { this.error.set(error?.error?.detail || 'Convite inválido ou indisponível.'); }
     finally { this.loading.set(false); }
   }
 
-  async login(): Promise<void> { await this.router.navigate(['/login'], { queryParams: { returnUrl: `/signing/${this.token}` } }); }
+  async login(): Promise<void> { await this.router.navigate(['/login'], { queryParams: { returnUrl: `/signing/${this.requestId}` } }); }
   download(): void { const item = this.context(); if (item) window.open(`/documents/${item.request.document_id}/download?version=${item.request.document_version}`, '_blank', 'noopener'); }
 
   async sign(): Promise<void> {
@@ -52,7 +52,7 @@ export class SigningPageComponent implements OnInit {
   private async answer(action: string, body: unknown): Promise<void> {
     this.signing.set(true); this.error.set(''); this.message.set('');
     try {
-      await firstValueFrom(this.api.post(`/signing/${this.token}${action}`, body));
+      await firstValueFrom(this.api.post(`/signing/requests/${this.requestId}${action}`, body));
       this.completed.set(true); this.message.set(action === '/sign' ? 'Assinatura concluída com sucesso.' : 'Assinatura recusada.');
       await Swal.fire({ icon: action === '/sign' ? 'success' : 'info', title: this.message(), confirmButtonText: 'Concluir' });
     }

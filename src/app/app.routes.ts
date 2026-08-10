@@ -7,7 +7,7 @@ import { SigningPageComponent } from './pages/signing-page.component';
 export const routes: Routes = [
   { path: 'login', component: LoginPageComponent },
   { path: 'dashboard', component: DashboardPageComponent },
-  { path: 'signing/:token', component: SigningPageComponent },
+  { path: 'signing/:requestId', component: SigningPageComponent },
   { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
   { path: '**', redirectTo: 'dashboard' },
 ];
