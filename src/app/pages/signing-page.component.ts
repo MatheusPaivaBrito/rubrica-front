@@ -157,13 +157,18 @@ export class SigningPageComponent implements OnInit {
     const consent = await Swal.fire({
       icon: 'info',
       title: 'Registro de evidências',
-      html: `<p style="text-align:left">Para proteger esta assinatura, registraremos:</p><ul style="text-align:left"><li>nome, e-mail e identificador pseudonimizado da sua conta;</li><li>data, IP, navegador, plataforma e tamanho de tela;</li><li>hash do documento e posição do carimbo;</li><li>localização somente se você autorizar no próximo passo.</li></ul><p style="text-align:left"><strong>Essas evidências ficarão incorporadas ao PDF assinado e poderão ser consultadas por quem possuir o arquivo.</strong></p>`,
-      input: 'checkbox',
-      inputPlaceholder: 'Li e concordo com o registro dessas evidências',
-      inputValidator: value => value ? undefined : 'Confirme o consentimento para continuar.',
+      html: `<div class="evidence-copy"><p>Para proteger esta assinatura, registraremos:</p><ul><li>nome, e-mail e identificador pseudonimizado da sua conta;</li><li>data, IP, navegador, plataforma e tamanho de tela;</li><li>hash do documento e posição do carimbo;</li><li>localização somente se você autorizar no próximo passo.</li></ul><p><strong>Essas evidências ficarão incorporadas ao PDF assinado e poderão ser consultadas por quem possuir o arquivo.</strong></p><label class="evidence-consent"><input id="evidence-consent" type="checkbox" /><span>Li e concordo com o registro dessas evidências.</span></label></div>`,
+      preConfirm: () => {
+        const checkbox = Swal.getPopup()?.querySelector<HTMLInputElement>('#evidence-consent');
+        if (!checkbox?.checked) { Swal.showValidationMessage('Confirme o consentimento para continuar.'); return false; }
+        return true;
+      },
+      customClass: { popup: 'evidence-dialog' },
       showCancelButton: true,
       confirmButtonText: 'Continuar',
       cancelButtonText: 'Voltar',
+      confirmButtonColor: '#187a66',
+      cancelButtonColor: '#667085',
     });
     if (!consent.isConfirmed) return;
     const geolocation = await this.collectGeolocation();
