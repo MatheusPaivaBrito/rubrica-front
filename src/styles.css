@@ -149,6 +149,7 @@ input:focus, select:focus { outline: 3px solid rgba(47, 154, 128, .18); border-c
 .modal-body { padding: 1.3rem 1.35rem; }
 .modal-footer { display: flex; justify-content: flex-end; gap: .65rem; margin: .5rem -1.35rem -1.3rem; padding: 1rem 1.35rem; border-top: 1px solid #edf0f5; background: #fafbfc; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+.role-help { color: #667085; font-weight: 450; line-height: 1.4; }
 .metric-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; margin-bottom: 1rem; }
 .metric-strip div { display: grid; gap: .2rem; padding: .8rem .9rem; border: 1px solid #e5eaf1; border-radius: 11px; background: #f8fafc; }
 .metric-strip small { color: #667085; }
