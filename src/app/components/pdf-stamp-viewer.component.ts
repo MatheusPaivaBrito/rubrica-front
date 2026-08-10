@@ -54,6 +54,7 @@ interface PdfPageView {
 })
 export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDestroy {
   @Input({ required: true }) token = '';
+  @Input() documentEndpoint = 'document';
   @Input({ required: true }) signerName = '';
   @Input() stampDate: string | Date = new Date();
   @Input() placement: StampPosition | null = null;
@@ -77,7 +78,7 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['token'] && !changes['token'].firstChange) void this.loadDocument();
+    if ((changes['token'] && !changes['token'].firstChange) || (changes['documentEndpoint'] && !changes['documentEndpoint'].firstChange)) void this.loadDocument();
   }
 
   ngOnDestroy(): void {
@@ -114,7 +115,7 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
     this.error.set('');
     try {
       await this.loadingTask?.destroy();
-      const data = await firstValueFrom(this.api.getArrayBuffer(`/signing/links/${this.token}/document`));
+      const data = await firstValueFrom(this.api.getArrayBuffer(`/signing/links/${this.token}/${this.documentEndpoint}`));
       this.loadingTask = getDocument({ data: new Uint8Array(data) });
       this.document = await this.loadingTask.promise;
       const pageViews: PdfPageView[] = [];

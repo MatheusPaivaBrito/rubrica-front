@@ -26,4 +26,5 @@ export interface SigningContext {
   document_title: string;
   original_filename: string;
   stamp: StampPosition | null;
+  viewer_mode: 'signer' | 'administrator';
 }

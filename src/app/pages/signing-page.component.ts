@@ -22,10 +22,11 @@ import { Signer, SigningContext, StampPosition } from '../core/models';
         <section class="signing-document-pane" aria-label="Documento para assinatura">
           <header class="signing-document-header">
             <div><p class="eyebrow">Documento para assinatura</p><h1>{{ context()!.document_title }}</h1><p>{{ context()!.original_filename }}</p></div>
-            <span class="page-hint">Clique no PDF e arraste o carimbo para posicioná-lo</span>
+            <span class="page-hint">{{ administrativeView() ? 'Visualização administrativa somente leitura' : 'Clique no PDF e arraste o carimbo para posicioná-lo' }}</span>
           </header>
           <app-pdf-stamp-viewer
             [token]="token"
+            [documentEndpoint]="documentEndpoint()"
             [signerName]="context()!.signer.name"
             [stampDate]="context()!.signer.signed_at || stampPreviewDate"
             [placement]="placement()"
@@ -37,34 +38,34 @@ import { Signer, SigningContext, StampPosition } from '../core/models';
         <aside class="signing-actions-pane">
           <div>
             <p class="eyebrow">Rubrica · assinatura segura</p>
-            <h2>Olá, {{ context()!.signer.name }}</h2>
-            <p class="muted">Leia o documento e escolha onde seu comprovante de assinatura deve aparecer.</p>
+            <h2>{{ administrativeView() ? 'Visualização administrativa' : 'Olá, ' + context()!.signer.name }}</h2>
+            <p class="muted">{{ administrativeView() ? 'Consulte o documento sem assinar no lugar do signatário.' : 'Leia o documento e escolha onde seu comprovante de assinatura deve aparecer.' }}</p>
           </div>
 
           <section class="signing-summary">
-            <small>Assinando como</small>
+            <small>{{ administrativeView() ? 'Signatário do documento' : 'Assinando como' }}</small>
             <strong>{{ context()!.signer.name }}</strong>
             <span>{{ context()!.signer.email }}</span>
           </section>
 
-          <section class="stamp-instructions" [class.ready]="placement()">
+          @if (!administrativeView()) { <section class="stamp-instructions" [class.ready]="placement()">
             <div class="mini-stamp"><span>Assinado por</span><strong>{{ context()!.signer.name }}</strong><small>{{ stampDateLabel() }}</small></div>
             @if (placement()) {
               <p>Carimbo posicionado na página {{ placement()!.page }}. Você ainda pode arrastá-lo.</p>
             } @else {
               <p>Clique no ponto desejado do PDF. Depois, arraste o carimbo para ajustar.</p>
             }
-          </section>
+          </section> }
 
-          <p class="notice">Sua identidade, data, posição e o hash desta versão serão registrados como evidência.</p>
+          @if (!administrativeView()) { <p class="notice">Sua identidade, data, posição e o hash desta versão serão registrados como evidência.</p> }
           @if (message()) { <p class="notice">{{ message() }}</p> }
 
           <div class="signing-actions">
-            <button class="button" [disabled]="signing() || completed() || !placement()" (click)="sign()">
+            @if (!administrativeView()) { <button class="button" [disabled]="signing() || completed() || !placement()" (click)="sign()">
               {{ signing() ? 'Assinando…' : completed() ? statusLabel() : 'Assinar documento' }}
-            </button>
-            <button class="button secondary" [disabled]="signing()" (click)="download()">Baixar PDF</button>
-            <button class="button subtle" [disabled]="signing() || completed()" (click)="decline()">Recusar</button>
+            </button> }
+            <button class="button secondary" [disabled]="signing()" (click)="download()">{{ context()!.request.signed_count > 0 ? 'Baixar PDF assinado' : 'Baixar PDF' }}</button>
+            @if (!administrativeView()) { <button class="button subtle" [disabled]="signing() || completed()" (click)="decline()">Recusar</button> }
           </div>
         </aside>
       </main>
@@ -97,8 +98,8 @@ export class SigningPageComponent implements OnInit {
       const context = await firstValueFrom(this.api.get<SigningContext>(`/signing/links/${this.token}`));
       this.context.set(context);
       this.placement.set(context.stamp);
-      this.completed.set(['signed', 'declined'].includes(context.signer.status));
-      if (context.signer.status === 'pending') {
+      this.completed.set(context.viewer_mode === 'administrator' || ['signed', 'declined'].includes(context.signer.status));
+      if (context.viewer_mode === 'signer' && context.signer.status === 'pending') {
         const signer = await firstValueFrom(this.api.post<Signer>(`/signing/links/${this.token}/view`, {}));
         this.context.update(current => current ? { ...current, signer } : current);
       }
@@ -116,7 +117,7 @@ export class SigningPageComponent implements OnInit {
 
   async download(): Promise<void> {
     try {
-      const signed = this.context()?.signer.status === 'signed';
+      const signed = (this.context()?.request.signed_count ?? 0) > 0;
       const endpoint = signed ? `/signing/links/${this.token}/signed-document` : `/signing/links/${this.token}/download`;
       const response = await firstValueFrom(this.api.getBlob(endpoint));
       const url = URL.createObjectURL(response.body!);
@@ -179,6 +180,9 @@ export class SigningPageComponent implements OnInit {
   statusLabel(): string {
     return this.context()?.signer.status === 'declined' ? 'Assinatura recusada' : 'Documento assinado';
   }
+
+  administrativeView(): boolean { return this.context()?.viewer_mode === 'administrator'; }
+  documentEndpoint(): string { return this.administrativeView() && (this.context()?.request.signed_count ?? 0) > 0 ? 'signed-document' : 'document'; }
 
   private async collectGeolocation(): Promise<{ status: string; latitude: number | null; longitude: number | null; accuracy_meters: number | null }> {
     if (!navigator.geolocation) return { status: 'unavailable', latitude: null, longitude: null, accuracy_meters: null };
