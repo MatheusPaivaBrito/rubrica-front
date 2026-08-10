@@ -8,6 +8,7 @@ import Swal from 'sweetalert2';
 
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
+import { FeedbackService } from '../core/feedback.service';
 import { DocumentItem, SignatureRequest, Signer, SignerOption, SigningLink, UserCreated } from '../core/models';
 
 @Component({
@@ -52,7 +53,6 @@ import { DocumentItem, SignatureRequest, Signer, SignerOption, SigningLink, User
               @if (isAdmin()) { <article class="card"><h2>Novo usuário</h2><form class="form" (ngSubmit)="createUser()"><label>Nome <input name="userName" [(ngModel)]="userName" required /></label><label>CPF <input name="userCpf" [(ngModel)]="userCpf" placeholder="000.000.000-00" required /></label><label>E-mail <input name="userEmail" type="email" [(ngModel)]="userEmail" required /></label><label>Senha inicial <input name="userPassword" type="password" [(ngModel)]="userPassword" minlength="8" required /></label><label>Perfil <select name="userRole" [(ngModel)]="userRole"><option value="signature_signer">Signatário</option><option value="signature_operator">Operador</option><option value="signature_auditor">Auditor</option></select></label><button class="button" [disabled]="submitting()">Criar usuário</button></form></article> }
             </aside>
           </div>
-          @if (error()) { <p class="error">{{ error() }}</p> }
         }
       </section>
 
@@ -64,12 +64,12 @@ export class DashboardPageComponent implements OnInit {
   readonly documents = signal<DocumentItem[]>([]); readonly requests = signal<SignatureRequest[]>([]); readonly signers = signal<Signer[]>([]); readonly signerOptions = signal<SignerOption[]>([]);
   readonly selectedDocument = signal<DocumentItem | null>(null); readonly selectedRequest = signal<SignatureRequest | null>(null); readonly selectedSigner = signal<SignerOption | null>(null);
   readonly requestLinks = signal<Record<string, string>>({}); readonly previewDocument = signal<DocumentItem | null>(null); readonly previewUrl = signal<SafeResourceUrl>('');
-  readonly loading = signal(true); readonly submitting = signal(false); readonly error = signal('');
+  readonly loading = signal(true); readonly submitting = signal(false);
   requestFilter = 'open'; signerSearch = ''; signerPickerOpen = false; title = ''; organization = 'default'; expiresAt = ''; userName = ''; userCpf = ''; userEmail = ''; userPassword = ''; userRole = 'signature_signer'; file: File | null = null;
 
-  constructor(readonly auth: AuthService, private readonly api: ApiService, private readonly router: Router, private readonly sanitizer: DomSanitizer) {}
+  constructor(readonly auth: AuthService, private readonly api: ApiService, private readonly router: Router, private readonly sanitizer: DomSanitizer, private readonly feedback: FeedbackService) {}
 
-  async ngOnInit(): Promise<void> { const context = await this.auth.restore(); if (!context) { await this.router.navigate(['/login']); return; } if (this.canManage()) await Promise.all([this.reload(), this.loadSignerOptions()]); this.loading.set(false); }
+  async ngOnInit(): Promise<void> { const context = await this.auth.restore(); if (!context) { await this.router.navigate(['/login']); return; } try { if (this.canManage()) await Promise.all([this.reload(), this.loadSignerOptions()]); } catch (error) { await this.feedback.error(error, 'Não foi possível carregar o dashboard'); } finally { this.loading.set(false); } }
   canManage(): boolean { return this.auth.can('documents:write') && this.auth.can('signature_requests:write'); }
   isAdmin(): boolean { return this.auth.context()?.roles.includes('signature_admin') ?? false; }
   openRequestsCount(): number { return this.requests().filter((item) => item.status === 'open').length; }
@@ -80,7 +80,7 @@ export class DashboardPageComponent implements OnInit {
   dropFile(event: DragEvent): void { event.preventDefault(); this.setFile(event.dataTransfer?.files.item(0) ?? null); }
   selectSigner(user: SignerOption): void { this.selectedSigner.set(user); this.signerSearch = `${user.name} · ${user.email}`; this.signerPickerOpen = false; }
   prepareRequest(document: DocumentItem): void { this.selectedDocument.set(document); this.selectedRequest.set(null); this.signers.set([]); }
-  async selectRequest(request: SignatureRequest): Promise<void> { this.selectedRequest.set(request); this.selectedDocument.set(null); this.selectedSigner.set(null); this.signerSearch = ''; await this.loadSigners(request.id); }
+  async selectRequest(request: SignatureRequest): Promise<void> { this.selectedRequest.set(request); this.selectedDocument.set(null); this.selectedSigner.set(null); this.signerSearch = ''; await this.run(() => this.loadSigners(request.id)); }
 
   preview(document: DocumentItem): void { this.previewDocument.set(document); this.previewUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(`/documents/${document.id}/preview?version=${document.version}`)); }
   closePreview(): void { this.previewDocument.set(null); this.previewUrl.set(''); }
@@ -92,13 +92,12 @@ export class DashboardPageComponent implements OnInit {
   async openRequest(): Promise<void> { const request = this.selectedRequest(); if (!request) return; const result = await Swal.fire({ icon: 'question', title: 'Abrir para assinatura?', text: 'A versão será congelada e não aceitará novos signatários.', showCancelButton: true, confirmButtonText: 'Abrir solicitação', cancelButtonText: 'Voltar' }); if (!result.isConfirmed) return; await this.run(async () => { const opened = await firstValueFrom(this.api.post<SignatureRequest>(`/signature-requests/${request.id}/open`, {})); this.requests.update((items) => items.map((item) => item.id === opened.id ? opened : item)); this.selectedRequest.set(opened); const link = await firstValueFrom(this.api.post<SigningLink>(`/signature-requests/${request.id}/signing-link`, {})); this.requestLinks.update((items) => ({ ...items, [request.id]: link.signing_url })); }); }
   async generateLink(): Promise<void> { const request = this.selectedRequest(); if (!request) return; if (this.requestLink()) { const result = await Swal.fire({ icon: 'warning', title: 'Rotacionar link?', text: 'O link anterior deixará de funcionar.', showCancelButton: true, confirmButtonText: 'Rotacionar', cancelButtonText: 'Cancelar' }); if (!result.isConfirmed) return; } await this.run(async () => { const link = await firstValueFrom(this.api.post<SigningLink>(`/signature-requests/${request.id}/signing-link`, {})); this.requestLinks.update((items) => ({ ...items, [request.id]: link.signing_url })); }); }
   async createUser(): Promise<void> { await this.run(async () => { const user = await firstValueFrom(this.api.post<UserCreated>('/users', { name: this.userName, cpf: this.userCpf, email: this.userEmail, password: this.userPassword, role: this.userRole })); if (user.role === 'signature_signer') await this.loadSignerOptions(); this.userName = ''; this.userCpf = ''; this.userEmail = ''; this.userPassword = ''; await Swal.fire({ icon: 'success', title: 'Usuário criado', text: `${user.name} já pode acessar o Rubrica.`, timer: 1800, showConfirmButton: false }); }); }
-  async copyInvite(): Promise<void> { await navigator.clipboard.writeText(this.requestLink()); await Swal.fire({ icon: 'success', title: 'Link copiado', toast: true, position: 'top-end', timer: 1500, showConfirmButton: false }); }
-  async logout(): Promise<void> { await this.auth.logout(); await this.router.navigate(['/login']); }
+  async copyInvite(): Promise<void> { await this.run(async () => { await navigator.clipboard.writeText(this.requestLink()); await Swal.fire({ icon: 'success', title: 'Link copiado', toast: true, position: 'top-end', timer: 1500, showConfirmButton: false }); }); }
+  async logout(): Promise<void> { try { await this.auth.logout(); } catch (error) { await this.feedback.error(error, 'Não foi possível encerrar a sessão no servidor'); } finally { await this.router.navigate(['/login']); } }
 
   private async reload(): Promise<void> { const [documents, requests] = await Promise.all([firstValueFrom(this.api.get<DocumentItem[]>('/documents')), firstValueFrom(this.api.get<SignatureRequest[]>('/signature-requests'))]); this.documents.set(documents); this.requests.set(requests.sort((a, b) => b.id.localeCompare(a.id, undefined, { numeric: true }))); }
   private async loadSigners(requestId: string): Promise<void> { this.signers.set(await firstValueFrom(this.api.get<Signer[]>(`/signature-requests/${requestId}/signers`))); }
   private async loadSignerOptions(): Promise<void> { this.signerOptions.set(await firstValueFrom(this.api.get<SignerOption[]>('/users/signers'))); }
-  private async run(action: () => Promise<void>): Promise<void> { this.submitting.set(true); this.error.set(''); try { await action(); } catch (error: any) { this.error.set(this.errorMessage(error)); } finally { this.submitting.set(false); } }
-  private errorMessage(error: any): string { const detail = error?.error?.detail; if (Array.isArray(detail)) return detail.map((item) => `${item.loc?.at(-1) || 'campo'}: ${item.msg}`).join(' · '); return detail || 'Não foi possível concluir a operação.'; }
-  private setFile(file: File | null): void { if (!file) return; if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) { this.error.set('Selecione um arquivo PDF.'); return; } this.error.set(''); this.file = file; }
+  private async run(action: () => Promise<void>): Promise<void> { this.submitting.set(true); try { await action(); } catch (error) { await this.feedback.error(error); } finally { this.submitting.set(false); } }
+  private setFile(file: File | null): void { if (!file) return; if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) { void this.feedback.warning('Somente arquivos PDF podem ser enviados.', 'Arquivo inválido'); return; } this.file = file; }
 }

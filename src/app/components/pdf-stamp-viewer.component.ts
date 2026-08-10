@@ -4,6 +4,7 @@ import { firstValueFrom, Subscription } from 'rxjs';
 import { GlobalWorkerOptions, getDocument, PDFDocumentLoadingTask, PDFDocumentProxy } from 'pdfjs-dist';
 
 import { ApiService } from '../core/api.service';
+import { FeedbackService } from '../core/feedback.service';
 import { StampPosition } from '../core/models';
 
 GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
@@ -68,7 +69,7 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
   private canvasesSubscription?: Subscription;
   private dragging = false;
 
-  constructor(private readonly api: ApiService) {}
+  constructor(private readonly api: ApiService, private readonly feedback: FeedbackService) {}
 
   ngAfterViewInit(): void {
     this.canvasesSubscription = this.canvases.changes.subscribe(() => void this.renderPages());
@@ -124,8 +125,10 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
       }
       this.pages.set(pageViews);
       queueMicrotask(() => void this.renderPages());
-    } catch {
-      this.error.set('Não foi possível renderizar o PDF. Você ainda pode baixá-lo pelo painel ao lado.');
+    } catch (error) {
+      const message = 'Não foi possível exibir o PDF. Você ainda pode baixá-lo pelo painel ao lado.';
+      this.error.set(message);
+      await this.feedback.error(error, message);
     } finally {
       this.loading.set(false);
     }

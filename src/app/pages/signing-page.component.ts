@@ -6,6 +6,7 @@ import Swal from 'sweetalert2';
 import { PdfStampViewerComponent } from '../components/pdf-stamp-viewer.component';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
+import { FeedbackService } from '../core/feedback.service';
 import { Signer, SigningContext, StampPosition } from '../core/models';
 
 @Component({
@@ -57,7 +58,6 @@ import { Signer, SigningContext, StampPosition } from '../core/models';
 
           <p class="notice">Sua identidade, data, posição e o hash desta versão serão registrados como evidência.</p>
           @if (message()) { <p class="notice">{{ message() }}</p> }
-          @if (error()) { <p class="error">{{ error() }}</p> }
 
           <div class="signing-actions">
             <button class="button" [disabled]="signing() || completed() || !placement()" (click)="sign()">
@@ -87,6 +87,7 @@ export class SigningPageComponent implements OnInit {
     private readonly api: ApiService,
     private readonly route: ActivatedRoute,
     private readonly router: Router,
+    private readonly feedback: FeedbackService,
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -101,8 +102,9 @@ export class SigningPageComponent implements OnInit {
         const signer = await firstValueFrom(this.api.post<Signer>(`/signing/links/${this.token}/view`, {}));
         this.context.update(current => current ? { ...current, signer } : current);
       }
-    } catch (error: any) {
-      this.error.set(error?.error?.detail || 'Convite inválido ou indisponível.');
+    } catch (error) {
+      this.error.set(this.feedback.message(error, 'Convite inválido ou indisponível.'));
+      await this.feedback.error(error, 'Não foi possível abrir o convite');
     } finally {
       this.loading.set(false);
     }
@@ -121,15 +123,15 @@ export class SigningPageComponent implements OnInit {
       anchor.download = this.context()?.original_filename || 'documento.pdf';
       anchor.click();
       URL.revokeObjectURL(url);
-    } catch {
-      this.error.set('Não foi possível baixar o documento.');
+    } catch (error) {
+      await this.feedback.error(error, 'Não foi possível baixar o documento');
     }
   }
 
   async sign(): Promise<void> {
     const stamp = this.placement();
     if (!stamp) {
-      this.error.set('Escolha no PDF onde o carimbo da assinatura deve aparecer.');
+      await this.feedback.warning('Clique no PDF para escolher onde o carimbo da assinatura deve aparecer.', 'Posicione sua assinatura');
       return;
     }
     const confirmation = await Swal.fire({
@@ -166,7 +168,6 @@ export class SigningPageComponent implements OnInit {
 
   private async answer(action: '/sign' | '/decline', body: unknown): Promise<void> {
     this.signing.set(true);
-    this.error.set('');
     this.message.set('');
     try {
       const signer = await firstValueFrom(this.api.post<Signer>(`/signing/links/${this.token}${action}`, body));
@@ -174,8 +175,8 @@ export class SigningPageComponent implements OnInit {
       this.completed.set(true);
       this.message.set(action === '/sign' ? 'Assinatura concluída com sucesso.' : 'Assinatura recusada.');
       await Swal.fire({ icon: action === '/sign' ? 'success' : 'info', title: this.message(), confirmButtonText: 'Concluir' });
-    } catch (error: any) {
-      this.error.set(error?.error?.detail || 'Não foi possível concluir sua resposta.');
+    } catch (error) {
+      await this.feedback.error(error, action === '/sign' ? 'Não foi possível assinar' : 'Não foi possível recusar');
     } finally {
       this.signing.set(false);
     }
