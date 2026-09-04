@@ -126,7 +126,7 @@ import { DocumentItem, SignatureEvidence, SignatureRequest, Signer, SignerOption
       @if (userModalOpen()) {
         <div class="modal-backdrop" (click)="closeUserModal()"><section class="app-modal" (click)="$event.stopPropagation()">
           <header class="modal-header"><div><p class="eyebrow">Acesso</p><h2>Novo usuário</h2><span class="muted">Cadastre uma pessoa e defina seu perfil inicial.</span></div><button class="modal-close" (click)="closeUserModal()" aria-label="Fechar">×</button></header>
-          <form class="modal-body form" (ngSubmit)="createUser()"><div class="form-row"><label>Nome <input name="userName" [(ngModel)]="userName" required /></label><label>CPF <input name="userCpf" [(ngModel)]="userCpf" placeholder="000.000.000-00" required /></label></div><label>E-mail <input name="userEmail" type="email" [(ngModel)]="userEmail" required /></label><label>Senha inicial <input name="userPassword" type="password" [(ngModel)]="userPassword" minlength="8" required /></label><label>Perfil <select name="userRole" [(ngModel)]="userRole"><option value="signature_signer">Signatário</option><option value="signature_operator">Operador</option><option value="signature_auditor">Auditor</option><option value="signature_admin">Administrador</option></select><small class="role-help">{{ roleDescription() }}</small></label><footer class="modal-footer"><button type="button" class="button secondary" (click)="closeUserModal()">Cancelar</button><button class="button" [disabled]="submitting()">Criar usuário</button></footer></form>
+          <form class="modal-body form" (ngSubmit)="createUser()"><div class="form-row"><label>Nome <input name="userName" [(ngModel)]="userName" required /></label><label>CPF <input name="userCpf" [ngModel]="userCpf" (ngModelChange)="formatUserCpf($event)" placeholder="000.000.000-00" inputmode="numeric" maxlength="14" autocomplete="off" required /></label></div><label>E-mail <input name="userEmail" type="email" [(ngModel)]="userEmail" required /></label><label>Senha inicial <input name="userPassword" type="password" [(ngModel)]="userPassword" minlength="8" required /></label><label>Perfil <select name="userRole" [(ngModel)]="userRole"><option value="signature_signer">Signatário</option><option value="signature_operator">Operador</option><option value="signature_auditor">Auditor</option><option value="signature_admin">Administrador</option></select><small class="role-help">{{ roleDescription() }}</small></label><footer class="modal-footer"><button type="button" class="button secondary" (click)="closeUserModal()">Cancelar</button><button class="button" [disabled]="submitting()">Criar usuário</button></footer></form>
         </section></div>
       }
 
@@ -179,11 +179,18 @@ export class DashboardPageComponent implements OnInit {
   completedRequestsCount(): number { return this.requests().filter((item) => item.status === 'completed').length; }
   visibleRequests(): SignatureRequest[] { return this.requests().filter((item) => this.requestFilter === 'all' || item.status === this.requestFilter); }
   filteredSignerOptions(): SignerOption[] { const query = this.signerSearch.trim().toLowerCase(); const assigned = new Set(this.signers().map((item) => item.email)); return this.signerOptions().filter((item) => !assigned.has(item.email) && (!query || item.name.toLowerCase().includes(query) || item.email.toLowerCase().includes(query))).slice(0, 10); }
-  requestLink(): string { const request = this.selectedRequest(); return request ? this.requestLinks()[request.id] || '' : ''; }
+  requestLink(): string {
+    const request = this.selectedRequest();
+    const storedLink = request ? this.requestLinks()[request.id] || '' : '';
+    if (!storedLink) return '';
+    const parsed = new URL(storedLink, window.location.origin);
+    return `${window.location.origin}${parsed.pathname}${parsed.search}${parsed.hash}`;
+  }
   documentTitle(documentId: string): string { return this.documents().find((item) => item.id === documentId)?.title || `Documento #${documentId}`; }
   requestStatusLabel(status: string): string { return ({ draft: 'Rascunho', open: 'Em assinatura', completed: 'Concluída', cancelled: 'Cancelada', expired: 'Expirada' } as Record<string, string>)[status] || status; }
   signerStatusLabel(status: string): string { return ({ pending: 'Pendente', viewed: 'Visualizado', signed: 'Assinado', declined: 'Recusado' } as Record<string, string>)[status] || status; }
   roleDescription(): string { return ({ signature_signer: 'Assina somente os documentos em que foi incluído.', signature_operator: 'Gerencia documentos, solicitações e signatários.', signature_auditor: 'Consulta documentos e evidências sem alterar o fluxo.', signature_admin: 'Acesso total, incluindo usuários e configurações administrativas.' } as Record<string, string>)[this.userRole] || ''; }
+  formatUserCpf(value: string): void { const digits = value.replace(/\D/g, '').slice(0, 11); this.userCpf = digits.replace(/^(\d{3})(\d)/, '$1.$2').replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1-$2'); }
   signatureProgress(request: SignatureRequest): number { return request.signer_count ? Math.round(request.signed_count / request.signer_count * 100) : 0; }
 
   showUploadModal(): void { this.uploadModalOpen.set(true); }
