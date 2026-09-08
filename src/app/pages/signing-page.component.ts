@@ -8,6 +8,7 @@ import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { FeedbackService } from '../core/feedback.service';
 import { Signer, SigningContext, StampPosition } from '../core/models';
+import { dateTime } from '../core/date-time';
 
 @Component({
   standalone: true,
@@ -173,7 +174,7 @@ export class SigningPageComponent implements OnInit {
     const client = {
       platform: navigator.platform || 'unknown',
       language: navigator.language || 'unknown',
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'unknown',
+      timezone: dateTime.timezone() || 'unknown',
       screen_width: window.screen?.width || null,
       screen_height: window.screen?.height || null,
     };
@@ -194,7 +195,7 @@ export class SigningPageComponent implements OnInit {
 
   stampDateLabel(): string {
     const value = this.context()?.signer.signed_at || this.stampPreviewDate;
-    return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
+    return dateTime.display(value);
   }
 
   statusLabel(): string {

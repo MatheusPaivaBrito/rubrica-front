@@ -1,5 +1,6 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable, signal } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
+import { Injectable, PLATFORM_ID, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
 import { accessTokenKey } from './api-auth.interceptor';
@@ -15,6 +16,7 @@ interface LoginResponse { access_token: string; refresh_token: string; }
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   readonly context = signal<AccessContext | null>(null);
+  private readonly browser = isPlatformBrowser(inject(PLATFORM_ID));
 
   constructor(private readonly http: HttpClient) {}
 
@@ -25,6 +27,7 @@ export class AuthService {
   }
 
   async restore(): Promise<AccessContext | null> {
+    if (!this.browser) return null;
     if (!sessionStorage.getItem(accessTokenKey)) {
       try {
         const response = await firstValueFrom(this.http.post<LoginResponse>('/auth/refresh', {}));
@@ -37,7 +40,10 @@ export class AuthService {
 
   async logout(): Promise<void> {
     try { await firstValueFrom(this.http.post('/auth/logout', {})); }
-    finally { sessionStorage.removeItem(accessTokenKey); this.context.set(null); }
+    finally {
+      if (this.browser) sessionStorage.removeItem(accessTokenKey);
+      this.context.set(null);
+    }
   }
 
   can(permission: string): boolean {

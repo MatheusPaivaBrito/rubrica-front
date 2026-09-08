@@ -6,7 +6,7 @@ import Swal, { SweetAlertIcon } from 'sweetalert2';
 import { accessTokenKey } from './api-auth.interceptor';
 
 interface ValidationIssue {
-  loc?: Array<string | number>;
+  loc?: (string | number)[];
   msg?: string;
 }
 

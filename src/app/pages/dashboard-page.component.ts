@@ -5,15 +5,17 @@ import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import Swal from 'sweetalert2';
+import { NgxMaskDirective } from 'ngx-mask';
 
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { FeedbackService } from '../core/feedback.service';
 import { DocumentItem, SignatureEvidence, SignatureRequest, Signer, SignerOption, SigningLink, UserCreated } from '../core/models';
+import { dateTime } from '../core/date-time';
 
 @Component({
   standalone: true,
-  imports: [DatePipe, DecimalPipe, FormsModule],
+  imports: [DatePipe, DecimalPipe, FormsModule, NgxMaskDirective],
   template: `
     <main class="shell">
       <header class="topbar">
@@ -126,7 +128,7 @@ import { DocumentItem, SignatureEvidence, SignatureRequest, Signer, SignerOption
       @if (userModalOpen()) {
         <div class="modal-backdrop" (click)="closeUserModal()"><section class="app-modal" (click)="$event.stopPropagation()">
           <header class="modal-header"><div><p class="eyebrow">Acesso</p><h2>Novo usuário</h2><span class="muted">Cadastre uma pessoa e defina seu perfil inicial.</span></div><button class="modal-close" (click)="closeUserModal()" aria-label="Fechar">×</button></header>
-          <form class="modal-body form" (ngSubmit)="createUser()"><div class="form-row"><label>Nome <input name="userName" [(ngModel)]="userName" required /></label><label>CPF <input name="userCpf" [ngModel]="userCpf" (ngModelChange)="formatUserCpf($event)" placeholder="000.000.000-00" inputmode="numeric" maxlength="14" autocomplete="off" required /></label></div><label>E-mail <input name="userEmail" type="email" [(ngModel)]="userEmail" required /></label><label>Senha inicial <input name="userPassword" type="password" [(ngModel)]="userPassword" minlength="8" required /></label><label>Perfil <select name="userRole" [(ngModel)]="userRole"><option value="signature_signer">Signatário</option><option value="signature_operator">Operador</option><option value="signature_auditor">Auditor</option><option value="signature_admin">Administrador</option></select><small class="role-help">{{ roleDescription() }}</small></label><footer class="modal-footer"><button type="button" class="button secondary" (click)="closeUserModal()">Cancelar</button><button class="button" [disabled]="submitting()">Criar usuário</button></footer></form>
+          <form class="modal-body form" (ngSubmit)="createUser()"><div class="form-row"><label>Nome <input name="userName" [(ngModel)]="userName" required /></label><label>CPF <input name="userCpf" [(ngModel)]="userCpf" mask="000.000.000-00" placeholder="000.000.000-00" inputmode="numeric" maxlength="14" autocomplete="off" required /></label></div><label>E-mail <input name="userEmail" type="email" [(ngModel)]="userEmail" required /></label><label>Senha inicial <input name="userPassword" type="password" [(ngModel)]="userPassword" minlength="8" required /></label><label>Perfil <select name="userRole" [(ngModel)]="userRole"><option value="signature_signer">Signatário</option><option value="signature_operator">Operador</option><option value="signature_auditor">Auditor</option><option value="signature_admin">Administrador</option></select><small class="role-help">{{ roleDescription() }}</small></label><footer class="modal-footer"><button type="button" class="button secondary" (click)="closeUserModal()">Cancelar</button><button class="button" [disabled]="submitting()">Criar usuário</button></footer></form>
         </section></div>
       }
 
@@ -190,7 +192,6 @@ export class DashboardPageComponent implements OnInit {
   requestStatusLabel(status: string): string { return ({ draft: 'Rascunho', open: 'Em assinatura', completed: 'Concluída', cancelled: 'Cancelada', expired: 'Expirada' } as Record<string, string>)[status] || status; }
   signerStatusLabel(status: string): string { return ({ pending: 'Pendente', viewed: 'Visualizado', signed: 'Assinado', declined: 'Recusado' } as Record<string, string>)[status] || status; }
   roleDescription(): string { return ({ signature_signer: 'Assina somente os documentos em que foi incluído.', signature_operator: 'Gerencia documentos, solicitações e signatários.', signature_auditor: 'Consulta documentos e evidências sem alterar o fluxo.', signature_admin: 'Acesso total, incluindo usuários e configurações administrativas.' } as Record<string, string>)[this.userRole] || ''; }
-  formatUserCpf(value: string): void { const digits = value.replace(/\D/g, '').slice(0, 11); this.userCpf = digits.replace(/^(\d{3})(\d)/, '$1.$2').replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1-$2'); }
   signatureProgress(request: SignatureRequest): number { return request.signer_count ? Math.round(request.signed_count / request.signer_count * 100) : 0; }
 
   showUploadModal(): void { this.uploadModalOpen.set(true); }
@@ -203,7 +204,7 @@ export class DashboardPageComponent implements OnInit {
   dropFile(event: DragEvent): void { event.preventDefault(); this.setFile(event.dataTransfer?.files.item(0) ?? null); }
   selectSigner(user: SignerOption): void { this.selectedSigner.set(user); this.signerSearch = `${user.name} · ${user.email}`; this.signerPickerOpen = false; }
   closeSignerPicker(event: FocusEvent): void { const container = event.currentTarget as HTMLElement; if (!container.contains(event.relatedTarget as Node | null)) this.signerPickerOpen = false; }
-  prepareRequest(document: DocumentItem): void { this.selectedDocument.set(document); const date = new Date(); date.setDate(date.getDate() + 3); this.expiresAt = this.localDateTime(date); this.requestCreateModalOpen.set(true); }
+  prepareRequest(document: DocumentItem): void { this.selectedDocument.set(document); this.expiresAt = dateTime.localInputAfterDays(3); this.requestCreateModalOpen.set(true); }
   async openRequestDetails(request: SignatureRequest): Promise<void> { this.selectedRequest.set(request); this.selectedDocument.set(null); this.selectedSigner.set(null); this.signerSearch = ''; this.requestEvidence.set([]); this.requestModalOpen.set(true); this.detailsLoading.set(true); try { await this.loadSigners(request.id); if (this.isAdmin()) await this.loadAdminRequestDetails(request); } catch (error) { await this.feedback.error(error, 'Não foi possível carregar os detalhes'); } finally { this.detailsLoading.set(false); } }
 
   preview(document: DocumentItem): void { this.releasePreviewObjectUrl(); this.previewHeading.set('Documento original'); this.previewDocument.set(document); this.previewUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(`/documents/${document.id}/preview?version=${document.version}`)); }
@@ -212,7 +213,7 @@ export class DashboardPageComponent implements OnInit {
   async deleteDocument(document: DocumentItem): Promise<void> { const result = await Swal.fire({ icon: 'warning', title: 'Excluir documento?', text: 'Ele sairá da lista, mas a trilha de auditoria e o arquivo serão preservados.', showCancelButton: true, confirmButtonText: 'Excluir', cancelButtonText: 'Cancelar', confirmButtonColor: '#b42318' }); if (!result.isConfirmed) return; await this.run(async () => { await firstValueFrom(this.api.delete(`/documents/${document.id}`)); this.documents.update((items) => items.filter((item) => item.id !== document.id)); }); }
 
   async upload(): Promise<void> { if (!this.file) return; await this.run(async () => { await firstValueFrom(this.api.postFile<DocumentItem>('/documents', this.file!, { organization_id: this.organization, title: this.title, filename: this.file!.name, content_type: this.file!.type || 'application/pdf' })); this.title = ''; this.file = null; this.closeUploadModal(); await this.reload(); await Swal.fire({ icon: 'success', title: 'Documento enviado', timer: 1500, showConfirmButton: false }); }); }
-  async createRequest(): Promise<void> { const document = this.selectedDocument(); if (!document || !this.expiresAt) return; await this.run(async () => { const request = await firstValueFrom(this.api.post<SignatureRequest>('/signature-requests', { document_id: document.id, expires_at: new Date(this.expiresAt).toISOString() })); this.requests.update((items) => [request, ...items]); this.closeRequestCreateModal(); await this.openRequestDetails(request); }); }
+  async createRequest(): Promise<void> { const document = this.selectedDocument(); if (!document || !this.expiresAt) return; await this.run(async () => { const request = await firstValueFrom(this.api.post<SignatureRequest>('/signature-requests', { document_id: document.id, expires_at: dateTime.toUtcIso(this.expiresAt) })); this.requests.update((items) => [request, ...items]); this.closeRequestCreateModal(); await this.openRequestDetails(request); }); }
   async addSigner(): Promise<void> { const request = this.selectedRequest(); const user = this.selectedSigner(); if (!request || !user) return; await this.run(async () => { await firstValueFrom(this.api.post<Signer>(`/signature-requests/${request.id}/signers`, { name: user.name, email: user.email })); this.selectedSigner.set(null); this.signerSearch = ''; await this.loadSigners(request.id); const refreshed = await firstValueFrom(this.api.get<SignatureRequest>(`/signature-requests/${request.id}`)); this.updateRequest(refreshed); }); }
   async openRequest(): Promise<void> { const request = this.selectedRequest(); if (!request) return; const result = await Swal.fire({ icon: 'question', title: 'Abrir para assinatura?', text: 'A versão será congelada e não aceitará novos signatários.', showCancelButton: true, confirmButtonText: 'Abrir solicitação', cancelButtonText: 'Voltar', confirmButtonColor: '#187a66' }); if (!result.isConfirmed) return; await this.run(async () => { const opened = await firstValueFrom(this.api.post<SignatureRequest>(`/signature-requests/${request.id}/open`, {})); this.updateRequest(opened); const link = await firstValueFrom(this.api.post<SigningLink>(`/signature-requests/${request.id}/signing-link`, {})); this.requestLinks.update((items) => ({ ...items, [request.id]: link.signing_url })); }); }
   async generateLink(): Promise<void> { const request = this.selectedRequest(); if (!request) return; if (this.requestLink()) { const result = await Swal.fire({ icon: 'warning', title: 'Rotacionar link?', text: 'O link anterior deixará de funcionar.', showCancelButton: true, confirmButtonText: 'Rotacionar', cancelButtonText: 'Cancelar', confirmButtonColor: '#b42318' }); if (!result.isConfirmed) return; } await this.run(async () => { const link = await firstValueFrom(this.api.post<SigningLink>(`/signature-requests/${request.id}/signing-link`, {})); this.requestLinks.update((items) => ({ ...items, [request.id]: link.signing_url })); }); }
@@ -223,7 +224,6 @@ export class DashboardPageComponent implements OnInit {
   async logout(): Promise<void> { try { await this.auth.logout(); } catch (error) { await this.feedback.error(error, 'Não foi possível encerrar a sessão no servidor'); } finally { await this.router.navigate(['/login']); } }
 
   private updateRequest(request: SignatureRequest): void { this.requests.update((items) => items.map((item) => item.id === request.id ? request : item)); this.selectedRequest.set(request); }
-  private localDateTime(date: Date): string { const offset = date.getTimezoneOffset(); return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 16); }
   private async reload(): Promise<void> { const [documents, requests] = await Promise.all([firstValueFrom(this.api.get<DocumentItem[]>('/documents')), firstValueFrom(this.api.get<SignatureRequest[]>('/signature-requests'))]); this.documents.set(documents); this.requests.set(requests.sort((a, b) => b.id.localeCompare(a.id, undefined, { numeric: true }))); }
   private async loadSigners(requestId: string): Promise<void> { this.signers.set(await firstValueFrom(this.api.get<Signer[]>(`/signature-requests/${requestId}/signers`))); }
   private async loadSignerOptions(): Promise<void> { this.signerOptions.set(await firstValueFrom(this.api.get<SignerOption[]>('/users/signers'))); }
