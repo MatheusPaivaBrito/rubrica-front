@@ -6,12 +6,17 @@ import { firstValueFrom } from 'rxjs';
 import { accessTokenKey } from './api-auth.interceptor';
 
 export interface AccessContext {
+  version: number;
   subject: string;
+  preferred_locale: 'pt-BR' | 'en' | 'ja-JP';
+  mfa_enabled: boolean;
+  mfa_setup_required: boolean;
   roles: string[];
   permission_keys: string[];
 }
 
 interface LoginResponse { access_token: string; refresh_token: string; }
+export interface MfaChallenge { mfa_required: true; mfa_ticket: string; expires_in: number; }
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -20,8 +25,18 @@ export class AuthService {
 
   constructor(private readonly http: HttpClient) {}
 
-  async login(email: string, password: string): Promise<AccessContext> {
-    const response = await firstValueFrom(this.http.post<LoginResponse>('/auth/login', { email, password }));
+  async login(email: string, password: string): Promise<AccessContext | MfaChallenge> {
+    const response = await firstValueFrom(this.http.post<LoginResponse | MfaChallenge>('/auth/login', { email, password }));
+    if ('mfa_required' in response) return response;
+    sessionStorage.setItem(accessTokenKey, response.access_token);
+    return this.loadContext();
+  }
+
+  async completeMfa(mfaTicket: string, code: string): Promise<AccessContext> {
+    const response = await firstValueFrom(this.http.post<LoginResponse>('/auth/mfa/challenge', {
+      mfa_ticket: mfaTicket,
+      code,
+    }));
     sessionStorage.setItem(accessTokenKey, response.access_token);
     return this.loadContext();
   }

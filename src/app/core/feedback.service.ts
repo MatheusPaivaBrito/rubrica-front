@@ -39,6 +39,10 @@ export class FeedbackService {
     await this.show('warning', title, message);
   }
 
+  async success(message: string, title = 'Tudo certo'): Promise<void> {
+    await this.show('success', title, message);
+  }
+
   message(error: unknown, fallback = 'Ocorreu um erro inesperado. Tente novamente.'): string {
     if (typeof error === 'string') return this.translate(error);
     if (!(error instanceof HttpErrorResponse) && !this.isHttpLike(error)) return fallback;
