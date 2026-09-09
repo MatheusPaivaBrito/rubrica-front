@@ -66,6 +66,8 @@ export class AuthService {
     return permissions.includes('*') || permissions.includes(permission);
   }
 
+  refreshContext(): Promise<AccessContext> { return this.loadContext(); }
+
   private async loadContext(): Promise<AccessContext> {
     const context = await firstValueFrom(this.http.get<AccessContext>('/access-control/context'));
     this.context.set(context);

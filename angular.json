@@ -36,7 +36,7 @@
               "node_modules/bootstrap-icons/font/bootstrap-icons.css",
               "src/styles.css"
             ],
-            "allowedCommonJsDependencies": ["sweetalert2", "dayjs"],
+            "allowedCommonJsDependencies": ["sweetalert2", "dayjs", "qrcode"],
             "server": "src/main.server.ts",
             "outputMode": "server",
             "security": {

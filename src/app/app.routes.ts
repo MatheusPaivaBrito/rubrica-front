@@ -11,6 +11,7 @@ export const routes: Routes = [
   { path: 'reset-password', component: AccountPageComponent },
   { path: 'verify-email', component: AccountPageComponent },
   { path: 'dashboard', component: DashboardPageComponent },
+  { path: 'security', loadComponent: () => import('./pages/security-page.component').then(module => module.SecurityPageComponent) },
   { path: 'signing/:token', loadComponent: () => import('./pages/signing-page.component').then(module => module.SigningPageComponent) },
   { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
   { path: '**', redirectTo: 'dashboard' },

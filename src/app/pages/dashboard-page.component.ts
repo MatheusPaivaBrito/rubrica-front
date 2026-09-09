@@ -20,7 +20,7 @@ import { dateTime } from '../core/date-time';
     <main class="shell">
       <header class="topbar">
         <div class="brand">Rubrica<span>.</span></div>
-        <div class="topbar-account"><span class="user-chip">{{ auth.context()?.subject }}</span><button class="button ghost" (click)="logout()">Sair</button></div>
+        <div class="topbar-account"><span class="user-chip">{{ auth.context()?.subject }}</span><button class="button ghost" (click)="security()">Segurança</button><button class="button ghost" (click)="logout()">Sair</button></div>
       </header>
 
       <section class="container dashboard-container">
@@ -173,7 +173,8 @@ export class DashboardPageComponent implements OnInit {
 
   constructor(readonly auth: AuthService, private readonly api: ApiService, private readonly router: Router, private readonly sanitizer: DomSanitizer, private readonly feedback: FeedbackService) {}
 
-  async ngOnInit(): Promise<void> { const context = await this.auth.restore(); if (!context) { await this.router.navigate(['/login']); return; } try { if (this.canManage()) await Promise.all([this.reload(), this.loadSignerOptions()]); } catch (error) { await this.feedback.error(error, 'Não foi possível carregar o dashboard'); } finally { this.loading.set(false); } }
+  async ngOnInit(): Promise<void> { const context = await this.auth.restore(); if (!context) { await this.router.navigate(['/login']); return; } if (context.mfa_setup_required) { await this.router.navigate(['/security']); return; } try { if (this.canManage()) await Promise.all([this.reload(), this.loadSignerOptions()]); } catch (error) { await this.feedback.error(error, 'Não foi possível carregar o dashboard'); } finally { this.loading.set(false); } }
+  security(): Promise<boolean> { return this.router.navigate(['/security']); }
   canManage(): boolean { return this.auth.can('documents:write') && this.auth.can('signature_requests:write'); }
   isAdmin(): boolean { const context = this.auth.context(); return context?.roles.includes('signature_admin') === true || context?.permission_keys.includes('*') === true; }
   hasSignedSigners(): boolean { return this.signers().some((signer) => signer.status === 'signed'); }
