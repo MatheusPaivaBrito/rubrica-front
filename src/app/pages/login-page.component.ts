@@ -14,18 +14,18 @@ import { FeedbackService } from '../core/feedback.service';
     <main class="login-layout"><section class="card auth-card">
       <div class="auth-language"><select [ngModel]="i18n.locale()" (ngModelChange)="i18n.setLocale($event)" aria-label="Language"><option value="pt-BR">Português</option><option value="en">English</option><option value="ja-JP">日本語</option></select></div>
       <p class="eyebrow">Rubrica</p><h1>{{ i18n.text('login') }}</h1>
-      <p class="muted">Use sua conta para acessar documentos e convites de assinatura.</p>
+      <p class="muted">{{ i18n.text('loginHelp') }}</p>
       <form class="form" (ngSubmit)="submit()" #form="ngForm">
         @if (!mfaTicket()) {
           <label>{{ i18n.text('email') }} <input name="email" type="email" [(ngModel)]="email" required autocomplete="email" /></label>
           <label>{{ i18n.text('password') }} <input name="password" type="password" [(ngModel)]="password" required autocomplete="current-password" /></label>
         } @else {
-          <label>Código do autenticador <input name="code" inputmode="numeric" [(ngModel)]="code" required autocomplete="one-time-code" /></label>
-          <p class="muted">Abra o Microsoft Authenticator e informe o código de seis dígitos.</p>
+          <label>{{ i18n.text('authenticatorCode') }} <input name="code" inputmode="numeric" [(ngModel)]="code" required autocomplete="one-time-code" /></label>
+          <p class="muted">{{ i18n.text('authenticatorHelp') }}</p>
         }
         <button class="button" [disabled]="form.invalid || loading()">{{ loading() ? '…' : i18n.text('enter') }}</button>
       </form>
-      <p><a routerLink="/forgot-password">Esqueci minha senha</a> · <a routerLink="/register">Criar conta</a></p>
+      <p><a routerLink="/forgot-password">{{ i18n.text('forgotPassword') }}</a> · <a routerLink="/register">{{ i18n.text('createAccount') }}</a></p>
     </section></main>
   `,
 })
@@ -51,7 +51,7 @@ export class LoginPageComponent {
         }
       }
       await this.router.navigateByUrl(this.route.snapshot.queryParamMap.get('returnUrl') || '/dashboard');
-    } catch { await this.feedback.error('E-mail ou senha incorretos.', 'Não foi possível entrar'); }
+    } catch { await this.feedback.error(this.i18n.text('invalidCredentials'), this.i18n.text('loginFailed')); }
     finally { this.loading.set(false); }
   }
 }

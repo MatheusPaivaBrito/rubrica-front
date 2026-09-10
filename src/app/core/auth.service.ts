@@ -4,6 +4,7 @@ import { Injectable, PLATFORM_ID, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
 import { accessTokenKey } from './api-auth.interceptor';
+import { I18nService } from './i18n.service';
 
 export interface AccessContext {
   version: number;
@@ -23,7 +24,7 @@ export class AuthService {
   readonly context = signal<AccessContext | null>(null);
   private readonly browser = isPlatformBrowser(inject(PLATFORM_ID));
 
-  constructor(private readonly http: HttpClient) {}
+  constructor(private readonly http: HttpClient, private readonly i18n: I18nService) {}
 
   async login(email: string, password: string): Promise<AccessContext | MfaChallenge> {
     const response = await firstValueFrom(this.http.post<LoginResponse | MfaChallenge>('/auth/login', { email, password }));
@@ -71,6 +72,7 @@ export class AuthService {
   private async loadContext(): Promise<AccessContext> {
     const context = await firstValueFrom(this.http.get<AccessContext>('/access-control/context'));
     this.context.set(context);
+    this.i18n.applyProfileLocale(context.preferred_locale);
     return context;
   }
 }
