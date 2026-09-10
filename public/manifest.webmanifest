@@ -1,6 +1,9 @@
 {
-  "name": "rubrica-web",
-  "short_name": "rubrica-web",
+  "name": "Rubrica — Assinatura eletrônica",
+  "short_name": "Rubrica",
+  "description": "Envie, acompanhe e assine documentos com evidências verificáveis.",
+  "theme_color": "#101c32",
+  "background_color": "#f6f8fb",
   "display": "standalone",
   "scope": "./",
   "start_url": "./",

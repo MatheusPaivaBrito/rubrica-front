@@ -44,7 +44,7 @@ import { dateTime } from '../core/date-time';
               <div class="section-heading"><div><p class="eyebrow">Plano e utilização</p><h2>Assinaturas por conta</h2><p class="muted">Cada signatário que conclui uma assinatura consome uma unidade. Uma assinatura Stripe ativa libera uso ilimitado.</p></div></div>
               <div class="table-wrap"><table class="data-table"><thead><tr><th>Conta</th><th>Plano</th><th>Utilização vitalícia</th><th>Disponível agora</th></tr></thead><tbody>
                 @for (tenant of tenants(); track tenant.id) {
-                  <tr><td><strong>{{ tenant.name }}</strong></td><td><span class="badge" [class.complete]="billingFor(tenant.id)?.unlimited_signatures">{{ billingFor(tenant.id)?.unlimited_signatures ? 'Ilimitado' : 'Gratuito' }}</span></td><td>{{ billingFor(tenant.id)?.signatures_used ?? 0 }} assinaturas</td><td><strong>{{ billingAvailability(tenant.id) }}</strong></td></tr>
+                  <tr><td data-label="Conta"><strong>{{ tenant.name }}</strong></td><td data-label="Plano"><span class="badge" [class.complete]="billingFor(tenant.id)?.unlimited_signatures">{{ billingFor(tenant.id)?.unlimited_signatures ? 'Ilimitado' : 'Gratuito' }}</span></td><td data-label="Utilização">{{ billingFor(tenant.id)?.signatures_used ?? 0 }} assinaturas</td><td data-label="Disponível"><strong>{{ billingAvailability(tenant.id) }}</strong></td></tr>
                 }
               </tbody></table></div>
             </article>
@@ -61,12 +61,12 @@ import { dateTime } from '../core/date-time';
                 <tbody>
                   @for (request of visibleRequests(); track request.id) {
                     <tr>
-                      <td><strong>#{{ request.id }}</strong></td>
-                      <td><div class="document-cell"><strong>{{ documentTitle(request.document_id) }}</strong><small>versão {{ request.document_version }}</small></div></td>
-                      <td><span class="badge" [class.pending]="request.status === 'draft'" [class.complete]="request.status === 'completed'">{{ requestStatusLabel(request.status) }}</span></td>
-                      <td><div class="progress-cell"><strong>{{ request.signed_count }} de {{ request.signer_count }}</strong><span class="progress-track"><i [style.width.%]="signatureProgress(request)"></i></span></div></td>
-                      <td>{{ request.expires_at | date:'dd/MM/yyyy HH:mm' }}</td>
-                      <td><div class="table-actions"><button class="button secondary compact" (click)="openRequestDetails(request)">Detalhes</button></div></td>
+                      <td data-label="Solicitação"><strong>#{{ request.id }}</strong></td>
+                      <td data-label="Documento"><div class="document-cell"><strong>{{ request.document_title }}</strong><small>{{ request.original_filename }} · versão {{ request.document_version }}</small></div></td>
+                      <td data-label="Status"><span class="badge" [class.pending]="request.status === 'draft'" [class.complete]="request.status === 'completed'">{{ requestStatusLabel(request.status) }}</span></td>
+                      <td data-label="Assinaturas"><div class="progress-cell"><strong>{{ request.signed_count }} de {{ request.signer_count }}</strong><span class="progress-track"><i [style.width.%]="signatureProgress(request)"></i></span></div></td>
+                      <td data-label="Prazo">{{ request.expires_at | date:'dd/MM/yyyy HH:mm' }}</td>
+                      <td data-label="Ações"><div class="table-actions"><button class="button secondary compact" (click)="openRequestDetails(request)">Detalhes</button></div></td>
                     </tr>
                   } @empty { <tr><td colspan="6"><div class="empty-state"><strong>Nenhuma solicitação neste filtro</strong><span>Altere o filtro ou crie uma solicitação a partir de um documento.</span></div></td></tr> }
                 </tbody>
@@ -82,11 +82,11 @@ import { dateTime } from '../core/date-time';
                 <tbody>
                   @for (document of documents(); track document.id) {
                     <tr>
-                      <td><strong>{{ document.title }}</strong></td>
-                      <td><span class="file-name">{{ document.original_filename }}</span></td>
-                      <td>{{ document.version }}</td>
-                      <td><span class="badge">Disponível</span></td>
-                      <td><div class="table-actions"><button class="button secondary compact" (click)="preview(document)">Visualizar</button><button class="button secondary compact" (click)="prepareRequest(document)">Solicitar assinatura</button><button class="button compact danger" (click)="deleteDocument(document)">Excluir</button></div></td>
+                      <td data-label="Documento"><div class="document-cell"><strong>{{ document.title }}</strong><small>{{ document.completed_signature_count }} assinaturas concluídas</small></div></td>
+                      <td data-label="Arquivo"><span class="file-name">{{ document.original_filename }}</span><small>{{ fileSize(document.size_bytes) }}</small></td>
+                      <td data-label="Versão">{{ document.version }}</td>
+                      <td data-label="Status"><span class="badge">{{ document.status === 'ready' ? 'Disponível' : document.status }}</span><small>{{ document.signature_request_count }} solicitações</small></td>
+                      <td data-label="Ações"><div class="table-actions"><button class="button secondary compact" (click)="preview(document)">Visualizar</button><button class="button secondary compact" (click)="prepareRequest(document)">Solicitar assinatura</button><button class="button compact danger" (click)="deleteDocument(document)">Excluir</button></div></td>
                     </tr>
                   } @empty { <tr><td colspan="5"><div class="empty-state"><strong>Nenhum documento enviado</strong><span>Envie o primeiro PDF para iniciar uma solicitação.</span></div></td></tr> }
                 </tbody>
@@ -112,7 +112,7 @@ import { dateTime } from '../core/date-time';
 
       @if (requestModalOpen() && selectedRequest()) {
         <div class="modal-backdrop" (click)="closeRequestModal()"><section class="app-modal wide" (click)="$event.stopPropagation()">
-          <header class="modal-header"><div><p class="eyebrow">Solicitação #{{ selectedRequest()!.id }}</p><h2>{{ documentTitle(selectedRequest()!.document_id) }}</h2><span class="badge" [class.pending]="selectedRequest()!.status === 'draft'" [class.complete]="selectedRequest()!.status === 'completed'">{{ requestStatusLabel(selectedRequest()!.status) }}</span></div><button class="modal-close" (click)="closeRequestModal()" aria-label="Fechar">×</button></header>
+          <header class="modal-header"><div><p class="eyebrow">Solicitação #{{ selectedRequest()!.id }}</p><h2>{{ selectedRequest()!.document_title }}</h2><span class="badge" [class.pending]="selectedRequest()!.status === 'draft'" [class.complete]="selectedRequest()!.status === 'completed'">{{ requestStatusLabel(selectedRequest()!.status) }}</span></div><button class="modal-close" (click)="closeRequestModal()" aria-label="Fechar">×</button></header>
           <div class="modal-body">
             @if (detailsLoading()) { <p class="notice">Carregando detalhes…</p> } @else {
               <div class="metric-strip"><div><small>Assinaturas</small><strong>{{ selectedRequest()!.signed_count }}/{{ selectedRequest()!.signer_count }}</strong></div><div><small>Versão</small><strong>{{ selectedRequest()!.document_version }}</strong></div><div><small>Prazo</small><strong>{{ selectedRequest()!.expires_at | date:'dd/MM/yyyy HH:mm' }}</strong></div></div>
@@ -203,7 +203,7 @@ export class DashboardPageComponent implements OnInit {
     const parsed = new URL(storedLink, window.location.origin);
     return `${window.location.origin}${parsed.pathname}${parsed.search}${parsed.hash}`;
   }
-  documentTitle(documentId: string): string { return this.documents().find((item) => item.id === documentId)?.title || `Documento #${documentId}`; }
+  fileSize(bytes: number | null): string { if (bytes === null) return 'Tamanho indisponível'; if (bytes < 1024) return `${bytes} B`; if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`; return `${(bytes / 1024 / 1024).toFixed(1)} MB`; }
   requestStatusLabel(status: string): string { return ({ draft: 'Rascunho', open: 'Em assinatura', completed: 'Concluída', cancelled: 'Cancelada', expired: 'Expirada' } as Record<string, string>)[status] || status; }
   signerStatusLabel(status: string): string { return ({ pending: 'Pendente', viewed: 'Visualizado', signed: 'Assinado', declined: 'Recusado' } as Record<string, string>)[status] || status; }
   roleDescription(): string { return ({ signature_signer: 'Assina somente os documentos em que foi incluído.', signature_operator: 'Gerencia documentos, solicitações e signatários.', signature_auditor: 'Consulta documentos e evidências sem alterar o fluxo.', signature_admin: 'Acesso total, incluindo usuários e configurações administrativas.' } as Record<string, string>)[this.userRole] || ''; }

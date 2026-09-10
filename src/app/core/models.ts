@@ -1,5 +1,5 @@
-export interface DocumentItem { id: string; title: string; original_filename: string; version: number; status: string; created_at: string; }
-export interface SignatureRequest { id: string; document_id: string; document_version: number; status: string; expires_at: string; signer_count: number; signed_count: number; }
+export interface DocumentItem { id: string; title: string; original_filename: string; version: number; status: string; created_at: string; created_by: string; sha256: string; size_bytes: number | null; signature_request_count: number; completed_signature_count: number; }
+export interface SignatureRequest { id: string; document_id: string; document_version: number; document_title: string; original_filename: string; status: string; expires_at: string; created_at: string; created_by: string; completed_at: string | null; signer_count: number; signed_count: number; }
 export interface SigningLink { signing_url: string; }
 export interface SignatureEvidence {
   signature_id: string;

@@ -188,3 +188,38 @@ input:focus, select:focus { outline: 3px solid rgba(47, 154, 128, .18); border-c
   .form-row { grid-template-columns: 1fr; }
   .topbar-account .user-chip { display: none; }
 }
+
+@media (max-width: 700px) {
+  .topbar { align-items: flex-start; padding: .75rem 1rem; }
+  .topbar-account { justify-content: flex-end; gap: .4rem; }
+  .topbar-account .button { min-height: 42px; padding: .55rem .65rem; }
+  .container { width: calc(100% - 1.25rem); padding: 1.15rem 0 2.5rem; }
+  .dashboard-header h1 { font-size: 1.8rem; }
+  .header-actions .button, .section-heading > .button { width: 100%; }
+  .card { border-radius: 13px; }
+  .table-card { overflow: visible; border: 0; background: transparent; box-shadow: none; }
+  .table-card .section-heading { margin-bottom: .7rem; padding: 1rem; border: 1px solid #e3e8f0; border-radius: 13px; background: #fff; }
+  .table-wrap { overflow: visible; }
+  .data-table, .data-table tbody, .data-table tr, .data-table td { display: block; width: 100%; }
+  .data-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .data-table tbody { display: grid; gap: .75rem; }
+  .data-table tbody tr { padding: .4rem .9rem; border: 1px solid #e3e8f0; border-radius: 13px; background: #fff; box-shadow: 0 5px 18px rgba(32, 48, 73, .05); }
+  .data-table tbody tr:hover { background: #fff; }
+  .data-table td { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: .65rem 0; border-top: 1px solid #edf0f5; text-align: right; }
+  .data-table td:first-child { border-top: 0; }
+  .data-table td[data-label]::before { content: attr(data-label); flex: 0 0 34%; color: #667085; font-size: .72rem; font-weight: 800; letter-spacing: .04em; text-align: left; text-transform: uppercase; }
+  .data-table td:not([data-label]) { display: block; text-align: center; }
+  .document-cell, .progress-cell { justify-items: end; min-width: 0; }
+  .file-name { max-width: 190px; }
+  .table-actions { justify-content: flex-end; flex-wrap: wrap; }
+  .table-actions .button { min-height: 40px; }
+  .modal-backdrop { align-items: end; padding: 0; }
+  .app-modal, .app-modal.wide { width: 100%; max-height: 96dvh; border-radius: 18px 18px 0 0; }
+  .modal-header, .modal-body { padding-right: 1rem; padding-left: 1rem; }
+  .modal-footer { position: sticky; bottom: 0; margin-right: -1rem; margin-left: -1rem; padding-right: 1rem; padding-bottom: max(1rem, env(safe-area-inset-bottom)); padding-left: 1rem; }
+  .modal-footer .button { flex: 1; min-height: 44px; }
+  .pdf-modal { width: 100%; height: 96dvh; border-radius: 18px 18px 0 0; }
+  .signing-actions-pane { padding: 1.25rem 1rem max(1.25rem, env(safe-area-inset-bottom)); }
+  .signing-actions .button { min-height: 48px; }
+  .pdf-canvas-viewer { min-height: 55vh; padding: .5rem; border-radius: 9px; }
+}
