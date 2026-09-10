@@ -19,6 +19,16 @@ export interface SignatureEvidence {
 export interface Signer { id: string; name: string; email: string; status: string; signed_at: string | null; }
 export interface UserCreated { id: string; name: string; email: string; role: string; is_active: boolean; }
 export interface SignerOption { id: string; name: string; email: string; }
+export interface TenantItem { id: string; name: string; role: string; currency: string; }
+export interface BillingAccount {
+  id: string;
+  tenant_id: string;
+  status: string;
+  free_signatures_limit: number;
+  signatures_used: number;
+  signatures_remaining: number | null;
+  unlimited_signatures: boolean;
+}
 export interface StampPosition { page: number; x: number; y: number; }
 export interface SigningContext {
   request: SignatureRequest;

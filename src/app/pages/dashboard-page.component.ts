@@ -10,7 +10,7 @@ import { NgxMaskDirective } from 'ngx-mask';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { FeedbackService } from '../core/feedback.service';
-import { DocumentItem, SignatureEvidence, SignatureRequest, Signer, SignerOption, SigningLink, UserCreated } from '../core/models';
+import { BillingAccount, DocumentItem, SignatureEvidence, SignatureRequest, Signer, SignerOption, SigningLink, TenantItem, UserCreated } from '../core/models';
 import { dateTime } from '../core/date-time';
 
 @Component({
@@ -39,6 +39,17 @@ import { dateTime } from '../core/date-time';
             <article class="stat-card accent"><span>Em assinatura</span><strong>{{ openRequestsCount() }}</strong><small>solicitações abertas</small></article>
             <article class="stat-card"><span>Concluídas</span><strong>{{ completedRequestsCount() }}</strong><small>processos finalizados</small></article>
           </section>
+
+          @if (isAdmin() && tenants().length) {
+            <article class="card table-card">
+              <div class="section-heading"><div><p class="eyebrow">Plano e utilização</p><h2>Assinaturas por conta</h2><p class="muted">Cada signatário que conclui uma assinatura consome uma unidade. Uma assinatura Stripe ativa libera uso ilimitado.</p></div></div>
+              <div class="table-wrap"><table class="data-table"><thead><tr><th>Conta</th><th>Plano</th><th>Utilização vitalícia</th><th>Disponível agora</th></tr></thead><tbody>
+                @for (tenant of tenants(); track tenant.id) {
+                  <tr><td><strong>{{ tenant.name }}</strong></td><td><span class="badge" [class.complete]="billingFor(tenant.id)?.unlimited_signatures">{{ billingFor(tenant.id)?.unlimited_signatures ? 'Ilimitado' : 'Gratuito' }}</span></td><td>{{ billingFor(tenant.id)?.signatures_used ?? 0 }} assinaturas</td><td><strong>{{ billingAvailability(tenant.id) }}</strong></td></tr>
+                }
+              </tbody></table></div>
+            </article>
+          }
 
           <article class="card table-card">
             <div class="section-heading">
@@ -141,6 +152,8 @@ export class DashboardPageComponent implements OnInit {
   readonly requests = signal<SignatureRequest[]>([]);
   readonly signers = signal<Signer[]>([]);
   readonly signerOptions = signal<SignerOption[]>([]);
+  readonly tenants = signal<TenantItem[]>([]);
+  readonly billingAccounts = signal<Record<string, BillingAccount>>({});
   readonly selectedDocument = signal<DocumentItem | null>(null);
   readonly selectedRequest = signal<SignatureRequest | null>(null);
   readonly selectedSigner = signal<SignerOption | null>(null);
@@ -173,7 +186,7 @@ export class DashboardPageComponent implements OnInit {
 
   constructor(readonly auth: AuthService, private readonly api: ApiService, private readonly router: Router, private readonly sanitizer: DomSanitizer, private readonly feedback: FeedbackService) {}
 
-  async ngOnInit(): Promise<void> { const context = await this.auth.restore(); if (!context) { await this.router.navigate(['/login']); return; } if (context.mfa_setup_required) { await this.router.navigate(['/security']); return; } try { if (this.canManage()) await Promise.all([this.reload(), this.loadSignerOptions()]); } catch (error) { await this.feedback.error(error, 'Não foi possível carregar o dashboard'); } finally { this.loading.set(false); } }
+  async ngOnInit(): Promise<void> { const context = await this.auth.restore(); if (!context) { await this.router.navigate(['/login']); return; } if (context.mfa_setup_required) { await this.router.navigate(['/security']); return; } try { if (this.canManage()) await Promise.all([this.reload(), this.loadSignerOptions(), this.loadBilling()]); } catch (error) { await this.feedback.error(error, 'Não foi possível carregar o dashboard'); } finally { this.loading.set(false); } }
   security(): Promise<boolean> { return this.router.navigate(['/security']); }
   canManage(): boolean { return this.auth.can('documents:write') && this.auth.can('signature_requests:write'); }
   isAdmin(): boolean { const context = this.auth.context(); return context?.roles.includes('signature_admin') === true || context?.permission_keys.includes('*') === true; }
@@ -194,6 +207,8 @@ export class DashboardPageComponent implements OnInit {
   signerStatusLabel(status: string): string { return ({ pending: 'Pendente', viewed: 'Visualizado', signed: 'Assinado', declined: 'Recusado' } as Record<string, string>)[status] || status; }
   roleDescription(): string { return ({ signature_signer: 'Assina somente os documentos em que foi incluído.', signature_operator: 'Gerencia documentos, solicitações e signatários.', signature_auditor: 'Consulta documentos e evidências sem alterar o fluxo.', signature_admin: 'Acesso total, incluindo usuários e configurações administrativas.' } as Record<string, string>)[this.userRole] || ''; }
   signatureProgress(request: SignatureRequest): number { return request.signer_count ? Math.round(request.signed_count / request.signer_count * 100) : 0; }
+  billingFor(tenantId: string): BillingAccount | null { return this.billingAccounts()[tenantId] ?? null; }
+  billingAvailability(tenantId: string): string { const account = this.billingFor(tenantId); if (!account) return 'Indisponível'; return account.unlimited_signatures ? 'Ilimitado' : `${account.signatures_remaining ?? 0} de ${account.free_signatures_limit}`; }
 
   showUploadModal(): void { this.uploadModalOpen.set(true); }
   closeUploadModal(): void { this.uploadModalOpen.set(false); }
@@ -228,6 +243,7 @@ export class DashboardPageComponent implements OnInit {
   private async reload(): Promise<void> { const [documents, requests] = await Promise.all([firstValueFrom(this.api.get<DocumentItem[]>('/documents')), firstValueFrom(this.api.get<SignatureRequest[]>('/signature-requests'))]); this.documents.set(documents); this.requests.set(requests.sort((a, b) => b.id.localeCompare(a.id, undefined, { numeric: true }))); }
   private async loadSigners(requestId: string): Promise<void> { this.signers.set(await firstValueFrom(this.api.get<Signer[]>(`/signature-requests/${requestId}/signers`))); }
   private async loadSignerOptions(): Promise<void> { this.signerOptions.set(await firstValueFrom(this.api.get<SignerOption[]>('/users/signers'))); }
+  private async loadBilling(): Promise<void> { if (!this.isAdmin()) return; const tenants = await firstValueFrom(this.api.get<TenantItem[]>('/tenants')); this.tenants.set(tenants); const results = await Promise.allSettled(tenants.map(async tenant => [tenant.id, await firstValueFrom(this.api.get<BillingAccount>(`/billing/tenants/${tenant.id}/account`))] as const)); const accounts: Record<string, BillingAccount> = {}; for (const result of results) if (result.status === 'fulfilled') accounts[result.value[0]] = result.value[1]; this.billingAccounts.set(accounts); }
   private async loadAdminRequestDetails(request: SignatureRequest): Promise<void> { const [link, evidence] = await Promise.allSettled([firstValueFrom(this.api.get<SigningLink>(`/signature-requests/${request.id}/signing-link`)), firstValueFrom(this.api.get<SignatureEvidence[]>(`/signature-requests/${request.id}/evidence`))]); if (link.status === 'fulfilled') this.requestLinks.update(items => ({ ...items, [request.id]: link.value.signing_url })); if (evidence.status === 'fulfilled') this.requestEvidence.set(evidence.value); }
   private releasePreviewObjectUrl(): void { if (this.previewObjectUrl) URL.revokeObjectURL(this.previewObjectUrl); this.previewObjectUrl = ''; }
   private async run(action: () => Promise<void>): Promise<void> { this.submitting.set(true); try { await action(); } catch (error) { await this.feedback.error(error); } finally { this.submitting.set(false); } }
