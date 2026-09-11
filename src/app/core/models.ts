@@ -28,8 +28,13 @@ export interface BillingAccount {
   signatures_used: number;
   signatures_remaining: number | null;
   unlimited_signatures: boolean;
+  provider_customer_id?: string | null;
+  provider_subscription_id?: string | null;
+  current_period_ends_at?: string | null;
 }
-export interface StampPosition { page: number; x: number; y: number; }
+export interface BillingCheckout { checkout_url: string; }
+export interface BillingPortal { portal_url: string; }
+export interface StampPosition { page: number; x: number; y: number; locale?: 'pt-BR' | 'en' | 'ja-JP'; timezone?: string; }
 export interface SigningContext {
   request: SignatureRequest;
   signer: Signer;

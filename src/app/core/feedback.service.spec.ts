@@ -3,12 +3,14 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 
 import { FeedbackService } from './feedback.service';
+import { I18nService } from './i18n.service';
 
 describe('FeedbackService', () => {
   let service: FeedbackService;
 
   beforeEach(() => {
     TestBed.configureTestingModule({ providers: [provideRouter([])] });
+    TestBed.inject(I18nService).setLocale('pt-BR');
     service = TestBed.inject(FeedbackService);
   });
 

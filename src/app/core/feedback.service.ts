@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import Swal, { SweetAlertIcon } from 'sweetalert2';
 
 import { accessTokenKey } from './api-auth.interceptor';
+import { I18nService, MessageKey } from './i18n.service';
 
 interface ValidationIssue {
   loc?: (string | number)[];
@@ -14,9 +15,9 @@ interface ValidationIssue {
 export class FeedbackService {
   private handlingUnauthorized = false;
 
-  constructor(private readonly router: Router) {}
+  constructor(private readonly router: Router, private readonly i18n: I18nService) {}
 
-  async error(error: unknown, title = 'Não foi possível concluir'): Promise<void> {
+  async error(error: unknown, title = this.i18n.text('genericErrorTitle')): Promise<void> {
     const unauthorized = this.status(error) === 401;
     if (unauthorized && this.handlingUnauthorized) return;
     if (unauthorized) this.handlingUnauthorized = true;
@@ -24,7 +25,7 @@ export class FeedbackService {
       icon: 'error',
       title,
       text: this.message(error),
-      confirmButtonText: 'Entendi',
+      confirmButtonText: this.i18n.text('understood'),
       confirmButtonColor: '#187a66',
     });
     if (unauthorized) {
@@ -35,15 +36,15 @@ export class FeedbackService {
     }
   }
 
-  async warning(message: string, title = 'Atenção'): Promise<void> {
+  async warning(message: string, title = this.i18n.text('attention')): Promise<void> {
     await this.show('warning', title, message);
   }
 
-  async success(message: string, title = 'Tudo certo'): Promise<void> {
+  async success(message: string, title = this.i18n.text('success')): Promise<void> {
     await this.show('success', title, message);
   }
 
-  message(error: unknown, fallback = 'Ocorreu um erro inesperado. Tente novamente.'): string {
+  message(error: unknown, fallback = this.i18n.text('unexpectedError')): string {
     if (typeof error === 'string') return this.translate(error);
     if (!(error instanceof HttpErrorResponse) && !this.isHttpLike(error)) return fallback;
 
@@ -57,18 +58,18 @@ export class FeedbackService {
   }
 
   private async show(icon: SweetAlertIcon, title: string, text: string): Promise<void> {
-    await Swal.fire({ icon, title, text, confirmButtonText: 'Entendi', confirmButtonColor: '#187a66' });
+    await Swal.fire({ icon, title, text, confirmButtonText: this.i18n.text('understood'), confirmButtonColor: '#187a66' });
   }
 
   private validationMessage(issue: ValidationIssue): string {
     const rawField = String(issue.loc?.at(-1) || 'campo');
     const fields: Record<string, string> = {
-      cpf: 'CPF', email: 'E-mail', password: 'Senha', name: 'Nome', role: 'Perfil',
-      expires_at: 'Data de expiração', document_id: 'Documento', stamp: 'Carimbo',
-      page: 'Página', x: 'Posição horizontal', y: 'Posição vertical',
+      cpf: 'CPF', email: this.i18n.text('email'), password: this.i18n.text('password'), name: this.i18n.text('name'), role: this.i18n.text('profile'),
+      expires_at: this.i18n.text('expirationDate'), document_id: this.i18n.text('document'), stamp: this.i18n.text('stamp'),
+      page: this.i18n.text('page'), x: this.i18n.text('horizontalPosition'), y: this.i18n.text('verticalPosition'),
     };
-    const message = (issue.msg || 'valor inválido')
-      .replace('Field required', 'é obrigatório')
+    const message = (issue.msg || this.i18n.text('invalidValue'))
+      .replace('Field required', this.i18n.text('fieldRequired'))
       .replace('Value error, ', '')
       .replace('String should have at least', 'deve ter pelo menos')
       .replace('characters', 'caracteres');
@@ -76,43 +77,30 @@ export class FeedbackService {
   }
 
   private translate(message: string, status = 0): string {
-    const translations: Record<string, string> = {
-      'authentication required': 'Sua sessão expirou ou você ainda não entrou. Faça login novamente.',
-      'invalid or expired access token': 'Sua sessão expirou. Faça login novamente.',
-      'invalid credentials': 'E-mail ou senha incorretos.',
-      'forbidden': 'Seu perfil não possui permissão para realizar esta ação.',
-      'signing link is invalid': 'Este link de assinatura é inválido ou foi substituído.',
-      'signature request has expired': 'O prazo desta solicitação de assinatura terminou.',
-      'signature request is not open': 'Esta solicitação não está aberta para assinatura.',
-      'authenticated user does not match a signer for this request': 'Sua conta não está cadastrada como signatária deste documento.',
-      'signing access has been revoked': 'O acesso a esta assinatura foi revogado.',
-      'signer has already signed': 'Este documento já foi assinado por você.',
-      'signer already answered': 'Você já respondeu a esta solicitação.',
-      'explicit consent is required': 'É necessário confirmar o consentimento para assinar.',
-      'a document linked to an active signature request cannot be deleted': 'O documento possui uma solicitação ativa e não pode ser excluído.',
-      'email already registered': 'Já existe um usuário cadastrado com este e-mail.',
-      'cpf already registered': 'Já existe um usuário cadastrado com este CPF.',
+    const translations: Record<string, MessageKey> = {
+      'authentication required': 'sessionExpired',
+      'invalid or expired access token': 'sessionExpired',
+      'invalid credentials': 'invalidCredentials',
+      'forbidden': 'forbidden',
+      'signing link is invalid': 'invalidInvite',
+      'signature request has expired': 'linkGone',
+      'signature request is not open': 'conflict',
+      'authenticated user does not match a signer for this request': 'notSigner',
+      'signing access has been revoked': 'linkGone',
+      'signer has already signed': 'signedDocument',
+      'signer already answered': 'conflict',
+      'explicit consent is required': 'consentRequired',
+      'a document linked to an active signature request cannot be deleted': 'conflict',
+      'email already registered': 'conflict',
+      'cpf already registered': 'conflict',
     };
     const translated = translations[message.trim().toLowerCase()];
-    return translated || this.statusMessage(status) || message;
+    return translated ? this.i18n.text(translated) : this.statusMessage(status) || message;
   }
 
   private statusMessage(status: number): string {
-    const messages: Record<number, string> = {
-      0: 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.',
-      400: 'Os dados enviados são inválidos. Revise as informações e tente novamente.',
-      401: 'Sua sessão expirou ou você ainda não entrou. Faça login novamente.',
-      403: 'Seu perfil não possui permissão para realizar esta ação.',
-      404: 'O recurso solicitado não foi encontrado.',
-      409: 'A operação não pode ser concluída no estado atual.',
-      410: 'Este link não está mais disponível.',
-      413: 'O arquivo enviado é maior que o limite permitido.',
-      422: 'Revise os campos informados e tente novamente.',
-      500: 'O servidor encontrou um problema. Tente novamente em alguns instantes.',
-      502: 'O serviço está temporariamente indisponível. Tente novamente.',
-      503: 'O serviço está temporariamente indisponível. Tente novamente.',
-    };
-    return messages[status] || '';
+    const messages: Record<number, MessageKey> = { 0:'connectionError', 400:'invalidData', 401:'sessionExpired', 403:'forbidden', 404:'notFound', 409:'conflict', 410:'linkGone', 413:'tooLarge', 422:'invalidFields', 500:'serverError', 502:'serviceUnavailable', 503:'serviceUnavailable' };
+    return messages[status] ? this.i18n.text(messages[status]) : '';
   }
 
   private isHttpLike(error: unknown): error is { error?: unknown; status: number } {

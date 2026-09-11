@@ -9,20 +9,21 @@ import { AuthService } from '../core/auth.service';
 import { FeedbackService } from '../core/feedback.service';
 import { Signer, SigningContext, StampPosition } from '../core/models';
 import { dateTime } from '../core/date-time';
+import { I18nService, Locale } from '../core/i18n.service';
 
 @Component({
   standalone: true,
   imports: [PdfStampViewerComponent],
   template: `
     @if (loading()) {
-      <main class="signing-state"><section class="card"><h1>Carregando convite…</h1><p class="muted">Validando seu acesso e preparando o PDF.</p></section></main>
+      <main class="signing-state"><section class="card"><h1>{{ i18n.text('loadingInvite') }}</h1><p class="muted">{{ i18n.text('preparingPdf') }}</p></section></main>
     } @else if (error() && !context()) {
-      <main class="signing-state"><section class="card"><h1>Não foi possível abrir este convite</h1><p class="error">{{ error() }}</p><button class="button" (click)="login()">Entrar</button></section></main>
+      <main class="signing-state"><section class="card"><h1>{{ i18n.text('inviteFailed') }}</h1><p class="error">{{ error() }}</p><button class="button" (click)="login()">{{ i18n.text('enter') }}</button></section></main>
     } @else if (context()) {
       <main class="signing-workspace">
         <section class="signing-document-pane" aria-label="Documento para assinatura">
           <header class="signing-document-header">
-            <div><p class="eyebrow">Documento para assinatura</p><h1>{{ context()!.document_title }}</h1><p>{{ context()!.original_filename }}</p></div>
+            <div><p class="eyebrow">{{ i18n.text('documentForSigning') }}</p><h1>{{ context()!.document_title }}</h1><p>{{ context()!.original_filename }}</p></div>
             <span class="page-hint">{{ pageHint() }}</span>
           </header>
           <app-pdf-stamp-viewer
@@ -38,45 +39,45 @@ import { dateTime } from '../core/date-time';
 
         <aside class="signing-actions-pane">
           <div>
-            <p class="eyebrow">Rubrica · assinatura segura</p>
-            <h2>{{ administrativeView() ? 'Visualização administrativa' : 'Olá, ' + context()!.signer.name }}</h2>
-            <p class="muted">{{ administrativeView() ? 'Você não é um signatário deste documento.' : 'Leia o documento e escolha onde seu comprovante de assinatura deve aparecer.' }}</p>
+            <div class="signing-language"><p class="eyebrow">{{ i18n.text('secureSigning') }}</p><select [value]="i18n.locale()" (change)="changeLocale($any($event.target).value)" [attr.aria-label]="i18n.text('language')"><option value="pt-BR">Português</option><option value="en">English</option><option value="ja-JP">日本語</option></select></div>
+            <h2>{{ administrativeView() ? i18n.text('adminView') : i18n.text('hello', { name: context()!.signer.name }) }}</h2>
+            <p class="muted">{{ administrativeView() ? i18n.text('notSigner') : i18n.text('chooseStamp') }}</p>
           </div>
 
           @if (administrativeView()) {
             <section class="signing-summary">
-              <small>Conta atual</small>
+              <small>{{ i18n.text('currentAccount') }}</small>
               <strong>{{ auth.context()?.subject }}</strong>
-              <span>Não cadastrada como signatária nesta solicitação</span>
+              <span>{{ i18n.text('notRegisteredSigner') }}</span>
             </section>
-            <p class="notice">Entre com uma conta cadastrada nesta solicitação para assinar. O administrador também pode assinar, desde que adicione a própria conta enquanto a solicitação ainda estiver em rascunho.</p>
+            <p class="notice">{{ i18n.text('adminSignerHelp') }}</p>
           } @else {
             <section class="signing-summary">
-              <small>Assinando como</small>
+              <small>{{ i18n.text('signingAs') }}</small>
               <strong>{{ context()!.signer.name }}</strong>
               <span>{{ context()!.signer.email }}</span>
             </section>
           }
 
           @if (!administrativeView()) { <section class="stamp-instructions" [class.ready]="placement()">
-            <div class="mini-stamp"><span>Assinado por</span><strong>{{ context()!.signer.name }}</strong><small>{{ stampDateLabel() }}</small></div>
+            <div class="mini-stamp"><span>{{ i18n.text('signedBy') }}</span><strong>{{ context()!.signer.name }}</strong><small>{{ stampDateLabel() }}</small></div>
             @if (placement()) {
-              <p>Carimbo posicionado na página {{ placement()!.page }}. Você ainda pode arrastá-lo.</p>
+              <p>{{ i18n.text('stampPlaced', { page: placement()!.page }) }}</p>
             } @else {
-              <p>Clique no ponto desejado do PDF. Depois, arraste o carimbo para ajustar.</p>
+              <p>{{ i18n.text('clickToPlace') }}</p>
             }
           </section> }
 
-          @if (!administrativeView()) { <p class="notice">Sua identidade, data, posição e o hash desta versão serão registrados como evidência.</p> }
+          @if (!administrativeView()) { <p class="notice">{{ i18n.text('evidenceNotice') }}</p> }
           @if (message()) { <p class="notice">{{ message() }}</p> }
 
           <div class="signing-actions">
             @if (!administrativeView()) { <button class="button" [disabled]="signing() || completed() || !placement()" (click)="sign()">
-              {{ signing() ? 'Assinando…' : completed() ? statusLabel() : 'Assinar documento' }}
+              {{ signing() ? i18n.text('signing') : completed() ? statusLabel() : i18n.text('signDocument') }}
             </button> }
-            <button class="button secondary" [disabled]="signing()" (click)="download()">{{ context()!.request.signed_count > 0 ? 'Baixar PDF assinado' : 'Baixar PDF' }}</button>
-            @if (!administrativeView()) { <button class="button subtle" [disabled]="signing() || completed()" (click)="decline()">Recusar</button> }
-            @if (administrativeView()) { <button class="button" (click)="switchAccount()">Entrar como signatário</button><button class="button subtle" (click)="goToDashboard()">Voltar ao dashboard</button> }
+            <button class="button secondary" [disabled]="signing()" (click)="download()">{{ context()!.request.signed_count > 0 ? i18n.text('downloadSignedPdf') : i18n.text('downloadPdf') }}</button>
+            @if (!administrativeView()) { <button class="button subtle" [disabled]="signing() || completed()" (click)="decline()">{{ i18n.text('decline') }}</button> }
+            @if (administrativeView()) { <button class="button" (click)="switchAccount()">{{ i18n.text('signInAsSigner') }}</button><button class="button subtle" (click)="goToDashboard()">{{ i18n.text('backDashboard') }}</button> }
           </div>
         </aside>
       </main>
@@ -100,6 +101,7 @@ export class SigningPageComponent implements OnInit {
     private readonly route: ActivatedRoute,
     private readonly router: Router,
     private readonly feedback: FeedbackService,
+    readonly i18n: I18nService,
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -113,8 +115,8 @@ export class SigningPageComponent implements OnInit {
         this.context.update(current => current ? { ...current, signer } : current);
       }
     } catch (error) {
-      this.error.set(this.feedback.message(error, 'Convite inválido ou indisponível.'));
-      await this.feedback.error(error, 'Não foi possível abrir o convite');
+      this.error.set(this.feedback.message(error, this.i18n.text('invalidInvite')));
+      await this.feedback.error(error, this.i18n.text('openInviteFailed'));
     } finally {
       this.loading.set(false);
     }
@@ -130,6 +132,7 @@ export class SigningPageComponent implements OnInit {
   }
 
   async goToDashboard(): Promise<void> { await this.router.navigate(['/dashboard']); }
+  changeLocale(locale: Locale): void { this.i18n.setLocale(locale); }
 
   async download(): Promise<void> {
     try {
@@ -143,29 +146,29 @@ export class SigningPageComponent implements OnInit {
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (error) {
-      await this.feedback.error(error, 'Não foi possível baixar o documento');
+      await this.feedback.error(error, this.i18n.text('downloadFailed'));
     }
   }
 
   async sign(): Promise<void> {
     const stamp = this.placement();
     if (!stamp) {
-      await this.feedback.warning('Clique no PDF para escolher onde o carimbo da assinatura deve aparecer.', 'Posicione sua assinatura');
+      await this.feedback.warning(this.i18n.text('positionHelp'), this.i18n.text('positionSignature'));
       return;
     }
     const consent = await Swal.fire({
       icon: 'info',
-      title: 'Registro de evidências',
-      html: `<div class="evidence-copy"><p>Para proteger esta assinatura, registraremos:</p><ul><li>nome, e-mail e identificador pseudonimizado da sua conta;</li><li>data, IP, navegador, plataforma e tamanho de tela;</li><li>hash do documento e posição do carimbo;</li><li>localização somente se você autorizar no próximo passo.</li></ul><p><strong>Essas evidências ficarão incorporadas ao PDF assinado e poderão ser consultadas por quem possuir o arquivo.</strong></p><label class="evidence-consent"><input id="evidence-consent" type="checkbox" /><span>Li e concordo com o registro dessas evidências.</span></label></div>`,
+      title: this.i18n.text('evidenceTitle'),
+      html: `<div class="evidence-copy"><p>${this.i18n.text('evidenceIntro')}</p><ul><li>${this.i18n.text('evidenceIdentity')}</li><li>${this.i18n.text('evidenceDevice')}</li><li>${this.i18n.text('evidenceDocument')}</li><li>${this.i18n.text('evidenceLocation')}</li></ul><p><strong>${this.i18n.text('evidenceStored')}</strong></p><label class="evidence-consent"><input id="evidence-consent" type="checkbox" /><span>${this.i18n.text('evidenceConsent')}</span></label></div>`,
       preConfirm: () => {
         const checkbox = Swal.getPopup()?.querySelector<HTMLInputElement>('#evidence-consent');
-        if (!checkbox?.checked) { Swal.showValidationMessage('Confirme o consentimento para continuar.'); return false; }
+        if (!checkbox?.checked) { Swal.showValidationMessage(this.i18n.text('consentRequired')); return false; }
         return true;
       },
       customClass: { popup: 'evidence-dialog' },
       showCancelButton: true,
-      confirmButtonText: 'Continuar',
-      cancelButtonText: 'Voltar',
+      confirmButtonText: this.i18n.text('continue'),
+      cancelButtonText: this.i18n.text('back'),
       confirmButtonColor: '#187a66',
       cancelButtonColor: '#667085',
     });
@@ -178,44 +181,44 @@ export class SigningPageComponent implements OnInit {
       screen_width: window.screen?.width || null,
       screen_height: window.screen?.height || null,
     };
-    await this.answer('/sign', { consent: true, consent_version: 'rubrica-evidence-v1', stamp, client, geolocation });
+    await this.answer('/sign', { consent: true, consent_version: 'rubrica-evidence-v1', stamp: { ...stamp, locale: this.i18n.locale(), timezone: dateTime.timezone() }, client, geolocation });
   }
 
   async decline(): Promise<void> {
     const confirmation = await Swal.fire({
       icon: 'question',
-      title: 'Recusar assinatura?',
-      text: 'Esta ação será registrada na solicitação.',
+      title: this.i18n.text('declineTitle'),
+      text: this.i18n.text('declineHelp'),
       showCancelButton: true,
-      confirmButtonText: 'Recusar',
-      cancelButtonText: 'Voltar',
+      confirmButtonText: this.i18n.text('decline'),
+      cancelButtonText: this.i18n.text('back'),
     });
     if (confirmation.isConfirmed) await this.answer('/decline', {});
   }
 
   stampDateLabel(): string {
     const value = this.context()?.signer.signed_at || this.stampPreviewDate;
-    return dateTime.display(value);
+    return this.i18n.formatDate(value);
   }
 
   statusLabel(): string {
-    return this.context()?.signer.status === 'declined' ? 'Assinatura recusada' : 'Documento assinado';
+    return this.context()?.signer.status === 'declined' ? this.i18n.text('declinedSignature') : this.i18n.text('signedDocument');
   }
 
   administrativeView(): boolean { return this.context()?.viewer_mode === 'administrator'; }
   documentEndpoint(): string { return (this.context()?.request.signed_count ?? 0) > 0 ? 'signed-document' : 'document'; }
   pageHint(): string {
-    if (this.administrativeView()) return 'Visualização administrativa somente leitura';
+    if (this.administrativeView()) return this.i18n.text('readonlyAdmin');
     const signed = this.context()?.request.signed_count ?? 0;
-    if (this.completed()) return signed ? `Versão consolidada com ${signed} assinatura(s)` : 'Documento finalizado';
-    return signed ? `Exibindo ${signed} assinatura(s) anterior(es) · posicione a sua` : 'Clique no PDF e arraste o carimbo para posicioná-lo';
+    if (this.completed()) return signed ? this.i18n.text('consolidatedVersion', { count: signed }) : this.i18n.text('documentFinalized');
+    return signed ? this.i18n.text('priorSignatures', { count: signed }) : this.i18n.text('dragStamp');
   }
 
   private async collectGeolocation(): Promise<{ status: string; latitude: number | null; longitude: number | null; accuracy_meters: number | null }> {
     if (!navigator.geolocation) return { status: 'unavailable', latitude: null, longitude: null, accuracy_meters: null };
-    const choice = await Swal.fire({ icon: 'question', title: 'Compartilhar localização?', text: 'A localização aumenta a rastreabilidade, mas é opcional e não impede sua assinatura.', showCancelButton: true, confirmButtonText: 'Compartilhar localização', cancelButtonText: 'Assinar sem localização' });
+    const choice = await Swal.fire({ icon: 'question', title: this.i18n.text('shareLocation'), text: this.i18n.text('locationHelp'), showCancelButton: true, confirmButtonText: this.i18n.text('share'), cancelButtonText: this.i18n.text('withoutLocation') });
     if (!choice.isConfirmed) return { status: 'denied', latitude: null, longitude: null, accuracy_meters: null };
-    Swal.fire({ title: 'Obtendo localização…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    Swal.fire({ title: this.i18n.text('gettingLocation'), allowOutsideClick: false, didOpen: () => Swal.showLoading() });
     const result = await new Promise<{ status: string; latitude: number | null; longitude: number | null; accuracy_meters: number | null }>(resolve => {
       navigator.geolocation.getCurrentPosition(
         position => resolve({ status: 'granted', latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy_meters: position.coords.accuracy }),
@@ -234,10 +237,10 @@ export class SigningPageComponent implements OnInit {
       await firstValueFrom(this.api.post<Signer>(`/signing/links/${this.token}${action}`, body));
       const refreshed = await firstValueFrom(this.api.get<SigningContext>(`/signing/links/${this.token}`));
       this.applyContext(refreshed);
-      this.message.set(action === '/sign' ? 'Assinatura concluída com sucesso.' : 'Assinatura recusada.');
-      await Swal.fire({ icon: action === '/sign' ? 'success' : 'info', title: this.message(), confirmButtonText: 'Concluir' });
+      this.message.set(action === '/sign' ? this.i18n.text('signedSuccess') : this.i18n.text('declinedSuccess'));
+      await Swal.fire({ icon: action === '/sign' ? 'success' : 'info', title: this.message(), confirmButtonText: this.i18n.text('finish') });
     } catch (error) {
-      await this.feedback.error(error, action === '/sign' ? 'Não foi possível assinar' : 'Não foi possível recusar');
+      await this.feedback.error(error, action === '/sign' ? this.i18n.text('signFailed') : this.i18n.text('declineFailed'));
     } finally {
       this.signing.set(false);
     }

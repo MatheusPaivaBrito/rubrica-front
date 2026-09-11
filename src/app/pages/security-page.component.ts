@@ -7,6 +7,7 @@ import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { FeedbackService } from '../core/feedback.service';
+import { I18nService, Locale } from '../core/i18n.service';
 
 interface MfaStatus { enabled: boolean; required_by_policy: boolean; setup_required: boolean; recovery_codes_remaining: number; }
 interface MfaSetup { secret: string; provisioning_uri: string; }
@@ -17,23 +18,23 @@ interface RecoveryCodes { recovery_codes: string[]; }
   imports: [FormsModule, RouterLink],
   template: `
     <main class="settings-shell">
-      <header class="settings-top"><a routerLink="/dashboard" class="brand">Rubrica<span>.</span></a><button class="button secondary" (click)="logout()">Sair</button></header>
+      <header class="settings-top"><a routerLink="/dashboard" class="brand">Rubrica<span>.</span></a><div class="button-row"><select [ngModel]="i18n.locale()" (ngModelChange)="changeLocale($event)" [attr.aria-label]="i18n.text('language')"><option value="pt-BR">Português</option><option value="en">English</option><option value="ja-JP">日本語</option></select><button class="button secondary" (click)="logout()">{{ i18n.text('logout') }}</button></div></header>
       <section class="settings-card card">
-        <p class="eyebrow">Segurança da conta</p><h1>Microsoft Authenticator</h1>
-        <p class="muted">Proteja sua conta com um código temporário além da senha.</p>
-        @if (loading()) { <p class="notice">Carregando segurança…</p> }
+        <p class="eyebrow">{{ i18n.text('security') }}</p><h1>Microsoft Authenticator</h1>
+        <p class="muted">{{ i18n.text('securityHelp') }}</p>
+        @if (loading()) { <p class="notice">{{ i18n.text('loadingSecurity') }}</p> }
         @else if (!status()?.enabled && !setup()) {
-          @if (status()?.setup_required) { <p class="notice warning">Seu perfil exige autenticação em dois fatores. Configure-a para continuar.</p> }
-          <button class="button" (click)="startSetup()">Configurar autenticador</button>
+          @if (status()?.setup_required) { <p class="notice warning">{{ i18n.text('mfaRequired') }}</p> }
+          <button class="button" (click)="startSetup()">{{ i18n.text('configureAuthenticator') }}</button>
         } @else if (setup()) {
-          <div class="setup-grid"><div class="qr-panel"><img [src]="qrCode()" alt="QR Code do autenticador" /></div><div><h2>1. Leia o QR Code</h2><p>Abra o Microsoft Authenticator, adicione uma conta e escolha “Outra conta”.</p><p class="secret"><span>Chave manual</span><code>{{ setup()!.secret }}</code></p><h2>2. Confirme o código</h2><form class="form" (ngSubmit)="confirm()"><label>Código de 6 dígitos<input name="code" [(ngModel)]="code" inputmode="numeric" autocomplete="one-time-code" required /></label><button class="button">Ativar MFA</button></form></div></div>
+          <div class="setup-grid"><div class="qr-panel"><img [src]="qrCode()" alt="Microsoft Authenticator QR Code" /></div><div><h2>{{ i18n.text('scanQr') }}</h2><p>{{ i18n.text('scanQrHelp') }}</p><p class="secret"><span>{{ i18n.text('manualKey') }}</span><code>{{ setup()!.secret }}</code></p><h2>{{ i18n.text('confirmCode') }}</h2><form class="form" (ngSubmit)="confirm()"><label>{{ i18n.text('sixDigitCode') }}<input name="code" [(ngModel)]="code" inputmode="numeric" autocomplete="one-time-code" required /></label><button class="button">{{ i18n.text('activateMfa') }}</button></form></div></div>
         } @else {
-          <p class="status-ok"><i class="bi bi-shield-check"></i> MFA ativo</p>
-          <p>{{ status()?.recovery_codes_remaining }} códigos de recuperação disponíveis.</p>
-          <hr /><h2>Gerenciar MFA</h2><form class="form" (ngSubmit)="regenerate()"><label>Senha atual<input name="password" type="password" [(ngModel)]="password" required /></label><label>Código atual ou de recuperação<input name="manageCode" [(ngModel)]="code" required /></label><div class="button-row"><button class="button secondary">Gerar novos códigos</button>@if (!status()?.required_by_policy) { <button type="button" class="button danger" (click)="disable()">Desativar MFA</button> }</div></form>
-          @if (status()?.required_by_policy) { <p class="muted">Seu perfil exige MFA; por isso ele não pode ser desativado.</p> }
+          <p class="status-ok"><i class="bi bi-shield-check"></i> {{ i18n.text('mfaActive') }}</p>
+          <p>{{ i18n.text('recoveryAvailable', { count: status()?.recovery_codes_remaining ?? 0 }) }}</p>
+          <hr /><h2>{{ i18n.text('manageMfa') }}</h2><form class="form" (ngSubmit)="regenerate()"><label>{{ i18n.text('currentPassword') }}<input name="password" type="password" [(ngModel)]="password" required /></label><label>{{ i18n.text('currentOrRecoveryCode') }}<input name="manageCode" [(ngModel)]="code" required /></label><div class="button-row"><button class="button secondary">{{ i18n.text('generateCodes') }}</button>@if (!status()?.required_by_policy) { <button type="button" class="button danger" (click)="disable()">{{ i18n.text('disableMfa') }}</button> }</div></form>
+          @if (status()?.required_by_policy) { <p class="muted">{{ i18n.text('mfaCannotDisable') }}</p> }
         }
-        @if (recoveryCodes().length) { <section class="recovery-panel"><h2>Guarde estes códigos agora</h2><p>Eles não serão mostrados novamente. Cada código funciona uma única vez.</p><div class="codes">@for (item of recoveryCodes(); track item) { <code>{{ item }}</code> }</div><button class="button secondary" (click)="downloadCodes()">Baixar códigos</button></section> }
+        @if (recoveryCodes().length) { <section class="recovery-panel"><h2>{{ i18n.text('saveCodes') }}</h2><p>{{ i18n.text('saveCodesHelp') }}</p><div class="codes">@for (item of recoveryCodes(); track item) { <code>{{ item }}</code> }</div><button class="button secondary" (click)="downloadCodes()">{{ i18n.text('downloadCodes') }}</button></section> }
       </section>
     </main>
   `,
@@ -42,12 +43,13 @@ interface RecoveryCodes { recovery_codes: string[]; }
 export class SecurityPageComponent implements OnInit {
   readonly loading = signal(true); readonly status = signal<MfaStatus | null>(null); readonly setup = signal<MfaSetup | null>(null); readonly qrCode = signal(''); readonly recoveryCodes = signal<string[]>([]);
   code = ''; password = '';
-  constructor(private readonly api: ApiService, private readonly auth: AuthService, private readonly router: Router, private readonly feedback: FeedbackService) {}
+  constructor(private readonly api: ApiService, private readonly auth: AuthService, private readonly router: Router, private readonly feedback: FeedbackService, readonly i18n: I18nService) {}
+  changeLocale(locale: Locale): void { this.i18n.setLocale(locale); }
   async ngOnInit() { if (!await this.auth.restore()) { await this.router.navigate(['/login']); return; } await this.loadStatus(); this.loading.set(false); }
   async startSetup() { try { const setup = await firstValueFrom(this.api.post<MfaSetup>('/auth/mfa/setup', {})); this.setup.set(setup); this.qrCode.set(await QRCode.toDataURL(setup.provisioning_uri, { width: 320, margin: 1 })); } catch (error) { await this.feedback.error(error); } }
-  async confirm() { try { const result = await firstValueFrom(this.api.post<RecoveryCodes>('/auth/mfa/confirm', { code: this.code })); this.recoveryCodes.set(result.recovery_codes); this.setup.set(null); this.code=''; await this.auth.refreshContext(); await this.loadStatus(); await this.feedback.success('Autenticação em dois fatores ativada.'); } catch (error) { await this.feedback.error(error); } }
+  async confirm() { try { const result = await firstValueFrom(this.api.post<RecoveryCodes>('/auth/mfa/confirm', { code: this.code })); this.recoveryCodes.set(result.recovery_codes); this.setup.set(null); this.code=''; await this.auth.refreshContext(); await this.loadStatus(); await this.feedback.success(this.i18n.text('mfaEnabled')); } catch (error) { await this.feedback.error(error); } }
   async regenerate() { try { const result = await firstValueFrom(this.api.post<RecoveryCodes>('/auth/mfa/recovery-codes', { password: this.password, code: this.code })); this.recoveryCodes.set(result.recovery_codes); this.password=''; this.code=''; await this.loadStatus(); } catch (error) { await this.feedback.error(error); } }
-  async disable() { try { await firstValueFrom(this.api.deleteWithBody('/auth/mfa', { password: this.password, code: this.code })); this.password=''; this.code=''; this.recoveryCodes.set([]); await this.auth.refreshContext(); await this.loadStatus(); await this.feedback.warning('MFA desativado.'); } catch (error) { await this.feedback.error(error); } }
+  async disable() { try { await firstValueFrom(this.api.deleteWithBody('/auth/mfa', { password: this.password, code: this.code })); this.password=''; this.code=''; this.recoveryCodes.set([]); await this.auth.refreshContext(); await this.loadStatus(); await this.feedback.warning(this.i18n.text('mfaDisabled')); } catch (error) { await this.feedback.error(error); } }
   downloadCodes() { const blob=new Blob([this.recoveryCodes().join('\n')+'\n'],{type:'text/plain'}); const url=URL.createObjectURL(blob); const link=document.createElement('a'); link.href=url; link.download='rubrica-recovery-codes.txt'; link.click(); URL.revokeObjectURL(url); }
   async logout() { await this.auth.logout(); await this.router.navigate(['/login']); }
   private async loadStatus() { this.status.set(await firstValueFrom(this.api.get<MfaStatus>('/auth/mfa/status'))); }
