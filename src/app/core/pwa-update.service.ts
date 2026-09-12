@@ -24,7 +24,7 @@ export class PwaUpdateService {
       confirmButtonText: this.i18n.text('updateNow'),
       showCancelButton: true,
       cancelButtonText: this.i18n.text('later'),
-      confirmButtonColor: '#187a66',
+      confirmButtonColor: '#a82035',
     });
     if (!result.isConfirmed) return;
     await this.updates.activateUpdate();

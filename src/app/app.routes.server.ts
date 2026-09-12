@@ -6,6 +6,10 @@ export const serverRoutes: ServerRoute[] = [
     renderMode: RenderMode.Client,
   },
   {
+    path: 'tenant/:tenantId/dashboard',
+    renderMode: RenderMode.Client,
+  },
+  {
     path: 'signing/:token',
     renderMode: RenderMode.Client,
   },

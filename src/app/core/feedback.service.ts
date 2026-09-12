@@ -26,7 +26,7 @@ export class FeedbackService {
       title,
       text: this.message(error),
       confirmButtonText: this.i18n.text('understood'),
-      confirmButtonColor: '#187a66',
+      confirmButtonColor: '#a82035',
     });
     if (unauthorized) {
       const returnUrl = this.router.url;
@@ -58,7 +58,7 @@ export class FeedbackService {
   }
 
   private async show(icon: SweetAlertIcon, title: string, text: string): Promise<void> {
-    await Swal.fire({ icon, title, text, confirmButtonText: this.i18n.text('understood'), confirmButtonColor: '#187a66' });
+    await Swal.fire({ icon, title, text, confirmButtonText: this.i18n.text('understood'), confirmButtonColor: '#a82035' });
   }
 
   private validationMessage(issue: ValidationIssue): string {

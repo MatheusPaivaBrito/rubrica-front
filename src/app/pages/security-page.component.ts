@@ -25,7 +25,7 @@ interface RecoveryCodes { recovery_codes: string[]; }
         @if (loading()) { <p class="notice">{{ i18n.text('loadingSecurity') }}</p> }
         @else if (!status()?.enabled && !setup()) {
           @if (status()?.setup_required) { <p class="notice warning">{{ i18n.text('mfaRequired') }}</p> }
-          <button class="button" (click)="startSetup()">{{ i18n.text('configureAuthenticator') }}</button>
+          <div class="button-row"><button class="button" (click)="startSetup()">{{ i18n.text('configureAuthenticator') }}</button>@if (status()?.setup_required) { <button class="button secondary" (click)="deferMfa()">{{ i18n.text('later') }}</button> }</div>
         } @else if (setup()) {
           <div class="setup-grid"><div class="qr-panel"><img [src]="qrCode()" alt="Microsoft Authenticator QR Code" /></div><div><h2>{{ i18n.text('scanQr') }}</h2><p>{{ i18n.text('scanQrHelp') }}</p><p class="secret"><span>{{ i18n.text('manualKey') }}</span><code>{{ setup()!.secret }}</code></p><h2>{{ i18n.text('confirmCode') }}</h2><form class="form" (ngSubmit)="confirm()"><label>{{ i18n.text('sixDigitCode') }}<input name="code" [(ngModel)]="code" inputmode="numeric" autocomplete="one-time-code" required /></label><button class="button">{{ i18n.text('activateMfa') }}</button></form></div></div>
         } @else {
@@ -47,6 +47,7 @@ export class SecurityPageComponent implements OnInit {
   changeLocale(locale: Locale): void { this.i18n.setLocale(locale); }
   async ngOnInit() { if (!await this.auth.restore()) { await this.router.navigate(['/login']); return; } await this.loadStatus(); this.loading.set(false); }
   async startSetup() { try { const setup = await firstValueFrom(this.api.post<MfaSetup>('/auth/mfa/setup', {})); this.setup.set(setup); this.qrCode.set(await QRCode.toDataURL(setup.provisioning_uri, { width: 320, margin: 1 })); } catch (error) { await this.feedback.error(error); } }
+  async deferMfa() { this.auth.deferMfaForSession(); await this.router.navigateByUrl(await this.auth.dashboardUrl()); }
   async confirm() { try { const result = await firstValueFrom(this.api.post<RecoveryCodes>('/auth/mfa/confirm', { code: this.code })); this.recoveryCodes.set(result.recovery_codes); this.setup.set(null); this.code=''; await this.auth.refreshContext(); await this.loadStatus(); await this.feedback.success(this.i18n.text('mfaEnabled')); } catch (error) { await this.feedback.error(error); } }
   async regenerate() { try { const result = await firstValueFrom(this.api.post<RecoveryCodes>('/auth/mfa/recovery-codes', { password: this.password, code: this.code })); this.recoveryCodes.set(result.recovery_codes); this.password=''; this.code=''; await this.loadStatus(); } catch (error) { await this.feedback.error(error); } }
   async disable() { try { await firstValueFrom(this.api.deleteWithBody('/auth/mfa', { password: this.password, code: this.code })); this.password=''; this.code=''; this.recoveryCodes.set([]); await this.auth.refreshContext(); await this.loadStatus(); await this.feedback.warning(this.i18n.text('mfaDisabled')); } catch (error) { await this.feedback.error(error); } }

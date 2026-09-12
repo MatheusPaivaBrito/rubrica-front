@@ -169,7 +169,7 @@ export class SigningPageComponent implements OnInit {
       showCancelButton: true,
       confirmButtonText: this.i18n.text('continue'),
       cancelButtonText: this.i18n.text('back'),
-      confirmButtonColor: '#187a66',
+      confirmButtonColor: '#a82035',
       cancelButtonColor: '#667085',
     });
     if (!consent.isConfirmed) return;

@@ -50,7 +50,8 @@ export class LoginPageComponent {
           return;
         }
       }
-      await this.router.navigateByUrl(this.route.snapshot.queryParamMap.get('returnUrl') || '/dashboard');
+      const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+      await this.router.navigateByUrl(returnUrl || await this.auth.dashboardUrl());
     } catch { await this.feedback.error(this.i18n.text('invalidCredentials'), this.i18n.text('loginFailed')); }
     finally { this.loading.set(false); }
   }
