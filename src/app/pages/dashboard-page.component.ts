@@ -228,7 +228,17 @@ export class DashboardPageComponent implements OnInit {
   prepareRequest(document: DocumentItem): void { this.selectedDocument.set(document); this.expiresAt = dateTime.localInputAfterDays(3); this.requestCreateModalOpen.set(true); }
   async openRequestDetails(request: SignatureRequest): Promise<void> { this.selectedRequest.set(request); this.selectedDocument.set(null); this.selectedSigner.set(null); this.signerSearch = ''; this.requestEvidence.set([]); this.requestModalOpen.set(true); this.detailsLoading.set(true); try { await this.loadSigners(request.id); if (this.isAdmin()) await this.loadAdminRequestDetails(request); } catch (error) { await this.feedback.error(error, this.i18n.text('detailsLoadFailed')); } finally { this.detailsLoading.set(false); } }
 
-  preview(document: DocumentItem): void { this.releasePreviewObjectUrl(); this.previewHeading.set(this.i18n.text('originalDocument')); this.previewDocument.set(document); this.previewUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(`/documents/${document.id}/preview?version=${document.version}`)); }
+  async preview(document: DocumentItem): Promise<void> {
+    await this.run(async () => {
+      const response = await firstValueFrom(this.api.getBlob(`/documents/${document.id}/preview?version=${document.version}`));
+      if (!response.body) throw new Error('Document preview is empty');
+      this.releasePreviewObjectUrl();
+      this.previewObjectUrl = URL.createObjectURL(response.body);
+      this.previewHeading.set(this.i18n.text('originalDocument'));
+      this.previewDocument.set(document);
+      this.previewUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(this.previewObjectUrl));
+    });
+  }
   async previewSignedRequest(): Promise<void> { const request = this.selectedRequest(); const document = this.documents().find(item => item.id === request?.document_id); if (!request || !document) return; await this.run(async () => { const response = await firstValueFrom(this.api.getBlob(`/signature-requests/${request.id}/signed-document`)); this.releasePreviewObjectUrl(); this.previewObjectUrl = URL.createObjectURL(response.body!); this.previewHeading.set(this.i18n.text('stampedPdf')); this.previewDocument.set(document); this.previewUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(this.previewObjectUrl)); }); }
   closePreview(): void { this.previewDocument.set(null); this.previewUrl.set(''); this.releasePreviewObjectUrl(); }
   async deleteDocument(document: DocumentItem): Promise<void> { const result = await Swal.fire({ icon: 'warning', title: this.i18n.text('deleteDocumentTitle'), text: this.i18n.text('deleteDocumentHelp'), showCancelButton: true, confirmButtonText: this.i18n.text('deleteAction'), cancelButtonText: this.i18n.text('cancel'), confirmButtonColor: '#b42318' }); if (!result.isConfirmed) return; await this.run(async () => { await firstValueFrom(this.api.delete(`/documents/${document.id}`)); this.documents.update((items) => items.filter((item) => item.id !== document.id)); }); }

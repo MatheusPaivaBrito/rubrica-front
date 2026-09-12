@@ -47,7 +47,10 @@ export class SecurityPageComponent implements OnInit {
   changeLocale(locale: Locale): void { this.i18n.setLocale(locale); }
   async ngOnInit() { if (!await this.auth.restore()) { await this.router.navigate(['/login']); return; } await this.loadStatus(); this.loading.set(false); }
   async startSetup() { try { const setup = await firstValueFrom(this.api.post<MfaSetup>('/auth/mfa/setup', {})); this.setup.set(setup); this.qrCode.set(await QRCode.toDataURL(setup.provisioning_uri, { width: 320, margin: 1 })); } catch (error) { await this.feedback.error(error); } }
-  async deferMfa() { this.auth.deferMfaForSession(); await this.router.navigateByUrl(await this.auth.dashboardUrl()); }
+  async deferMfa() {
+    this.auth.deferMfaForSession();
+    await this.router.navigateByUrl(await this.auth.dashboardUrl(), { replaceUrl: true });
+  }
   async confirm() { try { const result = await firstValueFrom(this.api.post<RecoveryCodes>('/auth/mfa/confirm', { code: this.code })); this.recoveryCodes.set(result.recovery_codes); this.setup.set(null); this.code=''; await this.auth.refreshContext(); await this.loadStatus(); await this.feedback.success(this.i18n.text('mfaEnabled')); } catch (error) { await this.feedback.error(error); } }
   async regenerate() { try { const result = await firstValueFrom(this.api.post<RecoveryCodes>('/auth/mfa/recovery-codes', { password: this.password, code: this.code })); this.recoveryCodes.set(result.recovery_codes); this.password=''; this.code=''; await this.loadStatus(); } catch (error) { await this.feedback.error(error); } }
   async disable() { try { await firstValueFrom(this.api.deleteWithBody('/auth/mfa', { password: this.password, code: this.code })); this.password=''; this.code=''; this.recoveryCodes.set([]); await this.auth.refreshContext(); await this.loadStatus(); await this.feedback.warning(this.i18n.text('mfaDisabled')); } catch (error) { await this.feedback.error(error); } }
