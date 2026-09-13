@@ -1,7 +1,7 @@
 import { isPlatformBrowser } from '@angular/common';
 import { Injectable, PLATFORM_ID, inject, signal } from '@angular/core';
 
-export type Locale = 'pt-BR' | 'en' | 'ja-JP';
+export type Locale = 'pt-BR' | 'en' | 'es' | 'ja-JP';
 
 const en = {
   updateAvailable:'New version available', updateHelp:'Update now to use the latest Rubrica version.', updateNow:'Update', later:'Later',
@@ -22,6 +22,15 @@ type Catalog = Record<MessageKey, string>;
 
 const messages: Record<Locale, Catalog> = {
   en,
+  es: Object.assign({}, en, {
+    language:'Idioma', email:'Correo electrónico', password:'Contraseña', name:'Nombre', close:'Cerrar', back:'Volver', continue:'Continuar', cancel:'Cancelar', confirm:'Confirmar', understood:'Entendido', logout:'Cerrar sesión', loading:'Cargando…', unavailable:'No disponible', unlimited:'Ilimitado', free:'Gratis', active:'Activo', pending:'Pendiente', pastDue:'Pago atrasado', cancelled:'Cancelado', paused:'Pausado', notConfigured:'No configurado',
+    login:'Inicia sesión para firmar', loginHelp:'Usa tu cuenta para acceder a documentos e invitaciones de firma.', enter:'Entrar', authenticatorCode:'Código del autenticador', forgotPassword:'Olvidé mi contraseña', createAccount:'Crear cuenta', newPassword:'Nueva contraseña', documentCountry:'País emisor del documento', documentType:'Tipo de documento', documentNumber:'Número de documento', optionalIdentity:'Documento opcional', doNotProvide:'Ahora no', passport:'Pasaporte', nationalId:'Documento nacional', residenceCard:'Tarjeta de residencia', driverLicense:'Licencia de conducir', taxId:'Identificación fiscal', other:'Otro', sendRecovery:'Enviar correo de recuperación', changePassword:'Cambiar contraseña', backToLogin:'Volver al inicio de sesión', verifyingEmail:'Confirmando tu correo…', account:'Cuenta', recovery:'Recuperar contraseña', verifyEmail:'Confirmar correo', registrationSent:'Revisa tu correo para confirmar la cuenta.', recoverySent:'Si la cuenta existe, enviaremos las instrucciones.', passwordChanged:'Contraseña cambiada.', emailVerified:'Correo confirmado.', invalidCredentials:'Correo o contraseña incorrectos.', loginFailed:'No fue posible iniciar sesión',
+    security:'Seguridad de la cuenta', securityHelp:'Protege tu cuenta con un código temporal además de la contraseña.', loadingSecurity:'Cargando seguridad…', mfaRequired:'Tu perfil requiere autenticación de dos factores.', configureAuthenticator:'Configurar autenticador', scanQr:'1. Escanea el código QR', manualKey:'Clave manual', confirmCode:'2. Confirma el código', sixDigitCode:'Código de 6 dígitos', activateMfa:'Activar MFA', mfaActive:'MFA activo', manageMfa:'Administrar MFA', currentPassword:'Contraseña actual', currentOrRecoveryCode:'Código actual o de recuperación', generateCodes:'Generar nuevos códigos', disableMfa:'Desactivar MFA', saveCodes:'Guarda estos códigos ahora', downloadCodes:'Descargar códigos', mfaEnabled:'Autenticación de dos factores activada.', mfaDisabled:'MFA desactivado.',
+    billing:'Plan y facturación', billingHelp:'Administra la suscripción y el uso de Rubrica.', tenant:'Cuenta', chooseTenant:'Elige una cuenta', plan:'Plan', usage:'Uso acumulado', availableNow:'Disponible ahora', currentPeriod:'Fin del período actual', subscribe:'Suscribirse con Stripe', manageSubscription:'Administrar suscripción', checkoutSuccess:'Suscripción recibida.', checkoutCancelled:'Pago cancelado. No se realizó ningún cargo.', billingAdminOnly:'Solo los administradores pueden gestionar la facturación.', paidPlan:'Rubrica ilimitado', fiveFree:'Cada cuenta nueva incluye 5 firmas gratuitas.', signatures:'{count} firmas', remainingOf:'{remaining} de {limit}', backDashboard:'Volver al panel',
+    loadingInvite:'Cargando invitación…', preparingPdf:'Validando tu acceso y preparando el PDF.', inviteFailed:'No fue posible abrir esta invitación', documentForSigning:'Documento para firmar', secureSigning:'Rubrica · firma segura', adminView:'Vista administrativa', hello:'Hola, {name}', notSigner:'No eres firmante de este documento.', chooseStamp:'Lee el documento y elige dónde debe aparecer el sello.', currentAccount:'Cuenta actual', notRegisteredSigner:'No estás registrado como firmante de esta solicitud', signingAs:'Firmando como', signedBy:'Firmado por', signDocument:'Firmar documento', downloadPdf:'Descargar PDF', downloadSignedPdf:'Descargar PDF firmado', decline:'Rechazar', signInAsSigner:'Entrar como firmante', readonlyAdmin:'Vista administrativa de solo lectura', documentFinalized:'Documento finalizado', evidenceTitle:'Registro de evidencias', evidenceIntro:'Para proteger esta firma, registraremos:', evidenceIdentity:'nombre, correo e identificador seudonimizado;', evidenceDevice:'fecha, IP, navegador, plataforma y pantalla;', evidenceDocument:'hash del documento y posición del sello;', evidenceLocation:'ubicación solo si la autorizas.', evidenceStored:'Las evidencias se incorporarán al PDF firmado.', evidenceConsent:'He leído y acepto este registro de evidencias.', consentRequired:'Confirma el consentimiento para continuar.', shareLocation:'¿Compartir ubicación?', withoutLocation:'Firmar sin ubicación', signedSuccess:'Firma completada correctamente.', finish:'Finalizar',
+    dashboardSecurity:'Seguridad', workspaceLoading:'Cargando tu espacio de trabajo…', connected:'Has iniciado sesión', signerLinkHelp:'Usa el enlace recibido para abrir la solicitud.', overview:'Resumen', signatureCenter:'Centro de firmas', dashboardHelp:'Organiza documentos, acompaña solicitudes y consulta evidencias.', newUser:'Nuevo usuario', documentsPlural:'Documentos', filesAvailable:'archivos disponibles', inSigning:'En firma', openRequests:'solicitudes abiertas', completedPlural:'Completadas', finishedProcesses:'procesos finalizados', planUsage:'Plan y uso', signaturesByAccount:'Firmas por cuenta', monitoring:'Seguimiento', requests:'Solicitudes', requestsHelp:'Consulta el progreso y abre los detalles.', show:'Mostrar', all:'Todas', open:'Abiertas', drafts:'Borradores', request:'Solicitud', status:'Estado', deadline:'Plazo', actions:'Acciones', details:'Detalles', noRequests:'No hay solicitudes en este filtro', collection:'Archivo', documentsHelp:'Archivos disponibles para consulta.', uploadPdf:'+ Subir PDF', file:'Archivo', version:'Versión', view:'Visualizar', requestSignature:'Solicitar firma', deleteAction:'Eliminar', noDocuments:'No hay documentos', firstPdf:'Sube el primer PDF para iniciar.', ready:'Disponible',
+    genericErrorTitle:'No fue posible completar', attention:'Atención', success:'Todo listo', unexpectedError:'Ocurrió un error inesperado.', connectionError:'No fue posible conectar con el servidor.', invalidData:'Los datos enviados no son válidos.', sessionExpired:'Tu sesión expiró. Inicia sesión nuevamente.', forbidden:'No tienes permiso para realizar esta acción.', notFound:'No se encontró el recurso solicitado.', conflict:'La operación no puede completarse.', linkGone:'Este enlace ya no está disponible.', tooLarge:'El archivo supera el tamaño permitido.', invalidFields:'Revisa los campos.', serverError:'El servidor encontró un problema.', serviceUnavailable:'El servicio no está disponible temporalmente.', fieldRequired:'es obligatorio', invalidValue:'valor no válido', profile:'Perfil', expirationDate:'Fecha de vencimiento', document:'Documento', stamp:'Sello', page:'Página', horizontalPosition:'Posición horizontal', verticalPosition:'Posición vertical',
+  }),
   'pt-BR': Object.assign({}, en, {
     updateAvailable:'Nova versão disponível', updateHelp:'Atualize agora para usar a versão mais recente do Rubrica.', updateNow:'Atualizar', later:'Depois',
     brazil:'Brasil', japan:'Japão', portugal:'Portugal', unitedStates:'Estados Unidos', signerRoleHelp:'Assina somente os documentos em que foi incluído.', operatorRoleHelp:'Gerencia documentos, solicitações e signatários.', auditorRoleHelp:'Consulta documentos e evidências sem alterar o fluxo.', administratorRoleHelp:'Acesso total, incluindo usuários e configurações administrativas.',
@@ -73,17 +82,18 @@ export class I18nService {
   }
 
   applyProfileLocale(locale: string | null | undefined): void {
-    if (locale === 'pt-BR' || locale === 'en' || locale === 'ja-JP') this.setLocale(locale);
+    if (locale === 'pt-BR' || locale === 'en' || locale === 'es' || locale === 'ja-JP') this.setLocale(locale);
   }
 
   private initialLocale(): Locale {
     if (!this.browser) return 'en';
     const stored = localStorage.getItem('rubrica_locale');
-    if (stored === 'pt-BR' || stored === 'en' || stored === 'ja-JP') return stored;
+    if (stored === 'pt-BR' || stored === 'en' || stored === 'es' || stored === 'ja-JP') return stored;
     for (const candidate of navigator.languages.length ? navigator.languages : [navigator.language]) {
       const language = candidate.toLowerCase();
       if (language.startsWith('pt')) return 'pt-BR';
       if (language.startsWith('ja')) return 'ja-JP';
+      if (language.startsWith('es')) return 'es';
     }
     return 'en';
   }

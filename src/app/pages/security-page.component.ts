@@ -18,7 +18,7 @@ interface RecoveryCodes { recovery_codes: string[]; }
   imports: [FormsModule, RouterLink],
   template: `
     <main class="settings-shell">
-      <header class="settings-top"><a routerLink="/dashboard" class="brand">Rubrica<span>.</span></a><div class="button-row"><select [ngModel]="i18n.locale()" (ngModelChange)="changeLocale($event)" [attr.aria-label]="i18n.text('language')"><option value="pt-BR">Português</option><option value="en">English</option><option value="ja-JP">日本語</option></select><button class="button secondary" (click)="logout()">{{ i18n.text('logout') }}</button></div></header>
+      <header class="settings-top"><a routerLink="/dashboard" class="brand">Rubrica<span>.</span></a><div class="button-row"><select [ngModel]="i18n.locale()" (ngModelChange)="changeLocale($event)" [attr.aria-label]="i18n.text('language')"><option value="pt-BR">Português</option><option value="en">English</option><option value="es">Español</option><option value="ja-JP">日本語</option></select><button class="button secondary" (click)="logout()">{{ i18n.text('logout') }}</button></div></header>
       <section class="settings-card card">
         <p class="eyebrow">{{ i18n.text('security') }}</p><h1>Microsoft Authenticator</h1>
         <p class="muted">{{ i18n.text('securityHelp') }}</p>

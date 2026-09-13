@@ -20,7 +20,7 @@ import { I18nService, Locale } from '../core/i18n.service';
     <main class="shell">
       <header class="topbar">
         <div class="brand">Rubrica<span>.</span></div>
-        <div class="topbar-account"><select [ngModel]="i18n.locale()" (ngModelChange)="changeLocale($event)" [attr.aria-label]="i18n.text('language')"><option value="pt-BR">Português</option><option value="en">English</option><option value="ja-JP">日本語</option></select><span class="user-chip">{{ auth.context()?.subject }}</span><button class="button ghost" (click)="security()">{{ i18n.text('dashboardSecurity') }}</button><button class="button ghost" (click)="logout()">{{ i18n.text('logout') }}</button></div>
+        <div class="topbar-account"><select [ngModel]="i18n.locale()" (ngModelChange)="changeLocale($event)" [attr.aria-label]="i18n.text('language')"><option value="pt-BR">Português</option><option value="en">English</option><option value="es">Español</option><option value="ja-JP">日本語</option></select><span class="user-chip">{{ auth.context()?.subject }}</span><button class="button ghost" (click)="security()">{{ i18n.text('dashboardSecurity') }}</button><button class="button ghost" (click)="logout()">{{ i18n.text('logout') }}</button></div>
       </header>
 
       <section class="container dashboard-container">

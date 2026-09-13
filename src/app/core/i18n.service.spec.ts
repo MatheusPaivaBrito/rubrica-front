@@ -7,7 +7,7 @@ describe('I18nService', () => {
 
   it('resolves the main product areas in every supported locale', () => {
     const service = TestBed.inject(I18nService);
-    for (const locale of ['pt-BR', 'en', 'ja-JP'] satisfies Locale[]) {
+    for (const locale of ['pt-BR', 'en', 'es', 'ja-JP'] satisfies Locale[]) {
       service.setLocale(locale);
       for (const key of representativeKeys) expect(service.text(key)).toBeTruthy();
     }

@@ -39,7 +39,7 @@ import { I18nService, Locale } from '../core/i18n.service';
 
         <aside class="signing-actions-pane">
           <div>
-            <div class="signing-language"><p class="eyebrow">{{ i18n.text('secureSigning') }}</p><select [value]="i18n.locale()" (change)="changeLocale($any($event.target).value)" [attr.aria-label]="i18n.text('language')"><option value="pt-BR">Português</option><option value="en">English</option><option value="ja-JP">日本語</option></select></div>
+            <div class="signing-language"><p class="eyebrow">{{ i18n.text('secureSigning') }}</p><select [value]="i18n.locale()" (change)="changeLocale($any($event.target).value)" [attr.aria-label]="i18n.text('language')"><option value="pt-BR">Português</option><option value="en">English</option><option value="es">Español</option><option value="ja-JP">日本語</option></select></div>
             <h2>{{ administrativeView() ? i18n.text('adminView') : i18n.text('hello', { name: context()!.signer.name }) }}</h2>
             <p class="muted">{{ administrativeView() ? i18n.text('notSigner') : i18n.text('chooseStamp') }}</p>
           </div>

@@ -16,7 +16,7 @@ interface IdentityOption { value: string; label: MessageKey }
     <main class="login-layout account-layout"><section class="card auth-card account-card">
       <header class="account-heading">
         <a class="account-brand" routerLink="/"><img src="icons/rubrica-mark.png" alt="" /><span>Rubrica</span></a>
-        <div class="auth-language"><label class="sr-only" for="account-language">{{ i18n.text('language') }}</label><select id="account-language" [ngModel]="i18n.locale()" (ngModelChange)="i18n.setLocale($event)" [attr.aria-label]="i18n.text('language')"><option value="pt-BR">Português</option><option value="en">English</option><option value="ja-JP">日本語</option></select></div>
+        <div class="auth-language"><label class="sr-only" for="account-language">{{ i18n.text('language') }}</label><select id="account-language" [ngModel]="i18n.locale()" (ngModelChange)="i18n.setLocale($event)" [attr.aria-label]="i18n.text('language')"><option value="pt-BR">Português</option><option value="en">English</option><option value="es">Español</option><option value="ja-JP">日本語</option></select></div>
       </header>
       <div class="account-title"><p class="eyebrow">Acesso seguro</p><h1>{{ i18n.text(titleKey) }}</h1>@if (mode === 'register') { <p class="muted">Comece com 5 assinaturas gratuitas. Nenhum cartão é necessário.</p> }</div>
       @if (mode === 'register') {

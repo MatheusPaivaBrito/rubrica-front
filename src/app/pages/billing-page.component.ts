@@ -18,7 +18,7 @@ import { BillingAccount, BillingCheckout, BillingPortal, TenantItem } from '../c
         <a routerLink="/dashboard" class="brand">Rubrica<span>.</span></a>
         <div class="top-actions">
           <select [ngModel]="i18n.locale()" (ngModelChange)="changeLocale($event)" [attr.aria-label]="i18n.text('language')">
-            <option value="pt-BR">Português</option><option value="en">English</option><option value="ja-JP">日本語</option>
+            <option value="pt-BR">Português</option><option value="en">English</option><option value="es">Español</option><option value="ja-JP">日本語</option>
           </select>
           <a routerLink="/dashboard" class="button secondary">{{ i18n.text('backDashboard') }}</a>
         </div>

@@ -10,7 +10,7 @@ import { TenantItem } from './models';
 export interface AccessContext {
   version: number;
   subject: string;
-  preferred_locale: 'pt-BR' | 'en' | 'ja-JP';
+  preferred_locale: 'pt-BR' | 'en' | 'es' | 'ja-JP';
   mfa_enabled: boolean;
   mfa_setup_required: boolean;
   roles: string[];

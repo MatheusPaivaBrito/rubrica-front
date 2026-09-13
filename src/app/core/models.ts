@@ -34,7 +34,7 @@ export interface BillingAccount {
 }
 export interface BillingCheckout { checkout_url: string; }
 export interface BillingPortal { portal_url: string; }
-export interface StampPosition { page: number; x: number; y: number; locale?: 'pt-BR' | 'en' | 'ja-JP'; timezone?: string; }
+export interface StampPosition { page: number; x: number; y: number; locale?: 'pt-BR' | 'en' | 'es' | 'ja-JP'; timezone?: string; }
 export interface SigningContext {
   request: SignatureRequest;
   signer: Signer;
