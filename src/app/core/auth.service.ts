@@ -85,7 +85,7 @@ export class AuthService {
   async dashboardUrl(): Promise<string> {
     try {
       const tenants = await firstValueFrom(this.http.get<TenantItem[]>('/tenants'));
-      return tenants.length ? `/tenant/${tenants[0].id}/dashboard` : '/dashboard';
+      return tenants.length ? `/tenant/${tenants[0].slug}/dashboard` : '/dashboard';
     } catch {
       return '/dashboard';
     }
