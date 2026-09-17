@@ -203,7 +203,9 @@ export class SigningPageComponent implements OnInit {
     return this.i18n.formatDate(value);
   }
 
-  identityLabel(): string { const signer = this.context()?.signer; if (!signer?.identity_document_masked) return ''; const type = (signer.identity_document_type ?? '').replace('BR_', '').replace('PT_', '').replaceAll('_', ' '); return `${type} ${signer.identity_document_masked}`.trim(); }
+  identityLabel(): string { const signer = this.context()?.signer; if (!signer?.identity_document_masked) return ''; const type = (signer.identity_document_type ?? '').replace('BR_', '').replace('PT_', '').replaceAll('_', ' '); const country = this.alpha3Country(signer.identity_document_country); return [country, `${type} ${signer.identity_document_masked}`.trim()].filter(Boolean).join(' · '); }
+
+  private alpha3Country(country: string | null | undefined): string { return ({ BR: 'BRA', JP: 'JPN', PT: 'PRT', US: 'USA' } as Record<string, string>)[(country ?? '').toUpperCase()] ?? (country ?? '').toUpperCase(); }
 
   statusLabel(): string {
     return this.context()?.signer.status === 'declined' ? this.i18n.text('declinedSignature') : this.i18n.text('signedDocument');
