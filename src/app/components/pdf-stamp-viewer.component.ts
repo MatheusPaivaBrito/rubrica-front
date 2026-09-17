@@ -43,6 +43,7 @@ interface PdfPageView {
             >
               <span>Assinado por</span>
               <strong>{{ signerName }}</strong>
+              @if (signerIdentity) { <small class="stamp-identity">{{ signerIdentity }}</small> }
               <small>{{ stampDate | date:'dd/MM/yyyy HH:mm' }}</small>
             </div>
           }
@@ -56,6 +57,7 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
   @Input({ required: true }) token = '';
   @Input() documentEndpoint = 'document';
   @Input({ required: true }) signerName = '';
+  @Input() signerIdentity = '';
   @Input() stampDate: string | Date = new Date();
   @Input() placement: StampPosition | null = null;
   @Input() readonly = false;

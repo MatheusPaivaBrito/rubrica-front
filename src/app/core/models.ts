@@ -16,7 +16,7 @@ export interface SignatureEvidence {
   artifact_sha256: string;
   evidence: Record<string, unknown>;
 }
-export interface Signer { id: string; name: string; email: string; status: string; signed_at: string | null; }
+export interface Signer { id: string; name: string; email: string; status: string; signed_at: string | null; identity_document_type?: string | null; identity_document_country?: string | null; identity_document_masked?: string | null; }
 export interface UserCreated { id: string; name: string; email: string; role: string; is_active: boolean; }
 export interface SignerOption { id: string; name: string; email: string; }
 export interface TenantItem { id: string; name: string; role: string; currency: string; }

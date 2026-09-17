@@ -30,6 +30,7 @@ import { I18nService, Locale } from '../core/i18n.service';
             [token]="token"
             [documentEndpoint]="documentEndpoint()"
             [signerName]="context()!.signer.name"
+            [signerIdentity]="identityLabel()"
             [stampDate]="context()!.signer.signed_at || stampPreviewDate"
             [placement]="placement()"
             [readonly]="completed()"
@@ -56,11 +57,12 @@ import { I18nService, Locale } from '../core/i18n.service';
               <small>{{ i18n.text('signingAs') }}</small>
               <strong>{{ context()!.signer.name }}</strong>
               <span>{{ context()!.signer.email }}</span>
+              @if (context()!.signer.identity_document_masked) { <span><i class="bi bi-person-vcard"></i> {{ identityLabel() }}</span> }
             </section>
           }
 
           @if (!administrativeView()) { <section class="stamp-instructions" [class.ready]="placement()">
-            <div class="mini-stamp"><span>{{ i18n.text('signedBy') }}</span><strong>{{ context()!.signer.name }}</strong><small>{{ stampDateLabel() }}</small></div>
+            <div class="mini-stamp"><span>{{ i18n.text('signedBy') }}</span><strong>{{ context()!.signer.name }}</strong>@if (identityLabel()) { <small class="stamp-identity">{{ identityLabel() }}</small> }<small>{{ stampDateLabel() }}</small></div>
             @if (placement()) {
               <p>{{ i18n.text('stampPlaced', { page: placement()!.page }) }}</p>
             } @else {
@@ -112,7 +114,7 @@ export class SigningPageComponent implements OnInit {
       this.applyContext(context);
       if (context.viewer_mode === 'signer' && context.signer.status === 'pending') {
         const signer = await firstValueFrom(this.api.post<Signer>(`/signing/links/${this.token}/view`, {}));
-        this.context.update(current => current ? { ...current, signer } : current);
+        this.context.update(current => current ? { ...current, signer: { ...current.signer, ...signer } } : current);
       }
     } catch (error) {
       this.error.set(this.feedback.message(error, this.i18n.text('invalidInvite')));
@@ -200,6 +202,8 @@ export class SigningPageComponent implements OnInit {
     const value = this.context()?.signer.signed_at || this.stampPreviewDate;
     return this.i18n.formatDate(value);
   }
+
+  identityLabel(): string { const signer = this.context()?.signer; if (!signer?.identity_document_masked) return ''; const type = (signer.identity_document_type ?? '').replace('BR_', '').replace('PT_', '').replaceAll('_', ' '); return `${type} ${signer.identity_document_masked}`.trim(); }
 
   statusLabel(): string {
     return this.context()?.signer.status === 'declined' ? this.i18n.text('declinedSignature') : this.i18n.text('signedDocument');

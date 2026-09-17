@@ -195,7 +195,21 @@ input:focus, select:focus { outline: 3px solid rgba(168, 32, 53, .16); border-co
 .account-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 2rem; }
 .account-brand { display: inline-flex; align-items: center; gap: .65rem; color: #3b151d; font-size: 1.25rem; font-weight: 850; letter-spacing: -.04em; text-decoration: none; }
 .account-brand img { width: 42px; height: 42px; object-fit: contain; }
-.account-heading select { width: auto; min-height: 40px; border-color: #e4cecb; background: #fffaf8; }
+.language-picker { position: relative; z-index: 5; }
+.language-picker summary { display: flex; align-items: center; gap: .55rem; min-width: 150px; min-height: 44px; padding: .65rem .8rem; border: 1px solid #ead8d5; border-radius: 13px; color: #532029; background: rgba(255, 250, 248, .88); box-shadow: 0 5px 16px rgba(86, 27, 36, .06); cursor: pointer; list-style: none; transition: border-color .18s ease, background .18s ease, box-shadow .18s ease; }
+.language-picker summary::-webkit-details-marker { display: none; }
+.language-picker summary:hover { border-color: #d9b8b5; background: #fff6f3; }
+.language-picker summary:focus-visible { outline: 3px solid rgba(168, 32, 53, .13); border-color: #b84a59; }
+.language-picker summary > i:first-child { color: #ae3445; font-size: .95rem; }
+.language-picker summary span { flex: 1; }
+.picker-chevron { color: #9b6870; font-size: .72rem; transition: transform .18s ease; }
+.language-picker[open] .picker-chevron { transform: rotate(180deg); }
+.language-options { position: absolute; top: calc(100% + .45rem); right: 0; display: grid; width: 190px; padding: .4rem; border: 1px solid #ead8d5; border-radius: 14px; background: rgba(255, 252, 250, .98); box-shadow: 0 18px 42px rgba(74, 22, 31, .14); animation: language-menu-in .14s ease-out; }
+.language-options button { display: flex; align-items: center; justify-content: space-between; gap: .75rem; width: 100%; padding: .7rem .75rem; border: 0; border-radius: 9px; color: #583039; background: transparent; text-align: left; cursor: pointer; }
+.language-options button:hover, .language-options button:focus-visible { outline: none; color: #7e1728; background: #fff0ed; }
+.language-options button.active { color: #8f1d2c; background: #f9e4e1; font-weight: 750; }
+.language-options button i { color: #b6293d; }
+@keyframes language-menu-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 .account-title { margin-bottom: 1.5rem; }
 .account-title h1 { margin: .1rem 0 .5rem; color: #32171c; font: 500 clamp(2.35rem, 7vw, 3.5rem) Georgia, 'Times New Roman', serif; letter-spacing: -.055em; }
 .account-title p { margin-bottom: 0; line-height: 1.5; }
@@ -224,10 +238,12 @@ input:focus, select:focus { outline: 3px solid rgba(168, 32, 53, .16); border-co
 .stamp-instructions { padding: 1rem; border: 1px dashed #9cacbf; border-radius: 12px; background: #f8fafc; }
 .stamp-instructions.ready { border-color: #a82035; background: #fff5f3; }
 .stamp-instructions p { margin: .75rem 0 0; color: #596579; font-size: .86rem; }
-.mini-stamp, .signature-stamp { display: grid; gap: .05rem; width: 205px; padding: .45rem .65rem; border: 2px solid #a82035; border-radius: 5px; color: #8f1d2c; background: rgba(255, 245, 243, .94); box-shadow: 0 3px 10px rgba(86, 27, 36, .18); line-height: 1.15; }
+.mini-stamp, .signature-stamp { display: grid; gap: .12rem; width: 255px; max-width: calc(100% - 12px); box-sizing: border-box; padding: .55rem .7rem; overflow: hidden; border: 2px solid #a82035; border-radius: 6px; color: #8f1d2c; background: rgba(255, 245, 243, .96); box-shadow: 0 3px 10px rgba(86, 27, 36, .18); line-height: 1.15; }
 .mini-stamp span, .signature-stamp span { font-size: .58rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .mini-stamp strong, .signature-stamp strong { overflow: hidden; font-size: .8rem; text-overflow: ellipsis; white-space: nowrap; }
-.mini-stamp small, .signature-stamp small { font-size: .64rem; }
+.mini-stamp small, .signature-stamp small { overflow: hidden; font-size: .64rem; text-overflow: ellipsis; white-space: nowrap; }
+.mini-stamp .stamp-identity, .signature-stamp .stamp-identity { color: #613940; font-weight: 700; }
+.signer-identity { color: #5f2630; font-weight: 700; }
 .signing-actions { display: grid; gap: .65rem; margin-top: auto; }
 .button.subtle { color: #8a3530; background: transparent; border: 1px solid #edcfcc; }
 .pdf-canvas-viewer { display: grid; justify-items: center; gap: 1.25rem; width: min(100%, 1100px); min-height: 70vh; margin: 0 auto; padding: clamp(.75rem, 2vw, 1.5rem); border-radius: 12px; background: #32363c; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08), 0 8px 30px rgba(27, 37, 49, .15); }
@@ -328,7 +344,7 @@ input:focus, select:focus { outline: 3px solid rgba(168, 32, 53, .16); border-co
   .page-hint { max-width: none; }
   .signing-actions-pane { position: static; height: auto; min-height: 40vh; border-top: 1px solid #dbe3ed; border-left: 0; }
   .signing-actions { margin-top: 0; }
-  .signature-stamp { width: min(205px, 48%); }
+  .signature-stamp { width: min(255px, 58%); }
   .dashboard-header { align-items: stretch; flex-direction: column; gap: 1rem; }
   .stats-grid { grid-template-columns: 1fr; }
   .stat-card { min-height: 105px; }

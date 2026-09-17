@@ -5,7 +5,7 @@ import { firstValueFrom } from 'rxjs';
 
 import { ApiService } from '../core/api.service';
 import { FeedbackService } from '../core/feedback.service';
-import { I18nService, MessageKey } from '../core/i18n.service';
+import { I18nService, Locale, MessageKey } from '../core/i18n.service';
 
 interface IdentityOption { value: string; label: MessageKey }
 
@@ -16,20 +16,26 @@ interface IdentityOption { value: string; label: MessageKey }
     <main class="login-layout account-layout"><section class="card auth-card account-card">
       <header class="account-heading">
         <a class="account-brand" routerLink="/"><img src="icons/rubrica-mark.png" alt="" /><span>Rubrica</span></a>
-        <div class="auth-language"><label class="sr-only" for="account-language">{{ i18n.text('language') }}</label><select id="account-language" [ngModel]="i18n.locale()" (ngModelChange)="i18n.setLocale($event)" [attr.aria-label]="i18n.text('language')"><option value="pt-BR">Português</option><option value="en">English</option><option value="es">Español</option><option value="ja-JP">日本語</option></select></div>
+        <details class="language-picker" #languageMenu>
+          <summary [attr.aria-label]="i18n.text('language')"><i class="bi bi-translate"></i><span>{{ languageName() }}</span><i class="bi bi-chevron-down picker-chevron"></i></summary>
+          <div class="language-options" role="menu">
+            @for (language of languages; track language.locale) {
+              <button type="button" role="menuitem" [class.active]="i18n.locale() === language.locale" (click)="changeLanguage(language.locale, languageMenu)"><span>{{ language.label }}</span>@if (i18n.locale() === language.locale) { <i class="bi bi-check2"></i> }</button>
+            }
+          </div>
+        </details>
       </header>
       <div class="account-title"><p class="eyebrow">Acesso seguro</p><h1>{{ i18n.text(titleKey) }}</h1>@if (mode === 'register') { <p class="muted">Comece com 5 assinaturas gratuitas. Nenhum cartão é necessário.</p> }</div>
       @if (mode === 'register') {
         <form class="form" (ngSubmit)="register()">
           <label>{{ i18n.text('name') }} <input name="name" [(ngModel)]="name" required autocomplete="name" /></label>
           <label>{{ i18n.text('email') }} <input name="email" type="email" [(ngModel)]="email" required autocomplete="email" /></label>
-          <label>{{ i18n.text('password') }} <input name="password" type="password" [(ngModel)]="password" minlength="8" required autocomplete="new-password" /></label>
           <fieldset class="form identity-fieldset"><legend>{{ i18n.text('optionalIdentity') }}</legend><p class="field-help">Você pode informar o documento agora ou completar seu perfil depois.</p>
             <label>{{ i18n.text('documentCountry') }} <input name="country" [(ngModel)]="country" (ngModelChange)="countryChanged()" list="country-options" maxlength="2" placeholder="BR, JP, PT…" autocomplete="country" /></label>
             <datalist id="country-options"><option value="BR">Brasil</option><option value="JP">日本</option><option value="PT">Portugal</option><option value="US">United States</option></datalist>
             @if (country) {
-              <label>{{ i18n.text('documentType') }} <select name="type" [(ngModel)]="documentType">@for (option of documentOptions(); track option.value) { <option [value]="option.value">{{ i18n.text(option.label) }}</option> }</select></label>
-              <label>{{ i18n.text('documentNumber') }} <input name="document" [(ngModel)]="documentValue" minlength="4" maxlength="80" required autocomplete="off" /></label>
+              <label>{{ i18n.text('documentType') }} <select name="type" [ngModel]="documentType" (ngModelChange)="documentTypeChanged($event)">@for (option of documentOptions(); track option.value) { <option [value]="option.value">{{ i18n.text(option.label) }}</option> }</select></label>
+              <label>{{ i18n.text('documentNumber') }} <input name="document" [ngModel]="documentValue" (ngModelChange)="documentValueChanged($event)" [placeholder]="documentPlaceholder()" [maxlength]="documentMaxLength()" [attr.inputmode]="documentInputMode()" minlength="4" required autocomplete="off" /></label>
             }
           </fieldset>
           <button class="button">{{ i18n.text('createAccount') }}</button>
@@ -38,15 +44,28 @@ interface IdentityOption { value: string; label: MessageKey }
         <form class="form" (ngSubmit)="requestReset()"><label>{{ i18n.text('email') }} <input name="email" type="email" [(ngModel)]="email" required /></label><button class="button">{{ i18n.text('sendRecovery') }}</button></form>
       } @else if (mode === 'reset-password') {
         <form class="form" (ngSubmit)="resetPassword()"><label>{{ i18n.text('newPassword') }} <input name="password" type="password" [(ngModel)]="password" minlength="8" required /></label><button class="button">{{ i18n.text('changePassword') }}</button></form>
-      } @else { <p>{{ i18n.text('verifyingEmail') }}</p> }
+      } @else {
+        <form class="form" (ngSubmit)="activateAccount()">
+          <p class="muted">{{ i18n.text('activationHelp') }}</p>
+          <label>{{ i18n.text('newPassword') }} <input name="password" type="password" [(ngModel)]="password" minlength="8" required autocomplete="new-password" /></label>
+          <label>{{ i18n.text('confirmPassword') }} <input name="passwordConfirmation" type="password" [(ngModel)]="passwordConfirmation" minlength="8" required autocomplete="new-password" /></label>
+          <button class="button">{{ i18n.text('activateAccount') }}</button>
+        </form>
+      }
       <p class="account-back"><a routerLink="/login"><i class="bi bi-arrow-left"></i> {{ i18n.text('backToLogin') }}</a></p>
     </section></main>
   `,
 })
 export class AccountPageComponent implements OnInit {
+  readonly languages: readonly { locale: Locale; label: string }[] = [
+    { locale: 'pt-BR', label: 'Português' },
+    { locale: 'en', label: 'English' },
+    { locale: 'es', label: 'Español' },
+    { locale: 'ja-JP', label: '日本語' },
+  ];
   titleKey: MessageKey = 'account';
   mode = '';
-  name = ''; email = ''; password = ''; country = ''; documentType = 'PASSPORT'; documentValue = '';
+  name = ''; email = ''; password = ''; passwordConfirmation = ''; country = ''; documentType = 'PASSPORT'; documentValue = '';
   private token = '';
 
   constructor(private readonly route: ActivatedRoute, private readonly router: Router, private readonly api: ApiService, private readonly feedback: FeedbackService, readonly i18n: I18nService) {}
@@ -56,7 +75,6 @@ export class AccountPageComponent implements OnInit {
     this.token = this.route.snapshot.queryParamMap.get('token') ?? '';
     const titleKeys: Record<string, MessageKey> = { register: 'createAccount', 'forgot-password': 'recovery', 'reset-password': 'newPassword', 'verify-email': 'verifyEmail' };
     this.titleKey = titleKeys[this.mode] ?? 'account';
-    if (this.mode === 'verify-email') await this.action('/auth/verify-email', { token: this.token }, this.i18n.text('emailVerified'));
   }
 
   documentOptions(): IdentityOption[] {
@@ -67,7 +85,30 @@ export class AccountPageComponent implements OnInit {
   }
 
   countryChanged(): void { this.country = this.country.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2); this.documentType = this.documentOptions()[0]?.value ?? 'PASSPORT'; this.documentValue = ''; }
-  async register(): Promise<void> { const accepted = await this.action('/auth/register', { name: this.name, email: this.email, password: this.password, preferred_locale: this.i18n.locale(), identity_document_type: this.country ? this.documentType : null, identity_document_country: this.country || null, identity_document_value: this.country ? this.documentValue : null }, this.i18n.text('registrationSent')); if (accepted) await this.router.navigate(['/']); }
+  documentTypeChanged(type: string): void { this.documentType = type; this.documentValue = ''; }
+  documentValueChanged(value: string): void {
+    if (this.documentType === 'BR_CPF') {
+      const digits = value.replace(/\D/g, '').slice(0, 11);
+      this.documentValue = digits.replace(/(\d{3})(?=\d)/g, '$1.').replace(/\.(\d{3})\.(\d{3})\.(\d{1,2})$/, '.$1.$2-$3');
+      return;
+    }
+    if (this.documentType === 'PT_NIF') {
+      this.documentValue = value.replace(/\D/g, '').slice(0, 9).replace(/(\d{3})(?=\d)/g, '$1 ').trimEnd();
+      return;
+    }
+    this.documentValue = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, this.documentType === 'PASSPORT' ? 12 : 30);
+  }
+  documentPlaceholder(): string { return this.documentType === 'BR_CPF' ? '000.000.000-00' : this.documentType === 'PT_NIF' ? '000 000 000' : this.documentType === 'PASSPORT' ? 'AB1234567' : ''; }
+  documentMaxLength(): number { return this.documentType === 'BR_CPF' ? 14 : this.documentType === 'PT_NIF' ? 11 : this.documentType === 'PASSPORT' ? 12 : 30; }
+  documentInputMode(): string { return this.documentType === 'BR_CPF' || this.documentType === 'PT_NIF' ? 'numeric' : 'text'; }
+  languageName(): string { return this.languages.find(language => language.locale === this.i18n.locale())?.label ?? 'Português'; }
+  changeLanguage(locale: Locale, menu: HTMLDetailsElement): void { this.i18n.setLocale(locale); menu.removeAttribute('open'); }
+  async register(): Promise<void> { const accepted = await this.action('/auth/register', { name: this.name, email: this.email, preferred_locale: this.i18n.locale(), identity_document_type: this.country ? this.documentType : null, identity_document_country: this.country || null, identity_document_value: this.country ? this.documentValue : null }, this.i18n.text('registrationSent')); if (accepted) await this.router.navigate(['/']); }
+  async activateAccount(): Promise<void> {
+    if (!this.token || this.password !== this.passwordConfirmation) { await this.feedback.error(this.i18n.text('passwordMismatch')); return; }
+    const activated = await this.action('/auth/verify-email', { token: this.token, new_password: this.password }, this.i18n.text('emailVerified'));
+    if (activated) await this.router.navigate(['/login']);
+  }
   requestReset() { return this.action('/auth/password-recovery', { email: this.email }, this.i18n.text('recoverySent')); }
   resetPassword() { return this.action('/auth/password-reset', { token: this.token, new_password: this.password }, this.i18n.text('passwordChanged')); }
   private async action(path: string, body: unknown, message: string): Promise<boolean> {
