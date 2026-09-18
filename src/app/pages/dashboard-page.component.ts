@@ -1,7 +1,6 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import Swal from 'sweetalert2';
@@ -14,10 +13,11 @@ import { BillingAccount, DocumentItem, SignatureEvidence, SignatureRequest, Sign
 import { dateTime } from '../core/date-time';
 import { I18nService } from '../core/i18n.service';
 import { LanguagePickerComponent } from '../components/language-picker.component';
+import { PdfStampViewerComponent } from '../components/pdf-stamp-viewer.component';
 
 @Component({
   standalone: true,
-  imports: [DecimalPipe, FormsModule, LanguagePickerComponent],
+  imports: [DecimalPipe, FormsModule, LanguagePickerComponent, PdfStampViewerComponent],
   template: `
     <main class="shell">
       <header class="topbar">
@@ -126,7 +126,7 @@ import { LanguagePickerComponent } from '../components/language-picker.component
                 <section class="detail-panel action-panel">
                   @if (selectedRequest()!.status === 'draft') {
                     <div><h3>{{ i18n.text('addSigner') }}</h3><p class="muted">{{ i18n.text('inviteSignerHelp') }}</p></div>
-                    @if (signerContacts().length) { <div class="contact-picker"><label>{{ i18n.text('previousInvitees') }}<input [ngModel]="contactSearch()" (ngModelChange)="contactSearch.set($event)" (focus)="contactPickerOpen.set(true)" (blur)="contactPickerOpen.set(false)" name="contactSearch" [placeholder]="i18n.text('nameOrEmail')" autocomplete="off" /></label>@if (contactPickerOpen()) { <div class="contact-options" role="listbox">@for (contact of filteredContacts(); track contact.email) { <button type="button" role="option" (mousedown)="$event.preventDefault()" (click)="selectContact(contact)"><strong>{{ contact.name }}</strong><span>{{ contact.email }}</span></button> } @empty { <p>{{ i18n.text('noUser') }}</p> }</div> }</div> }
+                    @if (signerContacts().length) { <div class="contact-picker"><label>{{ i18n.text('previousInvitees') }}<input [ngModel]="contactSearch()" (ngModelChange)="contactSearch.set($event)" (focus)="contactPickerOpen.set(true)" (blur)="contactPickerOpen.set(false)" name="contactSearch" [placeholder]="i18n.text('nameOrEmail')" autocomplete="off" /></label>@if (contactPickerOpen()) { <div class="contact-options" role="listbox">@for (contact of filteredContacts(); track contact.email) { <button type="button" role="option" [attr.aria-selected]="signerEmail === contact.email" (mousedown)="$event.preventDefault()" (click)="selectContact(contact)"><strong>{{ contact.name }}</strong><span>{{ contact.email }}</span></button> } @empty { <p>{{ i18n.text('noUser') }}</p> }</div> }</div> }
                     <form class="form" (ngSubmit)="addSigner()"><label>{{ i18n.text('name') }}<input name="signerName" [(ngModel)]="signerName" required autocomplete="name" /></label><label>{{ i18n.text('email') }}<input name="signerEmail" type="email" [(ngModel)]="signerEmail" required autocomplete="email" /></label><button class="button" [disabled]="submitting() || !signerName.trim() || !signerEmail.trim()">{{ i18n.text('add') }}</button></form><hr /><button class="button secondary full-width" (click)="openRequest()" [disabled]="submitting() || !signers().length">{{ i18n.text('openForSigning') }}</button>
                   } @else {
                     <div><h3>{{ i18n.text('documentAccess') }}</h3><p class="muted">{{ i18n.text('shareUnique') }}</p></div>
@@ -141,7 +141,7 @@ import { LanguagePickerComponent } from '../components/language-picker.component
         </section></div>
       }
 
-      @if (previewDocument()) { <div class="modal-backdrop pdf-backdrop" (click)="closePreview()"><section class="pdf-modal" (click)="$event.stopPropagation()"><header><div><strong>{{ previewHeading() }} · {{ previewDocument()!.title }}</strong><small>{{ previewDocument()!.original_filename }}</small></div><button class="modal-close" (click)="closePreview()" [attr.aria-label]="i18n.text('close')">×</button></header><iframe [src]="previewUrl()" [title]="i18n.text('view')"></iframe></section></div> }
+      @if (previewDocument()) { <div class="modal-backdrop pdf-backdrop" (click)="closePreview()"><section class="pdf-modal" (click)="$event.stopPropagation()"><header><div><strong>{{ previewHeading() }} · {{ previewDocument()!.title }}</strong><small>{{ previewDocument()!.original_filename }}</small></div><div class="pdf-modal-actions"><button class="button secondary compact" (click)="downloadPreview()"><i class="bi bi-download"></i> {{ i18n.text('downloadPdf') }}</button><button class="modal-close" (click)="closePreview()" [attr.aria-label]="i18n.text('close')">×</button></div></header><div class="pdf-modal-content"><app-pdf-stamp-viewer [sourceData]="previewData()" [readonly]="true" /></div></section></div> }
     </main>
   `,
 })
@@ -160,7 +160,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   readonly requestQrCode = signal('');
   readonly requestEvidence = signal<SignatureEvidence[]>([]);
   readonly previewDocument = signal<DocumentItem | null>(null);
-  readonly previewUrl = signal<SafeResourceUrl>('');
+  readonly previewData = signal<ArrayBuffer | null>(null);
   readonly previewHeading = signal('');
   readonly loading = signal(true);
   readonly submitting = signal(false);
@@ -181,7 +181,6 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   title = '';
   expiresAt = '';
   file: File | null = null;
-  private previewObjectUrl = '';
   private tenantSlug = '';
   private modalScrollY = 0;
   private modalBodyStyle: string | null = null;
@@ -193,7 +192,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     document.documentElement.style.setProperty('--rubrica-modal-height', `${viewport?.height ?? window.innerHeight}px`);
   };
 
-  constructor(readonly auth: AuthService, readonly i18n: I18nService, private readonly api: ApiService, private readonly route: ActivatedRoute, private readonly router: Router, private readonly sanitizer: DomSanitizer, private readonly feedback: FeedbackService) {}
+  constructor(readonly auth: AuthService, readonly i18n: I18nService, private readonly api: ApiService, private readonly route: ActivatedRoute, private readonly router: Router, private readonly feedback: FeedbackService) {}
 
   async ngOnInit(): Promise<void> { const context = await this.auth.restore(); if (!context) { await this.router.navigate(['/login']); return; } try { if (context.mfa_setup_required && !this.auth.isMfaDeferredForSession()) { await this.router.navigate(['/security']); return; } const dashboardUrl = await this.auth.dashboardUrl(); const routeSlug = this.route.snapshot.paramMap.get('tenantSlug'); if (!routeSlug) { await this.router.navigateByUrl(dashboardUrl, { replaceUrl: true }); return; } const tenants = await firstValueFrom(this.api.get<TenantItem[]>('/tenants')); const selectedTenant = tenants.find(tenant => tenant.slug === routeSlug); if (!selectedTenant) { await this.router.navigateByUrl(dashboardUrl, { replaceUrl: true }); return; } this.tenants.set(tenants); this.tenantSlug = selectedTenant.slug; if (this.canManage()) await Promise.all([this.reload(), this.loadBilling(tenants)]); } catch (error) { await this.feedback.error(error, this.i18n.text('dashboardLoadFailed')); } finally { this.loading.set(false); } }
   ngOnDestroy(): void { this.unlockPageScroll(); }
@@ -241,18 +240,17 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
 
   async preview(document: DocumentItem): Promise<void> {
     await this.run(async () => {
-      const response = await firstValueFrom(this.api.getBlob(`/documents/${document.id}/preview?version=${document.version}`));
-      if (!response.body) throw new Error('Document preview is empty');
-      this.releasePreviewObjectUrl();
-      this.previewObjectUrl = URL.createObjectURL(response.body);
+      const data = await firstValueFrom(this.api.getArrayBuffer(`/documents/${document.id}/preview?version=${document.version}`));
+      if (!data.byteLength) throw new Error('Document preview is empty');
       this.previewHeading.set(this.i18n.text('originalDocument'));
       this.previewDocument.set(document);
-      this.previewUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(this.previewObjectUrl));
+      this.previewData.set(data);
       this.syncModalLock();
     });
   }
-  async previewSignedRequest(): Promise<void> { const request = this.selectedRequest(); const document = this.documents().find(item => item.id === request?.document_id); if (!request || !document) return; await this.run(async () => { const response = await firstValueFrom(this.api.getBlob(`/signature-requests/${request.id}/signed-document`)); this.releasePreviewObjectUrl(); this.previewObjectUrl = URL.createObjectURL(response.body!); this.previewHeading.set(this.i18n.text('stampedPdf')); this.previewDocument.set(document); this.previewUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(this.previewObjectUrl)); this.syncModalLock(); }); }
-  closePreview(): void { this.previewDocument.set(null); this.previewUrl.set(''); this.releasePreviewObjectUrl(); this.syncModalLock(); }
+  async previewSignedRequest(): Promise<void> { const request = this.selectedRequest(); const document = this.documents().find(item => item.id === request?.document_id); if (!request || !document) return; await this.run(async () => { const data = await firstValueFrom(this.api.getArrayBuffer(`/signature-requests/${request.id}/signed-document`)); if (!data.byteLength) throw new Error('Signed document preview is empty'); this.previewHeading.set(this.i18n.text('stampedPdf')); this.previewDocument.set(document); this.previewData.set(data); this.syncModalLock(); }); }
+  closePreview(): void { this.previewDocument.set(null); this.previewData.set(null); this.syncModalLock(); }
+  downloadPreview(): void { const data = this.previewData(); const document = this.previewDocument(); if (!data || !document) return; const url = URL.createObjectURL(new Blob([data], { type: 'application/pdf' })); const anchor = window.document.createElement('a'); anchor.href = url; anchor.download = document.original_filename || 'documento.pdf'; window.document.body.appendChild(anchor); anchor.click(); anchor.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 60_000); }
   async deleteDocument(document: DocumentItem): Promise<void> { const result = await Swal.fire({ icon: 'warning', title: this.i18n.text('deleteDocumentTitle'), text: this.i18n.text('deleteDocumentHelp'), showCancelButton: true, confirmButtonText: this.i18n.text('deleteAction'), cancelButtonText: this.i18n.text('cancel'), confirmButtonColor: '#b42318' }); if (!result.isConfirmed) return; await this.run(async () => { await firstValueFrom(this.api.delete(`/documents/${document.id}`)); this.documents.update((items) => items.filter((item) => item.id !== document.id)); }); }
 
   async upload(): Promise<void> { if (!this.file || !this.tenantSlug) return; await this.run(async () => { const file = this.file!; const content = await file.arrayBuffer(); await firstValueFrom(this.api.postFile<DocumentItem>('/documents', content, file.type || 'application/pdf', { organization_id: this.tenantSlug, title: this.title, filename: file.name, content_type: file.type || 'application/pdf' })); this.title = ''; this.file = null; this.closeUploadModal(); await this.reload(); await Swal.fire({ icon: 'success', title: this.i18n.text('documentSent'), timer: 1500, showConfirmButton: false }); }); }
@@ -272,7 +270,6 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   private async loadBilling(tenants: TenantItem[]): Promise<void> { if (!this.isAdmin()) return; const results = await Promise.allSettled(tenants.map(async tenant => [tenant.id, await firstValueFrom(this.api.get<BillingAccount>(`/billing/tenants/${tenant.id}/account`))] as const)); const accounts: Record<string, BillingAccount> = {}; for (const result of results) if (result.status === 'fulfilled') accounts[result.value[0]] = result.value[1]; this.billingAccounts.set(accounts); }
   private async loadAdminRequestDetails(request: SignatureRequest): Promise<void> { const [link, evidence] = await Promise.allSettled([firstValueFrom(this.api.get<SigningLink>(`/signature-requests/${request.id}/signing-link`)), firstValueFrom(this.api.get<SignatureEvidence[]>(`/signature-requests/${request.id}/evidence`))]); if (link.status === 'fulfilled') await this.storeSigningLink(request.id, link.value.signing_url); if (evidence.status === 'fulfilled') this.requestEvidence.set(evidence.value); }
   private async storeSigningLink(requestId: string, url: string): Promise<void> { this.requestLinks.update(items => ({ ...items, [requestId]: url })); this.requestQrCode.set(await QRCode.toDataURL(url, { width: 220, margin: 2 })); }
-  private releasePreviewObjectUrl(): void { if (this.previewObjectUrl) URL.revokeObjectURL(this.previewObjectUrl); this.previewObjectUrl = ''; }
   private syncModalLock(): void { if (this.uploadModalOpen() || this.requestCreateModalOpen() || this.requestModalOpen() || this.previewDocument()) this.lockPageScroll(); else this.unlockPageScroll(); }
   private lockPageScroll(): void {
     if (this.modalLocked || typeof document === 'undefined' || typeof window === 'undefined') return;

@@ -1,13 +1,12 @@
 import { AfterViewInit, Component, ElementRef, EventEmitter, Input, OnChanges, OnDestroy, Output, QueryList, SimpleChanges, ViewChildren, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { firstValueFrom, Subscription } from 'rxjs';
-import { GlobalWorkerOptions, getDocument, PDFDocumentLoadingTask, PDFDocumentProxy } from 'pdfjs-dist';
+import { GlobalWorkerOptions, getDocument, PDFDocumentLoadingTask, PDFDocumentProxy } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 import { ApiService } from '../core/api.service';
-import { FeedbackService } from '../core/feedback.service';
 import { StampPosition } from '../core/models';
 
-GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs?v=6.2.108';
+GlobalWorkerOptions.workerSrc = '/pdf.worker.compat.mjs?v=6.3.289';
 
 interface PdfPageView {
   number: number;
@@ -54,9 +53,10 @@ interface PdfPageView {
   imports: [DatePipe],
 })
 export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDestroy {
-  @Input({ required: true }) token = '';
+  @Input() token = '';
+  @Input() sourceData: ArrayBuffer | null = null;
   @Input() documentEndpoint = 'document';
-  @Input({ required: true }) signerName = '';
+  @Input() signerName = '';
   @Input() signerIdentity = '';
   @Input() stampDate: string | Date = new Date();
   @Input() placement: StampPosition | null = null;
@@ -70,9 +70,10 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
   private document: PDFDocumentProxy | null = null;
   private loadingTask: PDFDocumentLoadingTask | null = null;
   private canvasesSubscription?: Subscription;
+  private renderingDocument: PDFDocumentProxy | null = null;
   private dragging = false;
 
-  constructor(private readonly api: ApiService, private readonly feedback: FeedbackService) {}
+  constructor(private readonly api: ApiService) {}
 
   ngAfterViewInit(): void {
     this.canvasesSubscription = this.canvases.changes.subscribe(() => void this.renderPages());
@@ -80,7 +81,11 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if ((changes['token'] && !changes['token'].firstChange) || (changes['documentEndpoint'] && !changes['documentEndpoint'].firstChange)) void this.loadDocument();
+    if (
+      (changes['token'] && !changes['token'].firstChange)
+      || (changes['sourceData'] && !changes['sourceData'].firstChange)
+      || (changes['documentEndpoint'] && !changes['documentEndpoint'].firstChange)
+    ) void this.loadDocument();
   }
 
   ngOnDestroy(): void {
@@ -112,12 +117,15 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
   }
 
   private async loadDocument(): Promise<void> {
-    if (!this.token) return;
+    if (!this.sourceData && !this.token) return;
     this.loading.set(true);
     this.error.set('');
     try {
       await this.loadingTask?.destroy();
-      const data = await firstValueFrom(this.api.getArrayBuffer(`/signing/links/${this.token}/${this.documentEndpoint}`));
+      this.pages.set([]);
+      const data = this.sourceData
+        ? this.sourceData.slice(0)
+        : await firstValueFrom(this.api.getArrayBuffer(`/signing/links/${this.token}/${this.documentEndpoint}`));
       this.loadingTask = getDocument({ data: new Uint8Array(data) });
       this.document = await this.loadingTask.promise;
       const pageViews: PdfPageView[] = [];
@@ -129,9 +137,9 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
       this.pages.set(pageViews);
       queueMicrotask(() => void this.renderPages());
     } catch (error) {
-      const message = 'Não foi possível exibir o PDF. Você ainda pode baixá-lo pelo painel ao lado.';
+      const message = 'Não foi possível exibir o PDF. Use o botão de download para abrir o arquivo.';
       this.error.set(message);
-      await this.feedback.error(error, message);
+      console.error('PDF rendering failed', error);
     } finally {
       this.loading.set(false);
     }
@@ -139,25 +147,38 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
 
   private async renderPages(): Promise<void> {
     if (!this.document || this.canvases.length !== this.document.numPages) return;
+    const document = this.document;
+    if (this.renderingDocument === document) return;
+    this.renderingDocument = document;
     const canvasItems = this.canvases.toArray();
-    await Promise.all(canvasItems.map(async (item, index) => {
-      const page = await this.document!.getPage(index + 1);
-      const viewport = page.getViewport({ scale: 1.5 });
-      const outputScale = window.devicePixelRatio || 1;
-      const canvas = item.nativeElement;
-      const context = canvas.getContext('2d');
-      if (!context) return;
-      canvas.width = Math.floor(viewport.width * outputScale);
-      canvas.height = Math.floor(viewport.height * outputScale);
-      canvas.style.width = '100%';
-      canvas.style.height = '100%';
-      await page.render({
-        canvas,
-        canvasContext: context,
-        viewport,
-        transform: outputScale === 1 ? undefined : [outputScale, 0, 0, outputScale, 0, 0],
-      }).promise;
-    }));
+    try {
+      for (const [index, item] of canvasItems.entries()) {
+        if (this.document !== document) return;
+        const page = await document.getPage(index + 1);
+        const viewport = page.getViewport({ scale: 1.5 });
+        const outputScale = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(8_000_000 / (viewport.width * viewport.height)));
+        const canvas = item.nativeElement;
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('PDF canvas is unavailable');
+        canvas.width = Math.floor(viewport.width * outputScale);
+        canvas.height = Math.floor(viewport.height * outputScale);
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        await page.render({
+          canvas,
+          canvasContext: context,
+          viewport,
+          transform: outputScale === 1 ? undefined : [outputScale, 0, 0, outputScale, 0, 0],
+        }).promise;
+      }
+    } catch (error) {
+      if (this.document === document) {
+        this.error.set('Não foi possível exibir o PDF. Use o botão de download para abrir o arquivo.');
+        console.error('PDF rendering failed', error);
+      }
+    } finally {
+      if (this.renderingDocument === document) this.renderingDocument = null;
+    }
   }
 
   private updatePlacement(event: PointerEvent, page: number): void {
