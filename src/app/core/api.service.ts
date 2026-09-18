@@ -13,9 +13,9 @@ export class ApiService {
   delete(path: string) { return this.http.delete(path); }
   deleteWithBody<T>(path: string, body: unknown) { return this.http.delete<T>(path, { body }); }
 
-  postFile<T>(path: string, file: File, parameters: Record<string, string>) {
+  postFile<T>(path: string, content: ArrayBuffer, contentType: string, parameters: Record<string, string>) {
     const params = new HttpParams({ fromObject: parameters });
-    const headers = new HttpHeaders({ 'Content-Type': file.type || 'application/octet-stream' });
-    return this.http.post<T>(path, file, { headers, params });
+    const headers = new HttpHeaders({ 'Content-Type': contentType || 'application/octet-stream' });
+    return this.http.post<T>(path, content, { headers, params });
   }
 }
