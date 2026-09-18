@@ -120,11 +120,15 @@ button { cursor: pointer; }
 
 @media (max-width: 600px) {
   .landing-nav, .landing-hero, .trust-band, .steps, .feature-grid, .pricing-section, .final-cta, .landing-footer, .legal-nav, .legal-document { width: min(100% - 2rem, 1180px); }
-  .landing-nav { min-height: 70px; }
-  .landing-brand strong, .landing-actions .text-link { display: none; }
+  .landing-nav { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .55rem .75rem; min-height: 70px; padding-block: .65rem; }
+  .landing-brand { grid-column: 1; grid-row: 1; }
+  .landing-brand strong { display: none; }
   .landing-brand img { width: 34px; height: 34px; }
-  .landing-actions { gap: .45rem; }
-  .landing-actions select { padding-inline: .4rem; }
+  .landing-actions { display: contents; }
+  .landing-actions app-language-picker { grid-column: 1; grid-row: 2; min-width: 0; }
+  .landing-actions .language-picker summary { width: 100%; min-width: 0; }
+  .landing-actions .text-link { display: inline-flex; grid-column: 2; grid-row: 2; align-items: center; justify-self: end; min-height: 44px; }
+  .landing-actions .landing-button.small { grid-column: 2; grid-row: 1; justify-self: end; }
   .landing-button.small { padding-inline: .75rem; }
   .landing-hero { min-height: auto; padding-block: 4rem 2rem; }
   .hero-copy h1 { font-size: clamp(2.65rem,13vw,4rem); }
@@ -392,10 +396,12 @@ input:focus, select:focus { outline: 3px solid rgba(168, 32, 53, .16); border-co
   .file-name { max-width: 190px; }
   .table-actions { justify-content: flex-end; flex-wrap: wrap; }
   .table-actions .button { min-height: 40px; }
-  .modal-backdrop { align-items: end; padding: 0; }
-  .app-modal, .app-modal.wide { width: 100%; max-height: 96dvh; border-radius: 18px 18px 0 0; }
+  .modal-backdrop { align-items: end; padding: 0 0 env(safe-area-inset-bottom); overflow: hidden; }
+  .app-modal, .app-modal.wide { display: flex; flex-direction: column; width: 100%; max-height: calc(100dvh - max(.5rem, env(safe-area-inset-bottom))); overflow: hidden; border-radius: 18px 18px 0 0; }
   .modal-header, .modal-body { padding-right: 1rem; padding-left: 1rem; }
-  .modal-footer { position: sticky; bottom: 0; margin-right: -1rem; margin-left: -1rem; padding-right: 1rem; padding-bottom: max(1rem, env(safe-area-inset-bottom)); padding-left: 1rem; }
+  .modal-header { flex: 0 0 auto; }
+  .modal-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  .modal-footer { position: sticky; bottom: 0; z-index: 2; margin-right: -1rem; margin-left: -1rem; padding-right: 1rem; padding-bottom: max(1rem, env(safe-area-inset-bottom)); padding-left: 1rem; }
   .modal-footer .button { flex: 1; min-height: 44px; }
   .pdf-modal { width: 100%; height: 96dvh; border-radius: 18px 18px 0 0; }
   .signing-actions-pane { padding: 1.25rem 1rem max(1.25rem, env(safe-area-inset-bottom)); }
