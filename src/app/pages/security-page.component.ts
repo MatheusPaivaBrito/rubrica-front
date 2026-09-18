@@ -1,6 +1,6 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import QRCode from 'qrcode';
 import { firstValueFrom } from 'rxjs';
 import Swal from 'sweetalert2';
@@ -8,7 +8,8 @@ import Swal from 'sweetalert2';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { FeedbackService } from '../core/feedback.service';
-import { I18nService, Locale } from '../core/i18n.service';
+import { I18nService } from '../core/i18n.service';
+import { LanguagePickerComponent } from '../components/language-picker.component';
 
 interface MfaStatus { enabled: boolean; required_by_policy: boolean; setup_required: boolean; recovery_codes_remaining: number; }
 interface MfaSetup { secret: string; provisioning_uri: string; }
@@ -16,10 +17,10 @@ interface RecoveryCodes { recovery_codes: string[]; }
 
 @Component({
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, LanguagePickerComponent],
   template: `
     <main class="settings-shell">
-      <header class="settings-top"><button type="button" class="brand brand-button" (click)="returnToDashboard()">Rubrica<span>.</span></button><div class="button-row"><select [ngModel]="i18n.locale()" (ngModelChange)="changeLocale($event)" [attr.aria-label]="i18n.text('language')"><option value="pt-BR">Português</option><option value="en">English</option><option value="es">Español</option><option value="ja-JP">日本語</option></select><button class="button secondary" (click)="returnToDashboard()">{{ i18n.text('backDashboard') }}</button><button class="button secondary" (click)="logout()">{{ i18n.text('logout') }}</button></div></header>
+      <header class="settings-top"><button type="button" class="brand brand-button" (click)="returnToDashboard()">Rubrica<span>.</span></button><div class="button-row"><app-language-picker /><button class="button secondary" (click)="returnToDashboard()">{{ i18n.text('backDashboard') }}</button><button class="button secondary" (click)="logout()">{{ i18n.text('logout') }}</button></div></header>
       <section class="settings-card card">
         <p class="eyebrow">{{ i18n.text('security') }}</p><h1>Microsoft Authenticator</h1>
         <p class="muted">{{ i18n.text('securityHelp') }}</p>
@@ -44,8 +45,7 @@ interface RecoveryCodes { recovery_codes: string[]; }
 export class SecurityPageComponent implements OnInit {
   readonly loading = signal(true); readonly status = signal<MfaStatus | null>(null); readonly setup = signal<MfaSetup | null>(null); readonly qrCode = signal(''); readonly recoveryCodes = signal<string[]>([]);
   code = ''; password = '';
-  constructor(private readonly api: ApiService, private readonly auth: AuthService, private readonly router: Router, private readonly feedback: FeedbackService, readonly i18n: I18nService) {}
-  changeLocale(locale: Locale): void { this.i18n.setLocale(locale); }
+  constructor(private readonly api: ApiService, private readonly auth: AuthService, private readonly route: ActivatedRoute, private readonly router: Router, private readonly feedback: FeedbackService, readonly i18n: I18nService) {}
   async ngOnInit() { if (!await this.auth.restore()) { await this.router.navigate(['/login']); return; } await this.loadStatus(); this.loading.set(false); }
   async startSetup() { try { const setup = await firstValueFrom(this.api.post<MfaSetup>('/auth/mfa/setup', {})); this.setup.set(setup); this.qrCode.set(await QRCode.toDataURL(setup.provisioning_uri, { width: 320, margin: 1 })); } catch (error) { await this.feedback.error(error); } }
   async deferMfa() {
@@ -53,14 +53,15 @@ export class SecurityPageComponent implements OnInit {
       await firstValueFrom(this.api.post('/auth/mfa/defer', {}));
       this.auth.deferMfaForSession();
       await this.auth.refreshContext();
-      await this.router.navigateByUrl(await this.auth.dashboardUrl(), { replaceUrl: true });
+      await this.navigateAfterSecurity();
     } catch (error) { await this.feedback.error(error); }
   }
   async confirm() { try { const result = await firstValueFrom(this.api.post<RecoveryCodes>('/auth/mfa/confirm', { code: this.code })); this.recoveryCodes.set(result.recovery_codes); this.setup.set(null); this.code=''; await this.auth.refreshContext(); await this.loadStatus(); await Swal.fire({ icon: 'success', title: this.i18n.text('mfaEnabled'), html: `<p>${this.i18n.text('mfaEnabledFlowHelp')}</p><p><strong>${this.i18n.text('saveCodes')}</strong><br>${this.i18n.text('saveCodesHelp')}</p>`, confirmButtonText: this.i18n.text('reviewRecoveryCodes'), confirmButtonColor: '#a82035' }); } catch (error) { await this.feedback.error(error); } }
   async regenerate() { try { const result = await firstValueFrom(this.api.post<RecoveryCodes>('/auth/mfa/recovery-codes', { password: this.password, code: this.code })); this.recoveryCodes.set(result.recovery_codes); this.password=''; this.code=''; await this.loadStatus(); } catch (error) { await this.feedback.error(error); } }
   async disable() { try { await firstValueFrom(this.api.deleteWithBody('/auth/mfa', { password: this.password, code: this.code })); this.password=''; this.code=''; this.recoveryCodes.set([]); await this.auth.refreshContext(); await this.loadStatus(); await this.feedback.warning(this.i18n.text('mfaDisabled')); } catch (error) { await this.feedback.error(error); } }
   downloadCodes() { const blob=new Blob([this.recoveryCodes().join('\n')+'\n'],{type:'text/plain'}); const url=URL.createObjectURL(blob); const link=document.createElement('a'); link.href=url; link.download='rubrica-recovery-codes.txt'; link.click(); URL.revokeObjectURL(url); }
-  async returnToDashboard() { if (this.status()?.setup_required && !this.status()?.enabled) { await this.deferMfa(); return; } await this.router.navigateByUrl(await this.auth.dashboardUrl(), { replaceUrl: true }); }
+  async returnToDashboard() { if (this.status()?.setup_required && !this.status()?.enabled) { await this.deferMfa(); return; } await this.navigateAfterSecurity(); }
   async logout() { await this.auth.logout(); await this.router.navigate(['/login']); }
   private async loadStatus() { this.status.set(await firstValueFrom(this.api.get<MfaStatus>('/auth/mfa/status'))); }
+  private async navigateAfterSecurity(): Promise<void> { const candidate = this.route.snapshot.queryParamMap.get('returnUrl'); const destination = candidate?.startsWith('/tenant/') && candidate.endsWith('/dashboard') ? candidate : await this.auth.dashboardUrl(); await this.router.navigateByUrl(destination, { replaceUrl: true }); }
 }

@@ -5,25 +5,19 @@ import { firstValueFrom } from 'rxjs';
 
 import { ApiService } from '../core/api.service';
 import { FeedbackService } from '../core/feedback.service';
-import { I18nService, Locale, MessageKey } from '../core/i18n.service';
+import { I18nService, MessageKey } from '../core/i18n.service';
+import { LanguagePickerComponent } from '../components/language-picker.component';
 
 interface IdentityOption { value: string; label: MessageKey }
 
 @Component({
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, LanguagePickerComponent],
   template: `
     <main class="login-layout account-layout"><section class="card auth-card account-card">
       <header class="account-heading">
         <a class="account-brand" routerLink="/"><img src="icons/rubrica-mark.png" alt="" /><span>Rubrica</span></a>
-        <details class="language-picker" #languageMenu>
-          <summary [attr.aria-label]="i18n.text('language')"><i class="bi bi-translate"></i><span>{{ languageName() }}</span><i class="bi bi-chevron-down picker-chevron"></i></summary>
-          <div class="language-options" role="menu">
-            @for (language of languages; track language.locale) {
-              <button type="button" role="menuitem" [class.active]="i18n.locale() === language.locale" (click)="changeLanguage(language.locale, languageMenu)"><span>{{ language.label }}</span>@if (i18n.locale() === language.locale) { <i class="bi bi-check2"></i> }</button>
-            }
-          </div>
-        </details>
+        <app-language-picker />
       </header>
       <div class="account-title"><p class="eyebrow">Acesso seguro</p><h1>{{ i18n.text(titleKey) }}</h1>@if (mode === 'register') { <p class="muted">Comece com 5 assinaturas gratuitas. Nenhum cartão é necessário.</p> }</div>
       @if (mode === 'register') {
@@ -52,20 +46,15 @@ interface IdentityOption { value: string; label: MessageKey }
           <button class="button">{{ i18n.text('activateAccount') }}</button>
         </form>
       }
-      <p class="account-back"><a routerLink="/login"><i class="bi bi-arrow-left"></i> {{ i18n.text('backToLogin') }}</a></p>
+      <p class="account-back"><a routerLink="/login" [queryParams]="returnUrl ? { returnUrl } : undefined"><i class="bi bi-arrow-left"></i> {{ i18n.text('backToLogin') }}</a></p>
     </section></main>
   `,
 })
 export class AccountPageComponent implements OnInit {
-  readonly languages: readonly { locale: Locale; label: string }[] = [
-    { locale: 'pt-BR', label: 'Português' },
-    { locale: 'en', label: 'English' },
-    { locale: 'es', label: 'Español' },
-    { locale: 'ja-JP', label: '日本語' },
-  ];
   titleKey: MessageKey = 'account';
   mode = '';
   name = ''; email = ''; password = ''; passwordConfirmation = ''; country = ''; documentType = 'PASSPORT'; documentValue = '';
+  returnUrl: string | null = null;
   private token = '';
 
   constructor(private readonly route: ActivatedRoute, private readonly router: Router, private readonly api: ApiService, private readonly feedback: FeedbackService, readonly i18n: I18nService) {}
@@ -73,6 +62,8 @@ export class AccountPageComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     this.mode = this.route.snapshot.routeConfig?.path ?? '';
     this.token = this.route.snapshot.queryParamMap.get('token') ?? '';
+    const candidate = this.route.snapshot.queryParamMap.get('returnUrl');
+    this.returnUrl = candidate?.startsWith('/signing/') ? candidate : null;
     const titleKeys: Record<string, MessageKey> = { register: 'createAccount', 'forgot-password': 'recovery', 'reset-password': 'newPassword', 'verify-email': 'verifyEmail' };
     this.titleKey = titleKeys[this.mode] ?? 'account';
   }
@@ -101,16 +92,14 @@ export class AccountPageComponent implements OnInit {
   documentPlaceholder(): string { return this.documentType === 'BR_CPF' ? '000.000.000-00' : this.documentType === 'PT_NIF' ? '000 000 000' : this.documentType === 'PASSPORT' ? 'AB1234567' : ''; }
   documentMaxLength(): number { return this.documentType === 'BR_CPF' ? 14 : this.documentType === 'PT_NIF' ? 11 : this.documentType === 'PASSPORT' ? 12 : 30; }
   documentInputMode(): string { return this.documentType === 'BR_CPF' || this.documentType === 'PT_NIF' ? 'numeric' : 'text'; }
-  languageName(): string { return this.languages.find(language => language.locale === this.i18n.locale())?.label ?? 'Português'; }
-  changeLanguage(locale: Locale, menu: HTMLDetailsElement): void { this.i18n.setLocale(locale); menu.removeAttribute('open'); }
-  async register(): Promise<void> { const accepted = await this.action('/auth/register', { name: this.name, email: this.email, preferred_locale: this.i18n.locale(), identity_document_type: this.country ? this.documentType : null, identity_document_country: this.country || null, identity_document_value: this.country ? this.documentValue : null }, this.i18n.text('registrationSent')); if (accepted) await this.router.navigate(['/']); }
+  async register(): Promise<void> { const accepted = await this.action('/auth/register', { name: this.name, email: this.email, preferred_locale: this.i18n.locale(), return_url: this.returnUrl, identity_document_type: this.country ? this.documentType : null, identity_document_country: this.country || null, identity_document_value: this.country ? this.documentValue : null }, this.i18n.text('registrationSent')); if (accepted) await this.router.navigate(['/']); }
   async activateAccount(): Promise<void> {
     if (!this.token || this.password !== this.passwordConfirmation) { await this.feedback.error(this.i18n.text('passwordMismatch')); return; }
     const activated = await this.action('/auth/verify-email', { token: this.token, new_password: this.password }, this.i18n.text('emailVerified'));
-    if (activated) await this.router.navigate(['/login']);
+    if (activated) await this.router.navigate(['/login'], { queryParams: this.returnUrl ? { returnUrl: this.returnUrl } : undefined });
   }
-  requestReset() { return this.action('/auth/password-recovery', { email: this.email }, this.i18n.text('recoverySent')); }
-  resetPassword() { return this.action('/auth/password-reset', { token: this.token, new_password: this.password }, this.i18n.text('passwordChanged')); }
+  requestReset() { return this.action('/auth/password-recovery', { email: this.email, return_url: this.returnUrl }, this.i18n.text('recoverySent')); }
+  async resetPassword(): Promise<void> { const reset = await this.action('/auth/password-reset', { token: this.token, new_password: this.password }, this.i18n.text('passwordChanged')); if (reset) await this.router.navigate(['/login'], { queryParams: this.returnUrl ? { returnUrl: this.returnUrl } : undefined }); }
   private async action(path: string, body: unknown, message: string): Promise<boolean> {
     try { await firstValueFrom(this.api.post(path, body)); await this.feedback.success(message); return true; }
     catch { await this.feedback.error(this.i18n.text('reviewData')); return false; }

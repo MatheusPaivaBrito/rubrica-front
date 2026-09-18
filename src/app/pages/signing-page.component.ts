@@ -9,11 +9,12 @@ import { AuthService } from '../core/auth.service';
 import { FeedbackService } from '../core/feedback.service';
 import { Signer, SigningContext, StampPosition } from '../core/models';
 import { dateTime } from '../core/date-time';
-import { I18nService, Locale } from '../core/i18n.service';
+import { I18nService } from '../core/i18n.service';
+import { LanguagePickerComponent } from '../components/language-picker.component';
 
 @Component({
   standalone: true,
-  imports: [PdfStampViewerComponent],
+  imports: [PdfStampViewerComponent, LanguagePickerComponent],
   template: `
     @if (loading()) {
       <main class="signing-state"><section class="card"><h1>{{ i18n.text('loadingInvite') }}</h1><p class="muted">{{ i18n.text('preparingPdf') }}</p></section></main>
@@ -40,7 +41,7 @@ import { I18nService, Locale } from '../core/i18n.service';
 
         <aside class="signing-actions-pane">
           <div>
-            <div class="signing-language"><p class="eyebrow">{{ i18n.text('secureSigning') }}</p><select [value]="i18n.locale()" (change)="changeLocale($any($event.target).value)" [attr.aria-label]="i18n.text('language')"><option value="pt-BR">Português</option><option value="en">English</option><option value="es">Español</option><option value="ja-JP">日本語</option></select></div>
+            <div class="signing-language"><p class="eyebrow">{{ i18n.text('secureSigning') }}</p><app-language-picker /></div>
             <h2>{{ administrativeView() ? i18n.text('adminView') : i18n.text('hello', { name: context()!.signer.name }) }}</h2>
             <p class="muted">{{ administrativeView() ? i18n.text('notSigner') : i18n.text('chooseStamp') }}</p>
           </div>
@@ -134,7 +135,6 @@ export class SigningPageComponent implements OnInit {
   }
 
   async goToDashboard(): Promise<void> { await this.router.navigate(['/dashboard']); }
-  changeLocale(locale: Locale): void { this.i18n.setLocale(locale); }
 
   async download(): Promise<void> {
     try {
@@ -245,6 +245,14 @@ export class SigningPageComponent implements OnInit {
       this.applyContext(refreshed);
       this.message.set(action === '/sign' ? this.i18n.text('signedSuccess') : this.i18n.text('declinedSuccess'));
       await Swal.fire({ icon: action === '/sign' ? 'success' : 'info', title: this.message(), confirmButtonText: this.i18n.text('finish') });
+      if (action === '/sign') {
+        const dashboardUrl = await this.auth.dashboardUrl();
+        if (this.auth.context()?.mfa_setup_required && !this.auth.context()?.mfa_enabled) {
+          await this.router.navigate(['/security'], { queryParams: { returnUrl: dashboardUrl } });
+        } else {
+          await this.router.navigateByUrl(dashboardUrl);
+        }
+      }
     } catch (error) {
       await this.feedback.error(error, action === '/sign' ? this.i18n.text('signFailed') : this.i18n.text('declineFailed'));
     } finally {

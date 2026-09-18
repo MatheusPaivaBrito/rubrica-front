@@ -10,18 +10,19 @@ import QRCode from 'qrcode';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { FeedbackService } from '../core/feedback.service';
-import { BillingAccount, DocumentItem, SignatureEvidence, SignatureRequest, Signer, SigningLink, TenantItem } from '../core/models';
+import { BillingAccount, DocumentItem, SignatureEvidence, SignatureRequest, Signer, SignerContact, SigningLink, TenantItem } from '../core/models';
 import { dateTime } from '../core/date-time';
-import { I18nService, Locale } from '../core/i18n.service';
+import { I18nService } from '../core/i18n.service';
+import { LanguagePickerComponent } from '../components/language-picker.component';
 
 @Component({
   standalone: true,
-  imports: [DecimalPipe, FormsModule],
+  imports: [DecimalPipe, FormsModule, LanguagePickerComponent],
   template: `
     <main class="shell">
       <header class="topbar">
         <div class="brand">Rubrica<span>.</span></div>
-        <div class="topbar-account"><select [ngModel]="i18n.locale()" (ngModelChange)="changeLocale($event)" [attr.aria-label]="i18n.text('language')"><option value="pt-BR">Português</option><option value="en">English</option><option value="es">Español</option><option value="ja-JP">日本語</option></select><span class="user-chip">{{ auth.context()?.subject }}</span><button class="button ghost" (click)="security()">{{ i18n.text('dashboardSecurity') }}</button><button class="button ghost" (click)="logout()">{{ i18n.text('logout') }}</button></div>
+        <div class="topbar-account"><app-language-picker /><span class="user-chip">{{ auth.context()?.subject }}</span><button class="button ghost" (click)="security()">{{ i18n.text('dashboardSecurity') }}</button><button class="button ghost" (click)="logout()">{{ i18n.text('logout') }}</button></div>
       </header>
 
       <section class="container dashboard-container">
@@ -123,6 +124,7 @@ import { I18nService, Locale } from '../core/i18n.service';
                 <section class="detail-panel action-panel">
                   @if (selectedRequest()!.status === 'draft') {
                     <div><h3>{{ i18n.text('addSigner') }}</h3><p class="muted">{{ i18n.text('inviteSignerHelp') }}</p></div>
+                    @if (signerContacts().length) { <div class="contact-picker"><label>{{ i18n.text('previousInvitees') }}<input [ngModel]="contactSearch()" (ngModelChange)="contactSearch.set($event)" (focus)="contactPickerOpen.set(true)" (blur)="contactPickerOpen.set(false)" name="contactSearch" [placeholder]="i18n.text('nameOrEmail')" autocomplete="off" /></label>@if (contactPickerOpen()) { <div class="contact-options" role="listbox">@for (contact of filteredContacts(); track contact.email) { <button type="button" role="option" (mousedown)="$event.preventDefault()" (click)="selectContact(contact)"><strong>{{ contact.name }}</strong><span>{{ contact.email }}</span></button> } @empty { <p>{{ i18n.text('noUser') }}</p> }</div> }</div> }
                     <form class="form" (ngSubmit)="addSigner()"><label>{{ i18n.text('name') }}<input name="signerName" [(ngModel)]="signerName" required autocomplete="name" /></label><label>{{ i18n.text('email') }}<input name="signerEmail" type="email" [(ngModel)]="signerEmail" required autocomplete="email" /></label><button class="button" [disabled]="submitting() || !signerName.trim() || !signerEmail.trim()">{{ i18n.text('add') }}</button></form><hr /><button class="button secondary full-width" (click)="openRequest()" [disabled]="submitting() || !signers().length">{{ i18n.text('openForSigning') }}</button>
                   } @else {
                     <div><h3>{{ i18n.text('documentAccess') }}</h3><p class="muted">{{ i18n.text('shareUnique') }}</p></div>
@@ -145,6 +147,9 @@ export class DashboardPageComponent implements OnInit {
   readonly documents = signal<DocumentItem[]>([]);
   readonly requests = signal<SignatureRequest[]>([]);
   readonly signers = signal<Signer[]>([]);
+  readonly signerContacts = signal<SignerContact[]>([]);
+  readonly contactSearch = signal('');
+  readonly contactPickerOpen = signal(false);
   readonly tenants = signal<TenantItem[]>([]);
   readonly billingAccounts = signal<Record<string, BillingAccount>>({});
   readonly selectedDocument = signal<DocumentItem | null>(null);
@@ -173,10 +178,9 @@ export class DashboardPageComponent implements OnInit {
 
   constructor(readonly auth: AuthService, readonly i18n: I18nService, private readonly api: ApiService, private readonly route: ActivatedRoute, private readonly router: Router, private readonly sanitizer: DomSanitizer, private readonly feedback: FeedbackService) {}
 
-  async ngOnInit(): Promise<void> { const context = await this.auth.restore(); if (!context) { await this.router.navigate(['/login']); return; } try { if (context.mfa_setup_required && !this.auth.isMfaDeferredForSession()) { await this.router.navigate(['/security']); return; } const dashboardUrl = await this.auth.dashboardUrl(); const routeSlug = this.route.snapshot.paramMap.get('tenantSlug'); if (!routeSlug) { await this.router.navigateByUrl(dashboardUrl, { replaceUrl: true }); return; } const tenants = await firstValueFrom(this.api.get<TenantItem[]>('/tenants')); const selectedTenant = tenants.find(tenant => tenant.slug === routeSlug); if (!selectedTenant) { await this.router.navigateByUrl(dashboardUrl, { replaceUrl: true }); return; } this.tenantSlug = selectedTenant.slug; if (this.canManage()) await Promise.all([this.reload(), this.loadBilling(tenants)]); } catch (error) { await this.feedback.error(error, this.i18n.text('dashboardLoadFailed')); } finally { this.loading.set(false); } }
+  async ngOnInit(): Promise<void> { const context = await this.auth.restore(); if (!context) { await this.router.navigate(['/login']); return; } try { if (context.mfa_setup_required && !this.auth.isMfaDeferredForSession()) { await this.router.navigate(['/security']); return; } const dashboardUrl = await this.auth.dashboardUrl(); const routeSlug = this.route.snapshot.paramMap.get('tenantSlug'); if (!routeSlug) { await this.router.navigateByUrl(dashboardUrl, { replaceUrl: true }); return; } const tenants = await firstValueFrom(this.api.get<TenantItem[]>('/tenants')); const selectedTenant = tenants.find(tenant => tenant.slug === routeSlug); if (!selectedTenant) { await this.router.navigateByUrl(dashboardUrl, { replaceUrl: true }); return; } this.tenants.set(tenants); this.tenantSlug = selectedTenant.slug; if (this.canManage()) await Promise.all([this.reload(), this.loadBilling(tenants)]); } catch (error) { await this.feedback.error(error, this.i18n.text('dashboardLoadFailed')); } finally { this.loading.set(false); } }
   security(): Promise<boolean> { return this.router.navigate(['/security']); }
   billing(): Promise<boolean> { return this.router.navigate(['/plan']); }
-  changeLocale(locale: Locale): void { this.i18n.setLocale(locale); }
   canManage(): boolean { return this.auth.can('documents:write') && this.auth.can('signature_requests:write'); }
   isAdmin(): boolean { const context = this.auth.context(); return context?.roles.includes('signature_admin') === true || context?.permission_keys.includes('*') === true; }
   hasSignedSigners(): boolean { return this.signers().some((signer) => signer.status === 'signed'); }
@@ -190,6 +194,8 @@ export class DashboardPageComponent implements OnInit {
     const parsed = new URL(storedLink, window.location.origin);
     return `${window.location.origin}${parsed.pathname}${parsed.search}${parsed.hash}`;
   }
+  filteredContacts(): SignerContact[] { const query = this.contactSearch().trim().toLowerCase(); return this.signerContacts().filter(contact => !query || contact.name.toLowerCase().includes(query) || contact.email.includes(query)).slice(0, 8); }
+  selectContact(contact: SignerContact): void { this.signerName = contact.name; this.signerEmail = contact.email; this.contactSearch.set(`${contact.name} · ${contact.email}`); this.contactPickerOpen.set(false); }
   qrCodeFilename(): string { return `rubrica-assinatura-${this.selectedRequest()?.id ?? 'documento'}.png`; }
   fileSize(bytes: number | null): string { if (bytes === null) return this.i18n.text('unavailable'); if (bytes < 1024) return `${bytes} B`; if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`; return `${(bytes / 1024 / 1024).toFixed(1)} MB`; }
   requestStatusLabel(status: string): string { const keys = { draft: 'drafts', open: 'inSigning', completed: 'completedPlural', cancelled: 'cancelled', expired: 'expired' } as const; return status in keys ? this.i18n.text(keys[status as keyof typeof keys]) : status; }
@@ -208,7 +214,7 @@ export class DashboardPageComponent implements OnInit {
   selectFile(event: Event): void { this.setFile((event.target as HTMLInputElement).files?.item(0) ?? null); }
   dropFile(event: DragEvent): void { event.preventDefault(); this.setFile(event.dataTransfer?.files.item(0) ?? null); }
   prepareRequest(document: DocumentItem): void { this.selectedDocument.set(document); this.expiresAt = dateTime.localInputAfterDays(3); this.requestCreateModalOpen.set(true); }
-  async openRequestDetails(request: SignatureRequest): Promise<void> { this.selectedRequest.set(request); this.selectedDocument.set(null); this.requestQrCode.set(''); this.signerName = ''; this.signerEmail = ''; this.requestEvidence.set([]); this.requestModalOpen.set(true); this.detailsLoading.set(true); try { await this.loadSigners(request.id); if (this.isAdmin()) await this.loadAdminRequestDetails(request); } catch (error) { await this.feedback.error(error, this.i18n.text('detailsLoadFailed')); } finally { this.detailsLoading.set(false); } }
+  async openRequestDetails(request: SignatureRequest): Promise<void> { this.selectedRequest.set(request); this.selectedDocument.set(null); this.requestQrCode.set(''); this.contactSearch.set(''); this.signerName = ''; this.signerEmail = ''; this.requestEvidence.set([]); this.requestModalOpen.set(true); this.detailsLoading.set(true); try { await this.loadSigners(request.id); if (request.status === 'draft') await this.loadSignerContacts(); if (this.isAdmin()) await this.loadAdminRequestDetails(request); } catch (error) { await this.feedback.error(error, this.i18n.text('detailsLoadFailed')); } finally { this.detailsLoading.set(false); } }
 
   async preview(document: DocumentItem): Promise<void> {
     await this.run(async () => {
@@ -227,7 +233,7 @@ export class DashboardPageComponent implements OnInit {
 
   async upload(): Promise<void> { if (!this.file || !this.tenantSlug) return; await this.run(async () => { await firstValueFrom(this.api.postFile<DocumentItem>('/documents', this.file!, { organization_id: this.tenantSlug, title: this.title, filename: this.file!.name, content_type: this.file!.type || 'application/pdf' })); this.title = ''; this.file = null; this.closeUploadModal(); await this.reload(); await Swal.fire({ icon: 'success', title: this.i18n.text('documentSent'), timer: 1500, showConfirmButton: false }); }); }
   async createRequest(): Promise<void> { const document = this.selectedDocument(); if (!document || !this.expiresAt) return; await this.run(async () => { const request = await firstValueFrom(this.api.post<SignatureRequest>('/signature-requests', { document_id: document.id, expires_at: dateTime.toUtcIso(this.expiresAt) })); this.requests.update((items) => [request, ...items]); this.closeRequestCreateModal(); await this.openRequestDetails(request); }); }
-  async addSigner(): Promise<void> { const request = this.selectedRequest(); if (!request || !this.signerName.trim() || !this.signerEmail.trim()) return; await this.run(async () => { await firstValueFrom(this.api.post<Signer>(`/signature-requests/${request.id}/signers`, { name: this.signerName.trim(), email: this.signerEmail.trim().toLowerCase() })); this.signerName = ''; this.signerEmail = ''; await this.loadSigners(request.id); const refreshed = await firstValueFrom(this.api.get<SignatureRequest>(`/signature-requests/${request.id}`)); this.updateRequest(refreshed); }); }
+  async addSigner(): Promise<void> { const request = this.selectedRequest(); if (!request || !this.signerName.trim() || !this.signerEmail.trim()) return; await this.run(async () => { await firstValueFrom(this.api.post<Signer>(`/signature-requests/${request.id}/signers`, { name: this.signerName.trim(), email: this.signerEmail.trim().toLowerCase() })); this.signerName = ''; this.signerEmail = ''; this.contactSearch.set(''); await Promise.all([this.loadSigners(request.id), this.loadSignerContacts()]); const refreshed = await firstValueFrom(this.api.get<SignatureRequest>(`/signature-requests/${request.id}`)); this.updateRequest(refreshed); }); }
   async openRequest(): Promise<void> { const request = this.selectedRequest(); if (!request) return; const result = await Swal.fire({ icon: 'question', title: this.i18n.text('openRequestTitle'), text: this.i18n.text('openRequestHelp'), showCancelButton: true, confirmButtonText: this.i18n.text('openForSigning'), cancelButtonText: this.i18n.text('back'), confirmButtonColor: '#a82035' }); if (!result.isConfirmed) return; await this.run(async () => { const opened = await firstValueFrom(this.api.post<SignatureRequest>(`/signature-requests/${request.id}/open`, {})); this.updateRequest(opened); const link = await firstValueFrom(this.api.post<SigningLink>(`/signature-requests/${request.id}/signing-link`, {})); await this.storeSigningLink(request.id, link.signing_url); }); }
   async generateLink(): Promise<void> { const request = this.selectedRequest(); if (!request) return; if (this.requestLink()) { const result = await Swal.fire({ icon: 'warning', title: this.i18n.text('rotateLinkTitle'), text: this.i18n.text('rotateLinkHelp'), showCancelButton: true, confirmButtonText: this.i18n.text('rotateLink'), cancelButtonText: this.i18n.text('cancel'), confirmButtonColor: '#b42318' }); if (!result.isConfirmed) return; } await this.run(async () => { const link = await firstValueFrom(this.api.post<SigningLink>(`/signature-requests/${request.id}/signing-link`, {})); await this.storeSigningLink(request.id, link.signing_url); }); }
   async copyInvite(): Promise<void> { await this.run(async () => { await navigator.clipboard.writeText(this.requestLink()); await Swal.fire({ icon: 'success', title: this.i18n.text('linkCopied'), toast: true, position: 'top-end', timer: 1500, showConfirmButton: false }); }); }
@@ -238,7 +244,8 @@ export class DashboardPageComponent implements OnInit {
   private updateRequest(request: SignatureRequest): void { this.requests.update((items) => items.map((item) => item.id === request.id ? request : item)); this.selectedRequest.set(request); }
   private async reload(): Promise<void> { const [documents, requests] = await Promise.all([firstValueFrom(this.api.get<DocumentItem[]>('/documents')), firstValueFrom(this.api.get<SignatureRequest[]>('/signature-requests'))]); this.documents.set(documents); this.requests.set(requests.sort((a, b) => b.id.localeCompare(a.id, undefined, { numeric: true }))); }
   private async loadSigners(requestId: string): Promise<void> { this.signers.set(await firstValueFrom(this.api.get<Signer[]>(`/signature-requests/${requestId}/signers`))); }
-  private async loadBilling(tenants: TenantItem[]): Promise<void> { if (!this.isAdmin()) return; this.tenants.set(tenants); const results = await Promise.allSettled(tenants.map(async tenant => [tenant.id, await firstValueFrom(this.api.get<BillingAccount>(`/billing/tenants/${tenant.id}/account`))] as const)); const accounts: Record<string, BillingAccount> = {}; for (const result of results) if (result.status === 'fulfilled') accounts[result.value[0]] = result.value[1]; this.billingAccounts.set(accounts); }
+  private async loadSignerContacts(): Promise<void> { const tenant = this.tenants().find(item => item.slug === this.tenantSlug); if (!tenant) return; this.signerContacts.set(await firstValueFrom(this.api.get<SignerContact[]>(`/tenants/${tenant.id}/signer-contacts`))); }
+  private async loadBilling(tenants: TenantItem[]): Promise<void> { if (!this.isAdmin()) return; const results = await Promise.allSettled(tenants.map(async tenant => [tenant.id, await firstValueFrom(this.api.get<BillingAccount>(`/billing/tenants/${tenant.id}/account`))] as const)); const accounts: Record<string, BillingAccount> = {}; for (const result of results) if (result.status === 'fulfilled') accounts[result.value[0]] = result.value[1]; this.billingAccounts.set(accounts); }
   private async loadAdminRequestDetails(request: SignatureRequest): Promise<void> { const [link, evidence] = await Promise.allSettled([firstValueFrom(this.api.get<SigningLink>(`/signature-requests/${request.id}/signing-link`)), firstValueFrom(this.api.get<SignatureEvidence[]>(`/signature-requests/${request.id}/evidence`))]); if (link.status === 'fulfilled') await this.storeSigningLink(request.id, link.value.signing_url); if (evidence.status === 'fulfilled') this.requestEvidence.set(evidence.value); }
   private async storeSigningLink(requestId: string, url: string): Promise<void> { this.requestLinks.update(items => ({ ...items, [requestId]: url })); this.requestQrCode.set(await QRCode.toDataURL(url, { width: 220, margin: 2 })); }
   private releasePreviewObjectUrl(): void { if (this.previewObjectUrl) URL.revokeObjectURL(this.previewObjectUrl); this.previewObjectUrl = ''; }

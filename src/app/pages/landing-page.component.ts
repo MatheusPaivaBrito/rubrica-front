@@ -1,8 +1,8 @@
 import { Component, computed } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
-import { I18nService, Locale } from '../core/i18n.service';
+import { I18nService } from '../core/i18n.service';
+import { LanguagePickerComponent } from '../components/language-picker.component';
 
 const copy = {
   'pt-BR': { navProduct:'Produto', navSecurity:'Segurança', navPrice:'Preço', enter:'Entrar', start:'Criar conta grátis', eyebrow:'ASSINATURAS SEM COMPLICAÇÃO', title:'Assine documentos com clareza, segurança e validade.', lead:'Envie PDFs, convide signatários e acompanhe cada etapa. As evidências ficam incorporadas ao documento assinado.', primary:'Começar com 5 assinaturas grátis', secondary:'Ver como funciona', trust:'Feito para documentos importantes', trustCopy:'Identidade, data, dispositivo, IP e hash do arquivo reunidos em uma trilha de evidências verificável.', step1:'Envie seu PDF', step2:'Convide as pessoas', step3:'Acompanhe e comprove', feature1:'Carimbo visual no PDF', feature2:'Autenticação em dois fatores', feature3:'Histórico e evidências', plans:'Planos para cada momento', plansHelp:'As assinaturas dos documentos estão incluídas. O limite mensal considera os arquivos enviados pela conta.', base:'Base', intermediate:'Intermediário', perMonth:'/mês por conta', baseFiles:'Até 25 arquivos por mês', intermediateFiles:'Até 30 arquivos por mês', signaturesIncluded:'Assinaturas eletrônicas incluídas', emailIncluded:'Envio de solicitações por e-mail', choosePlan:'Começar grátis', cta:'Seu próximo documento pode estar assinado hoje.', contact:'Contato', privacy:'Privacidade', terms:'Termos de uso', deletion:'Exclusão de dados', rights:'Rubrica. Documentos assinados, decisões registradas.' },
@@ -13,13 +13,13 @@ const copy = {
 
 @Component({
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [RouterLink, LanguagePickerComponent],
   template: `
     <main class="landing">
       <nav class="landing-nav" aria-label="Principal">
         <a class="landing-brand" routerLink="/"><img src="icons/rubrica-mark.png" alt="" /><strong>Rubrica</strong></a>
         <div class="landing-links"><a href="#produto">{{ t().navProduct }}</a><a href="#seguranca">{{ t().navSecurity }}</a><a href="#preco">{{ t().navPrice }}</a></div>
-        <div class="landing-actions"><select [ngModel]="i18n.locale()" (ngModelChange)="changeLocale($event)" aria-label="Idioma"><option value="pt-BR">PT</option><option value="en">EN</option><option value="es">ES</option><option value="ja-JP">日本語</option></select><a class="text-link" routerLink="/login">{{ t().enter }}</a><a class="landing-button small" routerLink="/register">{{ t().start }}</a></div>
+        <div class="landing-actions"><app-language-picker /><a class="text-link" routerLink="/login">{{ t().enter }}</a><a class="landing-button small" routerLink="/register">{{ t().start }}</a></div>
       </nav>
 
       <section class="landing-hero" id="produto">
@@ -46,5 +46,4 @@ export class LandingPageComponent {
   readonly year = new Date().getFullYear();
   readonly t = computed(() => copy[this.i18n.locale()]);
   constructor(readonly i18n: I18nService) {}
-  changeLocale(locale: Locale): void { this.i18n.setLocale(locale); }
 }

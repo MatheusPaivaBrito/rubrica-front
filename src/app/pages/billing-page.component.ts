@@ -7,20 +7,19 @@ import QRCode from 'qrcode';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { FeedbackService } from '../core/feedback.service';
-import { I18nService, Locale } from '../core/i18n.service';
+import { I18nService } from '../core/i18n.service';
 import { BillingAccount, BillingCheckout, BillingPortal, TenantItem } from '../core/models';
+import { LanguagePickerComponent } from '../components/language-picker.component';
 
 @Component({
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, LanguagePickerComponent],
   template: `
     <main class="billing-shell">
       <header class="billing-top">
         <a routerLink="/dashboard" class="brand">Rubrica<span>.</span></a>
         <div class="top-actions">
-          <select [ngModel]="i18n.locale()" (ngModelChange)="changeLocale($event)" [attr.aria-label]="i18n.text('language')">
-            <option value="pt-BR">Português</option><option value="en">English</option><option value="es">Español</option><option value="ja-JP">日本語</option>
-          </select>
+          <app-language-picker />
           <a routerLink="/dashboard" class="button secondary">{{ i18n.text('backDashboard') }}</a>
         </div>
       </header>
@@ -91,7 +90,6 @@ export class BillingPageComponent implements OnInit {
   }
 
   async selectTenant(id: string): Promise<void> { this.tenantId.set(id); await this.loadAccount(); }
-  changeLocale(locale: Locale): void { this.i18n.setLocale(locale); }
   statusLabel(status: string): string { const keys: Record<string, Parameters<I18nService['text']>[0]> = { active:'active', pending:'pending', past_due:'pastDue', cancelled:'cancelled', paused:'paused', not_configured:'notConfigured' }; return this.i18n.text(keys[status] ?? 'notConfigured'); }
 
   async checkout(): Promise<void> { this.submitting.set(true); try { const result = await firstValueFrom(this.api.post<BillingCheckout>(`/billing/tenants/${this.tenantId()}/checkout`, { product_code: this.selectedPlan() })); this.checkoutUrl.set(result.checkout_url); this.checkoutQrCode.set(await QRCode.toDataURL(result.checkout_url, { width: 260, margin: 2 })); } catch (error) { await this.feedback.error(error); } finally { this.submitting.set(false); } }

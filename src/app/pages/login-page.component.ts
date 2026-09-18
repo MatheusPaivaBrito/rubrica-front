@@ -6,13 +6,14 @@ import { RouterLink } from '@angular/router';
 import { AuthService, MfaChallenge } from '../core/auth.service';
 import { I18nService } from '../core/i18n.service';
 import { FeedbackService } from '../core/feedback.service';
+import { LanguagePickerComponent } from '../components/language-picker.component';
 
 @Component({
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, LanguagePickerComponent],
   template: `
     <main class="login-layout"><section class="card auth-card">
-      <div class="auth-language"><select [ngModel]="i18n.locale()" (ngModelChange)="i18n.setLocale($event)" aria-label="Language"><option value="pt-BR">Português</option><option value="en">English</option><option value="es">Español</option><option value="ja-JP">日本語</option></select></div>
+      <div class="auth-language"><app-language-picker /></div>
       <p class="eyebrow">Rubrica</p><h1>{{ i18n.text('login') }}</h1>
       <p class="muted">{{ i18n.text('loginHelp') }}</p>
       <form class="form" (ngSubmit)="submit()" #form="ngForm">
@@ -25,7 +26,10 @@ import { FeedbackService } from '../core/feedback.service';
         }
         <button class="button" [disabled]="form.invalid || loading()">{{ loading() ? '…' : i18n.text('enter') }}</button>
       </form>
-      <p><a routerLink="/forgot-password">{{ i18n.text('forgotPassword') }}</a> · <a routerLink="/register">{{ i18n.text('createAccount') }}</a></p>
+      <div class="auth-actions">
+        <a class="auth-action" routerLink="/forgot-password" [queryParams]="returnUrl ? { returnUrl } : undefined"><i class="bi bi-key"></i><span>{{ i18n.text('forgotPassword') }}</span></a>
+        <a class="auth-action primary" routerLink="/register" [queryParams]="returnUrl ? { returnUrl } : undefined"><i class="bi bi-person-plus"></i><span>{{ i18n.text('createAccount') }}</span><i class="bi bi-arrow-right"></i></a>
+      </div>
     </section></main>
   `,
 })
@@ -35,8 +39,12 @@ export class LoginPageComponent {
   readonly loading = signal(false);
   readonly mfaTicket = signal('');
   code = '';
+  readonly returnUrl: string | null;
 
-  constructor(private readonly auth: AuthService, private readonly router: Router, private readonly route: ActivatedRoute, private readonly feedback: FeedbackService, readonly i18n: I18nService) {}
+  constructor(private readonly auth: AuthService, private readonly router: Router, private readonly route: ActivatedRoute, private readonly feedback: FeedbackService, readonly i18n: I18nService) {
+    const candidate = this.route.snapshot.queryParamMap.get('returnUrl');
+    this.returnUrl = candidate?.startsWith('/signing/') ? candidate : null;
+  }
 
   async submit(): Promise<void> {
     this.loading.set(true);
@@ -50,8 +58,7 @@ export class LoginPageComponent {
           return;
         }
       }
-      const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
-      await this.router.navigateByUrl(returnUrl || await this.auth.dashboardUrl());
+      await this.router.navigateByUrl(this.returnUrl || await this.auth.dashboardUrl());
     } catch { await this.feedback.error(this.i18n.text('invalidCredentials'), this.i18n.text('loginFailed')); }
     finally { this.loading.set(false); }
   }
