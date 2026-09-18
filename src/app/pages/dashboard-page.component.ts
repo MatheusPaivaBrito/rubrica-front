@@ -56,7 +56,7 @@ import { LanguagePickerComponent } from '../components/language-picker.component
           <article class="card table-card">
             <div class="section-heading">
               <div><p class="eyebrow">{{ i18n.text('monitoring') }}</p><h2>{{ i18n.text('requests') }}</h2><p class="muted">{{ i18n.text('requestsHelp') }}</p></div>
-              <label class="filter-label">{{ i18n.text('show') }}<select [(ngModel)]="requestFilter"><option value="all">{{ i18n.text('all') }}</option><option value="open">{{ i18n.text('open') }}</option><option value="draft">{{ i18n.text('drafts') }}</option><option value="completed">{{ i18n.text('completedPlural') }}</option></select></label>
+              <div class="list-toolbar"><label>{{ i18n.text('search') }}<input [(ngModel)]="requestSearch" (ngModelChange)="resetRequestLimit()" [placeholder]="i18n.text('nameOrFile')" /></label><label>{{ i18n.text('date') }}<input type="date" [(ngModel)]="requestDate" (ngModelChange)="resetRequestLimit()" /></label><label>{{ i18n.text('show') }}<select [(ngModel)]="requestFilter" (ngModelChange)="resetRequestLimit()"><option value="all">{{ i18n.text('all') }}</option><option value="open">{{ i18n.text('open') }}</option><option value="draft">{{ i18n.text('drafts') }}</option><option value="completed">{{ i18n.text('completedPlural') }}</option></select></label></div>
             </div>
             <div class="table-wrap">
               <table class="data-table">
@@ -75,15 +75,16 @@ import { LanguagePickerComponent } from '../components/language-picker.component
                 </tbody>
               </table>
             </div>
+            @if (matchingRequests().length > requestLimit) { <footer class="list-footer"><span>{{ i18n.text('showingCount', { current: visibleRequests().length, total: matchingRequests().length }) }}</span><button class="button secondary compact" (click)="requestLimit = requestLimit + 5">{{ i18n.text('loadMore') }}</button></footer> }
           </article>
 
           <article class="card table-card">
-            <div class="section-heading"><div><p class="eyebrow">{{ i18n.text('collection') }}</p><h2>{{ i18n.text('documentsPlural') }}</h2><p class="muted">{{ i18n.text('documentsHelp') }}</p></div><button class="button secondary" (click)="showUploadModal()">{{ i18n.text('uploadPdf') }}</button></div>
+            <div class="section-heading"><div><p class="eyebrow">{{ i18n.text('collection') }}</p><h2>{{ i18n.text('documentsPlural') }}</h2><p class="muted">{{ i18n.text('documentsHelp') }}</p></div><div class="section-actions"><div class="list-toolbar"><label>{{ i18n.text('search') }}<input [(ngModel)]="documentSearch" (ngModelChange)="resetDocumentLimit()" [placeholder]="i18n.text('nameOrFile')" /></label><label>{{ i18n.text('date') }}<input type="date" [(ngModel)]="documentDate" (ngModelChange)="resetDocumentLimit()" /></label></div><button class="button secondary" (click)="showUploadModal()">{{ i18n.text('uploadPdf') }}</button></div></div>
             <div class="table-wrap">
               <table class="data-table">
                 <thead><tr><th>{{ i18n.text('document') }}</th><th>{{ i18n.text('file') }}</th><th>{{ i18n.text('version') }}</th><th>{{ i18n.text('status') }}</th><th class="actions-column">{{ i18n.text('actions') }}</th></tr></thead>
                 <tbody>
-                  @for (document of documents(); track document.id) {
+                  @for (document of visibleDocuments(); track document.id) {
                     <tr>
                       <td><div class="document-cell"><strong>{{ document.title }}</strong><small>{{ i18n.text('signedCount', { count: document.completed_signature_count }) }}</small></div></td>
                       <td data-label="Arquivo"><span class="file-name">{{ document.original_filename }}</span><small>{{ fileSize(document.size_bytes) }}</small></td>
@@ -95,6 +96,7 @@ import { LanguagePickerComponent } from '../components/language-picker.component
                 </tbody>
               </table>
             </div>
+            @if (matchingDocuments().length > documentLimit) { <footer class="list-footer"><span>{{ i18n.text('showingCount', { current: visibleDocuments().length, total: matchingDocuments().length }) }}</span><button class="button secondary compact" (click)="documentLimit = documentLimit + 5">{{ i18n.text('loadMore') }}</button></footer> }
           </article>
         }
       </section>
@@ -168,6 +170,12 @@ export class DashboardPageComponent implements OnInit {
   readonly requestModalOpen = signal(false);
 
   requestFilter = 'all';
+  requestSearch = '';
+  requestDate = '';
+  requestLimit = 5;
+  documentSearch = '';
+  documentDate = '';
+  documentLimit = 5;
   signerName = '';
   signerEmail = '';
   title = '';
@@ -186,7 +194,12 @@ export class DashboardPageComponent implements OnInit {
   hasSignedSigners(): boolean { return this.signers().some((signer) => signer.status === 'signed'); }
   openRequestsCount(): number { return this.requests().filter((item) => item.status === 'open').length; }
   completedRequestsCount(): number { return this.requests().filter((item) => item.status === 'completed').length; }
-  visibleRequests(): SignatureRequest[] { return this.requests().filter((item) => this.requestFilter === 'all' || item.status === this.requestFilter); }
+  matchingRequests(): SignatureRequest[] { const query = this.requestSearch.trim().toLowerCase(); return this.requests().filter((item) => (this.requestFilter === 'all' || item.status === this.requestFilter) && (!this.requestDate || item.created_at.slice(0, 10) === this.requestDate) && (!query || item.document_title.toLowerCase().includes(query) || item.original_filename.toLowerCase().includes(query) || item.id.toLowerCase().includes(query))); }
+  visibleRequests(): SignatureRequest[] { return this.matchingRequests().slice(0, this.requestLimit); }
+  matchingDocuments(): DocumentItem[] { const query = this.documentSearch.trim().toLowerCase(); return this.documents().filter((item) => (!this.documentDate || item.created_at.slice(0, 10) === this.documentDate) && (!query || item.title.toLowerCase().includes(query) || item.original_filename.toLowerCase().includes(query) || item.created_by.toLowerCase().includes(query))); }
+  visibleDocuments(): DocumentItem[] { return this.matchingDocuments().slice(0, this.documentLimit); }
+  resetRequestLimit(): void { this.requestLimit = 5; }
+  resetDocumentLimit(): void { this.documentLimit = 5; }
   requestLink(): string {
     const request = this.selectedRequest();
     const storedLink = request ? this.requestLinks()[request.id] || '' : '';
