@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 
 import { I18nService } from '../core/i18n.service';
 import { LanguagePickerComponent } from '../components/language-picker.component';
+import { SeoService } from '../core/seo.service';
 
 const copy = {
   'pt-BR': { navProduct:'Produto', navSecurity:'Segurança', navPrice:'Preço', enter:'Entrar', start:'Criar conta grátis', eyebrow:'ASSINATURAS SEM COMPLICAÇÃO', title:'Assine documentos com clareza, segurança e validade.', lead:'Envie PDFs, convide signatários e acompanhe cada etapa. As evidências ficam incorporadas ao documento assinado.', primary:'Começar com 5 assinaturas grátis', secondary:'Ver como funciona', trust:'Feito para documentos importantes', trustCopy:'Identidade, data, dispositivo, IP e hash do arquivo reunidos em uma trilha de evidências verificável.', step1:'Envie seu PDF', step2:'Convide as pessoas', step3:'Acompanhe e comprove', feature1:'Carimbo visual no PDF', feature2:'Autenticação em dois fatores', feature3:'Histórico e evidências', plans:'Planos para cada momento', plansHelp:'As assinaturas dos documentos estão incluídas. O limite mensal considera os arquivos enviados pela conta.', base:'Base', intermediate:'Intermediário', perMonth:'/mês por conta', baseFiles:'Até 25 arquivos por mês', intermediateFiles:'Até 30 arquivos por mês', signaturesIncluded:'Assinaturas eletrônicas incluídas', emailIncluded:'Envio de solicitações por e-mail', choosePlan:'Começar grátis', cta:'Seu próximo documento pode estar assinado hoje.', contact:'Contato', privacy:'Privacidade', terms:'Termos de uso', deletion:'Exclusão de dados', rights:'Rubrica. Documentos assinados, decisões registradas.' },
@@ -45,5 +46,5 @@ const copy = {
 export class LandingPageComponent {
   readonly year = new Date().getFullYear();
   readonly t = computed(() => copy[this.i18n.locale()]);
-  constructor(readonly i18n: I18nService) {}
+  constructor(readonly i18n: I18nService, seo: SeoService) { seo.setCanonical('/'); }
 }

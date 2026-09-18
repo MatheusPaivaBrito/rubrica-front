@@ -1,5 +1,5 @@
 import { isPlatformBrowser } from '@angular/common';
-import { Injectable, PLATFORM_ID, inject, signal } from '@angular/core';
+import { afterNextRender, Injectable, PLATFORM_ID, inject, signal } from '@angular/core';
 
 export type Locale = 'pt-BR' | 'en' | 'es' | 'ja-JP';
 
@@ -69,7 +69,18 @@ const messages: Record<Locale, Catalog> = {
 @Injectable({ providedIn: 'root' })
 export class I18nService {
   private readonly browser = isPlatformBrowser(inject(PLATFORM_ID));
-  readonly locale = signal<Locale>(this.initialLocale());
+  // The first client render must match the Portuguese prerendered HTML.
+  readonly locale = signal<Locale>('pt-BR');
+
+  constructor() {
+    afterNextRender(() => {
+      const preferred = this.preferredLocale();
+      if (preferred !== this.locale()) {
+        this.locale.set(preferred);
+        document.documentElement.lang = preferred;
+      }
+    });
+  }
 
   text(key: MessageKey, values: Record<string, string | number> = {}): string {
     return Object.entries(values).reduce((text, [name, value]) => text.replaceAll(`{${name}}`, String(value)), messages[this.locale()][key]);
@@ -92,8 +103,7 @@ export class I18nService {
     if (locale === 'pt-BR' || locale === 'en' || locale === 'es' || locale === 'ja-JP') this.setLocale(locale);
   }
 
-  private initialLocale(): Locale {
-    if (!this.browser) return 'en';
+  private preferredLocale(): Locale {
     const stored = localStorage.getItem('rubrica_locale');
     if (stored === 'pt-BR' || stored === 'en' || stored === 'es' || stored === 'ja-JP') return stored;
     for (const candidate of navigator.languages.length ? navigator.languages : [navigator.language]) {

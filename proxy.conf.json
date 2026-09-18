@@ -1,4 +1,5 @@
 {
+  "/contact": { "target": "http://localhost:8100", "secure": false, "changeOrigin": true },
   "/auth": { "target": "http://localhost:8101", "secure": false },
   "/sessions": { "target": "http://localhost:8101", "secure": false },
   "/access-control": { "target": "http://localhost:8101", "secure": false },

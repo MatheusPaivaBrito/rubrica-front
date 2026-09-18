@@ -3,7 +3,7 @@ import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import Swal, { SweetAlertIcon } from 'sweetalert2';
 
-import { accessTokenKey } from './api-auth.interceptor';
+import { setAccessToken } from './api-auth.interceptor';
 import { I18nService, MessageKey } from './i18n.service';
 
 interface ValidationIssue {
@@ -30,7 +30,7 @@ export class FeedbackService {
     });
     if (unauthorized) {
       const returnUrl = this.router.url;
-      sessionStorage.removeItem(accessTokenKey);
+      setAccessToken(null);
       await this.router.navigate(['/login'], { queryParams: returnUrl.startsWith('/login') ? undefined : { returnUrl } });
       this.handlingUnauthorized = false;
     }

@@ -3,7 +3,7 @@ import { isPlatformBrowser } from '@angular/common';
 import { Injectable, PLATFORM_ID, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
-import { accessTokenKey } from './api-auth.interceptor';
+import { getAccessToken, setAccessToken } from './api-auth.interceptor';
 import { I18nService } from './i18n.service';
 import { TenantItem } from './models';
 
@@ -17,7 +17,7 @@ export interface AccessContext {
   permission_keys: string[];
 }
 
-interface LoginResponse { access_token: string; refresh_token: string; }
+interface LoginResponse { access_token: string; }
 export interface MfaChallenge { mfa_required: true; mfa_ticket: string; expires_in: number; }
 const mfaDeferredKey = 'rubrica_mfa_deferred_for_session';
 
@@ -31,7 +31,7 @@ export class AuthService {
   async login(email: string, password: string): Promise<AccessContext | MfaChallenge> {
     const response = await firstValueFrom(this.http.post<LoginResponse | MfaChallenge>('/auth/login', { email, password }));
     if ('mfa_required' in response) return response;
-    sessionStorage.setItem(accessTokenKey, response.access_token);
+    setAccessToken(response.access_token);
     sessionStorage.removeItem(mfaDeferredKey);
     return this.loadContext();
   }
@@ -41,27 +41,27 @@ export class AuthService {
       mfa_ticket: mfaTicket,
       code,
     }));
-    sessionStorage.setItem(accessTokenKey, response.access_token);
+    setAccessToken(response.access_token);
     sessionStorage.removeItem(mfaDeferredKey);
     return this.loadContext();
   }
 
   async restore(): Promise<AccessContext | null> {
     if (!this.browser) return null;
-    if (!sessionStorage.getItem(accessTokenKey)) {
+    if (!getAccessToken()) {
       try {
         const response = await firstValueFrom(this.http.post<LoginResponse>('/auth/refresh', {}));
-        sessionStorage.setItem(accessTokenKey, response.access_token);
+        setAccessToken(response.access_token);
       } catch { return null; }
     }
     try { return await this.loadContext(); }
-    catch { sessionStorage.removeItem(accessTokenKey); return null; }
+    catch { setAccessToken(null); return null; }
   }
 
   async logout(): Promise<void> {
     try { await firstValueFrom(this.http.post('/auth/logout', {})); }
     finally {
-      if (this.browser) sessionStorage.removeItem(accessTokenKey);
+      setAccessToken(null);
       if (this.browser) sessionStorage.removeItem(mfaDeferredKey);
       this.context.set(null);
     }

@@ -2,13 +2,20 @@ import { HttpClient, HttpErrorResponse, HttpInterceptorFn } from '@angular/commo
 import { inject } from '@angular/core';
 import { Observable, catchError, finalize, shareReplay, switchMap, throwError } from 'rxjs';
 
-const accessTokenKey = 'rubrica.access-token';
+let accessToken: string | null = null;
+const legacyAccessTokenKey = 'rubrica.access-token';
+if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(legacyAccessTokenKey);
+export const getAccessToken = () => accessToken;
+export const setAccessToken = (token: string | null): void => {
+  accessToken = token;
+  if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(legacyAccessTokenKey);
+};
 interface RefreshResponse { access_token: string; }
 let refreshRequest$: Observable<RefreshResponse> | null = null;
 
 export const apiAuthInterceptor: HttpInterceptorFn = (request, next) => {
   const http = inject(HttpClient);
-  const token = typeof sessionStorage === 'undefined' ? null : sessionStorage.getItem(accessTokenKey);
+  const token = getAccessToken();
   const headers = token ? request.headers.set('Authorization', `Bearer ${token}`) : request.headers;
   const authenticatedRequest = request.clone({ headers, withCredentials: true });
 
@@ -25,19 +32,17 @@ export const apiAuthInterceptor: HttpInterceptorFn = (request, next) => {
       }
       return refreshRequest$.pipe(
         switchMap((response) => {
-          if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(accessTokenKey, response.access_token);
+          setAccessToken(response.access_token);
           return next(request.clone({
             headers: request.headers.set('Authorization', `Bearer ${response.access_token}`),
             withCredentials: true,
           }));
         }),
         catchError((refreshError) => {
-          if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(accessTokenKey);
+          setAccessToken(null);
           return throwError(() => refreshError);
         }),
       );
     }),
   );
 };
-
-export { accessTokenKey };
