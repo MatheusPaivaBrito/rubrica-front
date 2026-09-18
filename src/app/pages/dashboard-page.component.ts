@@ -1,5 +1,5 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -145,7 +145,7 @@ import { LanguagePickerComponent } from '../components/language-picker.component
     </main>
   `,
 })
-export class DashboardPageComponent implements OnInit {
+export class DashboardPageComponent implements OnInit, OnDestroy {
   readonly documents = signal<DocumentItem[]>([]);
   readonly requests = signal<SignatureRequest[]>([]);
   readonly signers = signal<Signer[]>([]);
@@ -183,10 +183,20 @@ export class DashboardPageComponent implements OnInit {
   file: File | null = null;
   private previewObjectUrl = '';
   private tenantSlug = '';
+  private modalScrollY = 0;
+  private modalBodyStyle: string | null = null;
+  private modalLocked = false;
+  private readonly updateModalViewport = (): void => {
+    if (typeof document === 'undefined' || typeof window === 'undefined') return;
+    const viewport = window.visualViewport;
+    document.documentElement.style.setProperty('--rubrica-modal-top', `${viewport?.offsetTop ?? 0}px`);
+    document.documentElement.style.setProperty('--rubrica-modal-height', `${viewport?.height ?? window.innerHeight}px`);
+  };
 
   constructor(readonly auth: AuthService, readonly i18n: I18nService, private readonly api: ApiService, private readonly route: ActivatedRoute, private readonly router: Router, private readonly sanitizer: DomSanitizer, private readonly feedback: FeedbackService) {}
 
   async ngOnInit(): Promise<void> { const context = await this.auth.restore(); if (!context) { await this.router.navigate(['/login']); return; } try { if (context.mfa_setup_required && !this.auth.isMfaDeferredForSession()) { await this.router.navigate(['/security']); return; } const dashboardUrl = await this.auth.dashboardUrl(); const routeSlug = this.route.snapshot.paramMap.get('tenantSlug'); if (!routeSlug) { await this.router.navigateByUrl(dashboardUrl, { replaceUrl: true }); return; } const tenants = await firstValueFrom(this.api.get<TenantItem[]>('/tenants')); const selectedTenant = tenants.find(tenant => tenant.slug === routeSlug); if (!selectedTenant) { await this.router.navigateByUrl(dashboardUrl, { replaceUrl: true }); return; } this.tenants.set(tenants); this.tenantSlug = selectedTenant.slug; if (this.canManage()) await Promise.all([this.reload(), this.loadBilling(tenants)]); } catch (error) { await this.feedback.error(error, this.i18n.text('dashboardLoadFailed')); } finally { this.loading.set(false); } }
+  ngOnDestroy(): void { this.unlockPageScroll(); }
   security(): Promise<boolean> { return this.router.navigate(['/security']); }
   billing(): Promise<boolean> { return this.router.navigate(['/plan']); }
   canManage(): boolean { return this.auth.can('documents:write') && this.auth.can('signature_requests:write'); }
@@ -220,14 +230,14 @@ export class DashboardPageComponent implements OnInit {
   billingFor(tenantId: string): BillingAccount | null { return this.billingAccounts()[tenantId] ?? null; }
   billingAvailability(tenantId: string): string { const account = this.billingFor(tenantId); if (!account) return this.i18n.text('unavailable'); return account.unlimited_signatures ? this.i18n.text('unlimited') : this.i18n.text('remainingOf', { remaining: account.signatures_remaining ?? 0, limit: account.free_signatures_limit }); }
 
-  showUploadModal(): void { this.uploadModalOpen.set(true); }
-  closeUploadModal(): void { this.uploadModalOpen.set(false); }
-  closeRequestCreateModal(): void { this.requestCreateModalOpen.set(false); }
-  closeRequestModal(): void { this.requestModalOpen.set(false); }
+  showUploadModal(): void { this.uploadModalOpen.set(true); this.syncModalLock(); }
+  closeUploadModal(): void { this.uploadModalOpen.set(false); this.syncModalLock(); }
+  closeRequestCreateModal(): void { this.requestCreateModalOpen.set(false); this.syncModalLock(); }
+  closeRequestModal(): void { this.requestModalOpen.set(false); this.syncModalLock(); }
   selectFile(event: Event): void { this.setFile((event.target as HTMLInputElement).files?.item(0) ?? null); }
   dropFile(event: DragEvent): void { event.preventDefault(); this.setFile(event.dataTransfer?.files.item(0) ?? null); }
-  prepareRequest(document: DocumentItem): void { this.selectedDocument.set(document); this.expiresAt = dateTime.localInputAfterDays(3); this.requestCreateModalOpen.set(true); }
-  async openRequestDetails(request: SignatureRequest): Promise<void> { this.selectedRequest.set(request); this.selectedDocument.set(null); this.requestQrCode.set(''); this.contactSearch.set(''); this.signerName = ''; this.signerEmail = ''; this.requestEvidence.set([]); this.requestModalOpen.set(true); this.detailsLoading.set(true); try { await this.loadSigners(request.id); if (request.status === 'draft') await this.loadSignerContacts(); if (this.isAdmin()) await this.loadAdminRequestDetails(request); } catch (error) { await this.feedback.error(error, this.i18n.text('detailsLoadFailed')); } finally { this.detailsLoading.set(false); } }
+  prepareRequest(document: DocumentItem): void { this.selectedDocument.set(document); this.expiresAt = dateTime.localInputAfterDays(3); this.requestCreateModalOpen.set(true); this.syncModalLock(); }
+  async openRequestDetails(request: SignatureRequest): Promise<void> { this.selectedRequest.set(request); this.selectedDocument.set(null); this.requestQrCode.set(''); this.contactSearch.set(''); this.signerName = ''; this.signerEmail = ''; this.requestEvidence.set([]); this.requestModalOpen.set(true); this.syncModalLock(); this.detailsLoading.set(true); try { await this.loadSigners(request.id); if (request.status === 'draft') await this.loadSignerContacts(); if (this.isAdmin()) await this.loadAdminRequestDetails(request); } catch (error) { await this.feedback.error(error, this.i18n.text('detailsLoadFailed')); } finally { this.detailsLoading.set(false); } }
 
   async preview(document: DocumentItem): Promise<void> {
     await this.run(async () => {
@@ -238,10 +248,11 @@ export class DashboardPageComponent implements OnInit {
       this.previewHeading.set(this.i18n.text('originalDocument'));
       this.previewDocument.set(document);
       this.previewUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(this.previewObjectUrl));
+      this.syncModalLock();
     });
   }
-  async previewSignedRequest(): Promise<void> { const request = this.selectedRequest(); const document = this.documents().find(item => item.id === request?.document_id); if (!request || !document) return; await this.run(async () => { const response = await firstValueFrom(this.api.getBlob(`/signature-requests/${request.id}/signed-document`)); this.releasePreviewObjectUrl(); this.previewObjectUrl = URL.createObjectURL(response.body!); this.previewHeading.set(this.i18n.text('stampedPdf')); this.previewDocument.set(document); this.previewUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(this.previewObjectUrl)); }); }
-  closePreview(): void { this.previewDocument.set(null); this.previewUrl.set(''); this.releasePreviewObjectUrl(); }
+  async previewSignedRequest(): Promise<void> { const request = this.selectedRequest(); const document = this.documents().find(item => item.id === request?.document_id); if (!request || !document) return; await this.run(async () => { const response = await firstValueFrom(this.api.getBlob(`/signature-requests/${request.id}/signed-document`)); this.releasePreviewObjectUrl(); this.previewObjectUrl = URL.createObjectURL(response.body!); this.previewHeading.set(this.i18n.text('stampedPdf')); this.previewDocument.set(document); this.previewUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(this.previewObjectUrl)); this.syncModalLock(); }); }
+  closePreview(): void { this.previewDocument.set(null); this.previewUrl.set(''); this.releasePreviewObjectUrl(); this.syncModalLock(); }
   async deleteDocument(document: DocumentItem): Promise<void> { const result = await Swal.fire({ icon: 'warning', title: this.i18n.text('deleteDocumentTitle'), text: this.i18n.text('deleteDocumentHelp'), showCancelButton: true, confirmButtonText: this.i18n.text('deleteAction'), cancelButtonText: this.i18n.text('cancel'), confirmButtonColor: '#b42318' }); if (!result.isConfirmed) return; await this.run(async () => { await firstValueFrom(this.api.delete(`/documents/${document.id}`)); this.documents.update((items) => items.filter((item) => item.id !== document.id)); }); }
 
   async upload(): Promise<void> { if (!this.file || !this.tenantSlug) return; await this.run(async () => { const file = this.file!; const content = await file.arrayBuffer(); await firstValueFrom(this.api.postFile<DocumentItem>('/documents', content, file.type || 'application/pdf', { organization_id: this.tenantSlug, title: this.title, filename: file.name, content_type: file.type || 'application/pdf' })); this.title = ''; this.file = null; this.closeUploadModal(); await this.reload(); await Swal.fire({ icon: 'success', title: this.i18n.text('documentSent'), timer: 1500, showConfirmButton: false }); }); }
@@ -262,6 +273,27 @@ export class DashboardPageComponent implements OnInit {
   private async loadAdminRequestDetails(request: SignatureRequest): Promise<void> { const [link, evidence] = await Promise.allSettled([firstValueFrom(this.api.get<SigningLink>(`/signature-requests/${request.id}/signing-link`)), firstValueFrom(this.api.get<SignatureEvidence[]>(`/signature-requests/${request.id}/evidence`))]); if (link.status === 'fulfilled') await this.storeSigningLink(request.id, link.value.signing_url); if (evidence.status === 'fulfilled') this.requestEvidence.set(evidence.value); }
   private async storeSigningLink(requestId: string, url: string): Promise<void> { this.requestLinks.update(items => ({ ...items, [requestId]: url })); this.requestQrCode.set(await QRCode.toDataURL(url, { width: 220, margin: 2 })); }
   private releasePreviewObjectUrl(): void { if (this.previewObjectUrl) URL.revokeObjectURL(this.previewObjectUrl); this.previewObjectUrl = ''; }
+  private syncModalLock(): void { if (this.uploadModalOpen() || this.requestCreateModalOpen() || this.requestModalOpen() || this.previewDocument()) this.lockPageScroll(); else this.unlockPageScroll(); }
+  private lockPageScroll(): void {
+    if (this.modalLocked || typeof document === 'undefined' || typeof window === 'undefined') return;
+    this.modalLocked = true;
+    this.modalScrollY = window.scrollY;
+    this.modalBodyStyle = document.body.getAttribute('style');
+    Object.assign(document.body.style, { position: 'fixed', top: `-${this.modalScrollY}px`, right: '0', left: '0', width: '100%', overflow: 'hidden' });
+    this.updateModalViewport();
+    window.visualViewport?.addEventListener('resize', this.updateModalViewport);
+    window.visualViewport?.addEventListener('scroll', this.updateModalViewport);
+  }
+  private unlockPageScroll(): void {
+    if (!this.modalLocked || typeof document === 'undefined' || typeof window === 'undefined') return;
+    this.modalLocked = false;
+    window.visualViewport?.removeEventListener('resize', this.updateModalViewport);
+    window.visualViewport?.removeEventListener('scroll', this.updateModalViewport);
+    if (this.modalBodyStyle === null) document.body.removeAttribute('style'); else document.body.setAttribute('style', this.modalBodyStyle);
+    document.documentElement.style.removeProperty('--rubrica-modal-top');
+    document.documentElement.style.removeProperty('--rubrica-modal-height');
+    window.scrollTo(0, this.modalScrollY);
+  }
   private async run(action: () => Promise<void>): Promise<void> { this.submitting.set(true); try { await action(); } catch (error) { await this.feedback.error(error); } finally { this.submitting.set(false); } }
   private setFile(file: File | null): void { if (!file) return; if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) { void this.feedback.warning(this.i18n.text('pdfOnly'), this.i18n.text('invalidFile')); return; } this.file = file; }
 }
