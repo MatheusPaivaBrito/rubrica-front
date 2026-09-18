@@ -326,6 +326,7 @@ input:focus, select:focus { outline: 3px solid rgba(168, 32, 53, .16); border-co
 .link-panel { display: grid; gap: .3rem; padding: .8rem; border: 1px dashed #96a8be; border-radius: 10px; background: #fff; }
 .link-panel small { color: #a82035; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
 .link-panel span { overflow-wrap: anywhere; color: #175cd3; font-size: .86rem; }
+.signing-qr { display: block; width: 190px; max-width: 100%; margin: .75rem auto; padding: .5rem; border: 1px solid #e4e7ec; border-radius: 12px; background: #fff; }
 .pdf-backdrop { z-index: 1100; }
 .evidence-dialog { width: min(620px, calc(100% - 2rem)) !important; border-radius: 18px !important; }
 .evidence-copy { color: #475467; text-align: left; line-height: 1.5; }
