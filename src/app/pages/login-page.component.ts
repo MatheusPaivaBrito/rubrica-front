@@ -8,10 +8,11 @@ import { I18nService } from '../core/i18n.service';
 import { FeedbackService } from '../core/feedback.service';
 import { LanguagePickerComponent } from '../components/language-picker.component';
 import { OneTimeCodeComponent } from '../components/one-time-code.component';
+import { PasswordFieldComponent } from '../components/password-field.component';
 
 @Component({
   standalone: true,
-  imports: [FormsModule, RouterLink, LanguagePickerComponent, OneTimeCodeComponent],
+  imports: [FormsModule, RouterLink, LanguagePickerComponent, OneTimeCodeComponent, PasswordFieldComponent],
   template: `
     <main class="login-layout"><section class="card auth-card">
       <div class="auth-language"><app-language-picker /></div>
@@ -20,7 +21,7 @@ import { OneTimeCodeComponent } from '../components/one-time-code.component';
       <form class="form" (ngSubmit)="submit()" #form="ngForm">
         @if (!mfaTicket()) {
           <label>{{ i18n.text('email') }} <input name="email" type="email" [(ngModel)]="email" required autocomplete="email" /></label>
-          <label>{{ i18n.text('password') }} <input name="password" type="password" [(ngModel)]="password" required autocomplete="current-password" /></label>
+          <app-password-field name="password" [(ngModel)]="password" [label]="i18n.text('password')" autocomplete="current-password" required />
         } @else {
           <span class="field-label">{{ i18n.text('authenticatorCode') }}</span>
           <app-one-time-code [(value)]="code" [label]="i18n.text('authenticatorCode')" (completed)="completeMfa($event)" />

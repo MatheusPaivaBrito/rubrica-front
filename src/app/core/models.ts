@@ -29,6 +29,7 @@ export interface BillingAccount {
   signatures_used: number;
   signatures_remaining: number | null;
   unlimited_signatures: boolean;
+  complimentary_lifetime: boolean;
   current_product_code?: string | null;
   provider_customer_id?: string | null;
   provider_subscription_id?: string | null;

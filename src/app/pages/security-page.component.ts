@@ -11,6 +11,7 @@ import { FeedbackService } from '../core/feedback.service';
 import { I18nService } from '../core/i18n.service';
 import { LanguagePickerComponent } from '../components/language-picker.component';
 import { OneTimeCodeComponent } from '../components/one-time-code.component';
+import { PasswordFieldComponent } from '../components/password-field.component';
 
 interface MfaStatus { enabled: boolean; required_by_policy: boolean; setup_required: boolean; recovery_codes_remaining: number; }
 interface MfaSetup { secret: string; provisioning_uri: string; }
@@ -18,7 +19,7 @@ interface RecoveryCodes { recovery_codes: string[]; }
 
 @Component({
   standalone: true,
-  imports: [FormsModule, LanguagePickerComponent, OneTimeCodeComponent],
+  imports: [FormsModule, LanguagePickerComponent, OneTimeCodeComponent, PasswordFieldComponent],
   template: `
     <main class="settings-shell">
       <header class="settings-top"><button type="button" class="brand brand-button" (click)="returnToDashboard()">Rubrica<span>.</span></button><div class="button-row"><app-language-picker /><button class="button secondary" (click)="returnToDashboard()">{{ i18n.text('backDashboard') }}</button><button class="button secondary" (click)="logout()">{{ i18n.text('logout') }}</button></div></header>
@@ -34,7 +35,7 @@ interface RecoveryCodes { recovery_codes: string[]; }
         } @else {
           <p class="status-ok"><i class="bi bi-shield-check"></i> {{ i18n.text('mfaActive') }}</p>
           <p>{{ i18n.text('recoveryAvailable', { count: status()?.recovery_codes_remaining ?? 0 }) }}</p>
-          <hr /><h2>{{ i18n.text('manageMfa') }}</h2><form class="form" (ngSubmit)="regenerate()"><label>{{ i18n.text('currentPassword') }}<input name="password" type="password" [(ngModel)]="password" required /></label><label>{{ i18n.text('currentOrRecoveryCode') }}<input name="manageCode" [(ngModel)]="code" required /></label><div class="button-row"><button class="button secondary">{{ i18n.text('generateCodes') }}</button>@if (!status()?.required_by_policy) { <button type="button" class="button danger" (click)="disable()">{{ i18n.text('disableMfa') }}</button> }</div></form>
+          <hr /><h2>{{ i18n.text('manageMfa') }}</h2><form class="form" (ngSubmit)="regenerate()"><app-password-field name="password" [(ngModel)]="password" [label]="i18n.text('currentPassword')" autocomplete="current-password" required /><label>{{ i18n.text('currentOrRecoveryCode') }}<input name="manageCode" [(ngModel)]="code" required /></label><div class="button-row"><button class="button secondary">{{ i18n.text('generateCodes') }}</button>@if (!status()?.required_by_policy) { <button type="button" class="button danger" (click)="disable()">{{ i18n.text('disableMfa') }}</button> }</div></form>
           @if (status()?.required_by_policy) { <p class="muted">{{ i18n.text('mfaCannotDisable') }}</p> }
         }
         @if (recoveryCodes().length) { <section class="recovery-panel"><h2>{{ i18n.text('saveCodes') }}</h2><p>{{ i18n.text('saveCodesHelp') }}</p><div class="codes">@for (item of recoveryCodes(); track item) { <code>{{ item }}</code> }</div><div class="button-row"><button class="button secondary" (click)="downloadCodes()">{{ i18n.text('downloadCodes') }}</button><button class="button" (click)="returnToDashboard()">{{ i18n.text('backDashboard') }}</button></div></section> }

@@ -32,7 +32,7 @@ import { LanguagePickerComponent } from '../components/language-picker.component
             <select [ngModel]="tenantId()" (ngModelChange)="selectTenant($event)">@for (tenant of tenants(); track tenant.id) { <option [value]="tenant.id">{{ tenant.name }} · {{ tenant.currency }}</option> }</select>
           </label>
           @if (account()) {
-            <div class="plan-banner"><div><small>{{ i18n.text('plan') }}</small><h2>{{ account()!.unlimited_signatures ? i18n.text('paidPlan') : i18n.text('free') }}</h2><p>{{ account()!.unlimited_signatures ? i18n.text('paidPlanHelp') : i18n.text('fiveFree') }}</p></div><span class="status" [attr.data-status]="account()!.status">{{ statusLabel(account()!.status) }}</span></div>
+            <div class="plan-banner"><div><small>{{ i18n.text('plan') }}</small><h2>{{ planName() }}</h2><p>{{ planHelp() }}</p></div><span class="status" [attr.data-status]="account()!.complimentary_lifetime ? 'complimentary' : account()!.status">{{ account()!.complimentary_lifetime ? i18n.text('complimentary') : statusLabel(account()!.status) }}</span></div>
             <div class="metrics">
               <article><small>{{ i18n.text('usage') }}</small><strong>{{ i18n.text('signatures', { count: account()!.signatures_used }) }}</strong></article>
               <article><small>{{ i18n.text('availableNow') }}</small><strong>{{ availability() }}</strong></article>
@@ -92,6 +92,8 @@ export class BillingPageComponent implements OnInit {
 
   async selectTenant(id: string): Promise<void> { this.tenantId.set(id); await this.loadAccount(); }
   statusLabel(status: string): string { const keys: Record<string, Parameters<I18nService['text']>[0]> = { active:'active', pending:'pending', past_due:'pastDue', cancelled:'cancelled', paused:'paused', not_configured:'notConfigured' }; return this.i18n.text(keys[status] ?? 'notConfigured'); }
+  planName(): string { const account = this.account(); if (account?.complimentary_lifetime) return this.i18n.text('lifetimePlan'); return account?.unlimited_signatures ? this.i18n.text('paidPlan') : this.i18n.text('free'); }
+  planHelp(): string { const account = this.account(); if (account?.complimentary_lifetime) return this.i18n.text('lifetimePlanHelp'); return account?.unlimited_signatures ? this.i18n.text('paidPlanHelp') : this.i18n.text('fiveFree'); }
 
   async checkout(): Promise<void> { this.submitting.set(true); try { const result = await firstValueFrom(this.api.post<BillingCheckout>(`/billing/tenants/${this.tenantId()}/checkout`, { product_code: this.selectedPlan() })); this.checkoutUrl.set(result.checkout_url); this.checkoutQrCode.set(await QRCode.toDataURL(result.checkout_url, { width: 260, margin: 2 })); } catch (error) { await this.feedback.error(error); } finally { this.submitting.set(false); } }
   async portal(): Promise<void> { await this.redirect<BillingPortal>(`/billing/tenants/${this.tenantId()}/portal`, 'portal_url'); }
