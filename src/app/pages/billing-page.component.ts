@@ -46,7 +46,7 @@ import { LanguagePickerComponent } from '../components/language-picker.component
             }
             <div class="actions">
               @if (canSubscribe()) { <button class="button" [disabled]="submitting()" (click)="checkout()"><i class="bi bi-box-arrow-up-right"></i> {{ i18n.text('subscribe') }}</button> }
-              @if (account()!.provider_customer_id || account()!.status !== 'not_configured') { <button class="button secondary" [disabled]="submitting()" (click)="portal()">{{ i18n.text('manageSubscription') }}</button> }
+              @if (showPortalAction()) { <button class="button" [disabled]="submitting()" (click)="portal()"><i class="bi bi-arrow-left-right"></i> {{ portalActionLabel() }}</button> }
             </div>
             @if (checkoutUrl()) { <div class="checkout-qr"><img [src]="checkoutQrCode()" [alt]="i18n.text('checkoutQrAlt')" /><div><strong>{{ i18n.text('checkoutFinalize') }}</strong><p>{{ i18n.text('checkoutScan') }}</p><button class="button" (click)="openCheckout()">{{ i18n.text('openStripe') }}</button></div></div> }
           }
@@ -72,7 +72,8 @@ export class BillingPageComponent implements OnInit {
     const account = this.account();
     if (!account) return this.i18n.text('unavailable');
     if (account.unlimited_files) return this.i18n.text('unlimited');
-    if (account.files_limit !== null) return this.i18n.text('filesRemainingOf', { remaining: account.files_remaining ?? 0, limit: account.files_limit });
+    const limit = this.fileLimit(account);
+    if (limit !== null) return this.i18n.text('filesRemainingOf', { remaining: account.files_remaining ?? Math.max(limit - this.filesUsed(account), 0), limit });
     return this.i18n.text('remainingOf', { remaining: account.signatures_remaining ?? 0, limit: account.free_signatures_limit });
   });
 
@@ -94,17 +95,21 @@ export class BillingPageComponent implements OnInit {
 
   async selectTenant(id: string): Promise<void> { this.tenantId.set(id); await this.loadAccount(); }
   statusLabel(status: string): string { const keys: Record<string, Parameters<I18nService['text']>[0]> = { active:'active', pending:'pending', past_due:'pastDue', cancelled:'cancelled', paused:'paused', not_configured:'notConfigured' }; return this.i18n.text(keys[status] ?? 'notConfigured'); }
-  planName(): string { const account = this.account(); if (account?.complimentary_lifetime) return this.i18n.text('lifetimePlan'); if (account?.current_product_code === 'rubrica_intermediate' && account.files_limit !== null) return this.i18n.text('intermediatePlan'); if (account?.current_product_code === 'rubrica_base' && account.files_limit !== null) return this.i18n.text('basePlan'); return this.i18n.text('free'); }
-  planHelp(): string { const account = this.account(); if (account?.complimentary_lifetime) return this.i18n.text('lifetimePlanHelp'); if (account?.current_product_code === 'rubrica_intermediate' && account.files_limit !== null) return this.i18n.text('intermediatePlanHelp'); if (account?.current_product_code === 'rubrica_base' && account.files_limit !== null) return this.i18n.text('basePlanHelp'); return this.i18n.text('fiveFree'); }
-  usageLabel(): string { const account = this.account(); return account && account.files_limit !== null ? this.i18n.text('monthlyUsage') : this.i18n.text('usage'); }
-  usageValue(): string { const account = this.account(); if (!account) return this.i18n.text('unavailable'); return account.files_limit !== null ? this.i18n.text('files', { count: account.files_uploaded_in_period }) : this.i18n.text('signatures', { count: account.signatures_used }); }
-  canSubscribe(): boolean { const account = this.account(); return Boolean(account && !account.complimentary_lifetime && account.files_limit === null && (!account.provider_subscription_id || ['cancelled', 'not_configured'].includes(account.status))); }
+  planName(): string { const account = this.account(); if (account?.complimentary_lifetime) return this.i18n.text('lifetimePlan'); if (account?.current_product_code === 'rubrica_intermediate' && this.fileLimit(account) !== null) return this.i18n.text('intermediatePlan'); if (account?.current_product_code === 'rubrica_base' && this.fileLimit(account) !== null) return this.i18n.text('basePlan'); return this.i18n.text('free'); }
+  planHelp(): string { const account = this.account(); if (account?.complimentary_lifetime) return this.i18n.text('lifetimePlanHelp'); if (account?.current_product_code === 'rubrica_intermediate' && this.fileLimit(account) !== null) return this.i18n.text('intermediatePlanHelp'); if (account?.current_product_code === 'rubrica_base' && this.fileLimit(account) !== null) return this.i18n.text('basePlanHelp'); return this.i18n.text('fiveFree'); }
+  usageLabel(): string { const account = this.account(); return account && this.fileLimit(account) !== null ? this.i18n.text('monthlyUsage') : this.i18n.text('usage'); }
+  usageValue(): string { const account = this.account(); if (!account) return this.i18n.text('unavailable'); return this.fileLimit(account) !== null ? this.i18n.text('files', { count: this.filesUsed(account) }) : this.i18n.text('signatures', { count: account.signatures_used }); }
+  canSubscribe(): boolean { const account = this.account(); return Boolean(account && !account.complimentary_lifetime && this.fileLimit(account) === null && (!account.provider_subscription_id || ['cancelled', 'not_configured'].includes(account.status))); }
+  showPortalAction(): boolean { const account = this.account(); return Boolean(account && !account.complimentary_lifetime && (account.provider_customer_id || account.status !== 'not_configured')); }
+  portalActionLabel(): string { const account = this.account(); if (account?.cancel_at_period_end) return this.i18n.text('reactivateSubscription'); if (account?.current_product_code === 'rubrica_base' && this.fileLimit(account) !== null) return this.i18n.text('upgradePlan'); if (account?.current_product_code === 'rubrica_intermediate' && this.fileLimit(account) !== null) return this.i18n.text('changePlan'); return this.i18n.text('manageSubscription'); }
 
   async checkout(): Promise<void> { this.submitting.set(true); try { const result = await firstValueFrom(this.api.post<BillingCheckout>(`/billing/tenants/${this.tenantId()}/checkout`, { product_code: this.selectedPlan() })); this.checkoutUrl.set(result.checkout_url); this.checkoutQrCode.set(await QRCode.toDataURL(result.checkout_url, { width: 260, margin: 2 })); } catch (error) { await this.feedback.error(error); } finally { this.submitting.set(false); } }
   async portal(): Promise<void> { await this.redirect<BillingPortal>(`/billing/tenants/${this.tenantId()}/portal`, 'portal_url'); }
   openCheckout(): void { if (this.checkoutUrl()) window.location.assign(this.checkoutUrl()); }
 
   private async loadAccount(): Promise<void> { const account = await firstValueFrom(this.api.get<BillingAccount>(`/billing/tenants/${this.tenantId()}/account`)); this.account.set(account); if (account.current_product_code === 'rubrica_base' || account.current_product_code === 'rubrica_intermediate') this.selectedPlan.set(account.current_product_code); }
+  private fileLimit(account: BillingAccount): number | null { if (typeof account.files_limit === 'number') return account.files_limit; if (!['active', 'past_due'].includes(account.status)) return null; if (account.current_product_code === 'rubrica_base') return 25; if (account.current_product_code === 'rubrica_intermediate') return 30; return null; }
+  private filesUsed(account: BillingAccount): number { return account.files_uploaded_in_period ?? 0; }
   private async redirect<T extends BillingCheckout | BillingPortal>(path: string, key: keyof T): Promise<void> {
     this.submitting.set(true);
     try { const result = await firstValueFrom(this.api.post<T>(path, {})); window.location.assign(String(result[key])); }
