@@ -22,7 +22,7 @@ import { LanguagePickerComponent } from '../components/language-picker.component
       <main class="signing-state"><section class="card"><h1>{{ i18n.text('inviteFailed') }}</h1><p class="error">{{ error() }}</p><button class="button" (click)="login()">{{ i18n.text('enter') }}</button></section></main>
     } @else if (context()) {
       <main class="signing-workspace">
-        <section class="signing-document-pane" aria-label="Documento para assinatura">
+        <section class="signing-document-pane" [attr.aria-label]="i18n.text('documentForSigning')">
           <header class="signing-document-header">
             <div><p class="eyebrow">{{ i18n.text('documentForSigning') }}</p><h1>{{ context()!.document_title }}</h1><p>{{ context()!.original_filename }}</p></div>
             <span class="page-hint">{{ pageHint() }}</span>
@@ -32,6 +32,7 @@ import { LanguagePickerComponent } from '../components/language-picker.component
             [documentEndpoint]="documentEndpoint()"
             [signerName]="context()!.signer.name"
             [signerIdentity]="identityLabel()"
+            [signerCountry]="context()!.signer.identity_document_country || context()!.account_country || ''"
             [stampDate]="context()!.signer.signed_at || stampPreviewDate"
             [placement]="placement()"
             [readonly]="completed()"

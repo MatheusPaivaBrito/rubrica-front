@@ -7,6 +7,7 @@ import { ApiService } from '../core/api.service';
 import { FeedbackService } from '../core/feedback.service';
 import { I18nService, MessageKey } from '../core/i18n.service';
 import { LanguagePickerComponent } from '../components/language-picker.component';
+import { countryFlag, SUPPORTED_COUNTRIES } from '../core/countries';
 
 interface IdentityOption { value: string; label: MessageKey }
 
@@ -19,14 +20,14 @@ interface IdentityOption { value: string; label: MessageKey }
         <a class="account-brand" routerLink="/"><img src="icons/rubrica-mark.png" alt="" /><span>Rubrica</span></a>
         <app-language-picker />
       </header>
-      <div class="account-title"><p class="eyebrow">Acesso seguro</p><h1>{{ i18n.text(titleKey) }}</h1>@if (mode === 'register') { <p class="muted">Comece com 5 assinaturas gratuitas. Nenhum cartão é necessário.</p> }</div>
+      <div class="account-title"><p class="eyebrow">{{ i18n.text('secureAccess') }}</p><h1>{{ i18n.text(titleKey) }}</h1>@if (mode === 'register') { <p class="muted">{{ i18n.text('registerHelp') }}</p> }</div>
       @if (mode === 'register') {
         <form class="form" (ngSubmit)="register()">
           <label>{{ i18n.text('name') }} <input name="name" [(ngModel)]="name" required autocomplete="name" /></label>
           <label>{{ i18n.text('email') }} <input name="email" type="email" [(ngModel)]="email" required autocomplete="email" /></label>
-          <fieldset class="form identity-fieldset"><legend>{{ i18n.text('optionalIdentity') }}</legend><p class="field-help">Você pode informar o documento agora ou completar seu perfil depois.</p>
-            <label>{{ i18n.text('documentCountry') }} <input name="country" [(ngModel)]="country" (ngModelChange)="countryChanged()" list="country-options" maxlength="2" placeholder="BR, JP, PT…" autocomplete="country" /></label>
-            <datalist id="country-options"><option value="BR">Brasil</option><option value="JP">日本</option><option value="PT">Portugal</option><option value="US">United States</option></datalist>
+          <fieldset class="form identity-fieldset"><legend>{{ i18n.text('optionalIdentity') }}</legend><p class="field-help">{{ i18n.text('identityLater') }}</p>
+            <label>{{ i18n.text('documentCountry') }} <span class="country-code-field"><span class="country-flag" aria-hidden="true">{{ countryFlag(country) || '🌐' }}</span><input name="country" [(ngModel)]="country" (ngModelChange)="countryChanged()" list="country-options" maxlength="2" placeholder="BR, JP, PT…" autocomplete="country" /></span></label>
+            <datalist id="country-options">@for (item of supportedCountries; track item.code) { <option [value]="item.code" [label]="countryFlag(item.code) + ' ' + i18n.text(item.nameKey)"></option> }</datalist>
             @if (country) {
               <label>{{ i18n.text('documentType') }} <select name="type" [ngModel]="documentType" (ngModelChange)="documentTypeChanged($event)">@for (option of documentOptions(); track option.value) { <option [value]="option.value">{{ i18n.text(option.label) }}</option> }</select></label>
               <label>{{ i18n.text('documentNumber') }} <input name="document" [ngModel]="documentValue" (ngModelChange)="documentValueChanged($event)" [placeholder]="documentPlaceholder()" [maxlength]="documentMaxLength()" [attr.inputmode]="documentInputMode()" minlength="4" required autocomplete="off" /></label>
@@ -51,6 +52,8 @@ interface IdentityOption { value: string; label: MessageKey }
   `,
 })
 export class AccountPageComponent implements OnInit {
+  readonly supportedCountries = SUPPORTED_COUNTRIES;
+  readonly countryFlag = countryFlag;
   titleKey: MessageKey = 'account';
   mode = '';
   name = ''; email = ''; password = ''; passwordConfirmation = ''; country = ''; documentType = 'PASSPORT'; documentValue = '';

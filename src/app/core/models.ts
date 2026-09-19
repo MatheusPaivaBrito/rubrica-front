@@ -42,6 +42,7 @@ export interface SigningContext {
   signer: Signer;
   document_title: string;
   original_filename: string;
+  account_country?: string | null;
   stamp: StampPosition | null;
   viewer_mode: 'signer' | 'administrator';
 }

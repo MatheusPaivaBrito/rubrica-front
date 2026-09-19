@@ -7,10 +7,11 @@ import { AuthService, MfaChallenge } from '../core/auth.service';
 import { I18nService } from '../core/i18n.service';
 import { FeedbackService } from '../core/feedback.service';
 import { LanguagePickerComponent } from '../components/language-picker.component';
+import { OneTimeCodeComponent } from '../components/one-time-code.component';
 
 @Component({
   standalone: true,
-  imports: [FormsModule, RouterLink, LanguagePickerComponent],
+  imports: [FormsModule, RouterLink, LanguagePickerComponent, OneTimeCodeComponent],
   template: `
     <main class="login-layout"><section class="card auth-card">
       <div class="auth-language"><app-language-picker /></div>
@@ -21,10 +22,11 @@ import { LanguagePickerComponent } from '../components/language-picker.component
           <label>{{ i18n.text('email') }} <input name="email" type="email" [(ngModel)]="email" required autocomplete="email" /></label>
           <label>{{ i18n.text('password') }} <input name="password" type="password" [(ngModel)]="password" required autocomplete="current-password" /></label>
         } @else {
-          <label>{{ i18n.text('authenticatorCode') }} <input name="code" inputmode="numeric" [(ngModel)]="code" required autocomplete="one-time-code" /></label>
+          <span class="field-label">{{ i18n.text('authenticatorCode') }}</span>
+          <app-one-time-code [(value)]="code" [label]="i18n.text('authenticatorCode')" (completed)="completeMfa($event)" />
           <p class="muted">{{ i18n.text('authenticatorHelp') }}</p>
         }
-        <button class="button" [disabled]="form.invalid || loading()">{{ loading() ? '…' : i18n.text('enter') }}</button>
+        <button class="button" [disabled]="loading() || (mfaTicket() ? code.length !== 6 : form.invalid)">{{ loading() ? '…' : i18n.text(mfaTicket() ? 'confirmAuthenticatorCode' : 'enter') }}</button>
       </form>
       <div class="auth-actions">
         <a class="auth-action" routerLink="/forgot-password" [queryParams]="returnUrl ? { returnUrl } : undefined"><i class="bi bi-key"></i><span>{{ i18n.text('forgotPassword') }}</span></a>
@@ -47,6 +49,7 @@ export class LoginPageComponent {
   }
 
   async submit(): Promise<void> {
+    if (this.loading() || (this.mfaTicket() && this.code.length !== 6)) return;
     this.loading.set(true);
     try {
       if (this.mfaTicket()) {
@@ -61,5 +64,10 @@ export class LoginPageComponent {
       await this.router.navigateByUrl(this.returnUrl || await this.auth.dashboardUrl());
     } catch { await this.feedback.error(this.i18n.text('invalidCredentials'), this.i18n.text('loginFailed')); }
     finally { this.loading.set(false); }
+  }
+
+  completeMfa(code: string): void {
+    this.code = code;
+    void this.submit();
   }
 }

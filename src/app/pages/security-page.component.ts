@@ -10,6 +10,7 @@ import { AuthService } from '../core/auth.service';
 import { FeedbackService } from '../core/feedback.service';
 import { I18nService } from '../core/i18n.service';
 import { LanguagePickerComponent } from '../components/language-picker.component';
+import { OneTimeCodeComponent } from '../components/one-time-code.component';
 
 interface MfaStatus { enabled: boolean; required_by_policy: boolean; setup_required: boolean; recovery_codes_remaining: number; }
 interface MfaSetup { secret: string; provisioning_uri: string; }
@@ -17,7 +18,7 @@ interface RecoveryCodes { recovery_codes: string[]; }
 
 @Component({
   standalone: true,
-  imports: [FormsModule, LanguagePickerComponent],
+  imports: [FormsModule, LanguagePickerComponent, OneTimeCodeComponent],
   template: `
     <main class="settings-shell">
       <header class="settings-top"><button type="button" class="brand brand-button" (click)="returnToDashboard()">Rubrica<span>.</span></button><div class="button-row"><app-language-picker /><button class="button secondary" (click)="returnToDashboard()">{{ i18n.text('backDashboard') }}</button><button class="button secondary" (click)="logout()">{{ i18n.text('logout') }}</button></div></header>
@@ -29,7 +30,7 @@ interface RecoveryCodes { recovery_codes: string[]; }
           @if (status()?.setup_required) { <p class="notice warning">{{ i18n.text('mfaRequired') }}</p> }
           <div class="button-row"><button class="button" (click)="startSetup()">{{ i18n.text('configureAuthenticator') }}</button>@if (status()?.setup_required) { <button class="button secondary" (click)="deferMfa()">{{ i18n.text('later') }}</button> }</div>
         } @else if (setup()) {
-          <p class="notice">{{ i18n.text('mfaSetupFlowHelp') }}</p><div class="setup-grid"><div class="qr-panel"><img [src]="qrCode()" alt="Microsoft Authenticator QR Code" /></div><div><h2>{{ i18n.text('scanQr') }}</h2><p>{{ i18n.text('scanQrHelp') }}</p><p class="secret"><span>{{ i18n.text('manualKey') }}</span><code>{{ setup()!.secret }}</code><small>{{ i18n.text('manualKeyHelp') }}</small></p><h2>{{ i18n.text('confirmCode') }}</h2><form class="form" (ngSubmit)="confirm()"><label>{{ i18n.text('sixDigitCode') }}<input name="code" [(ngModel)]="code" inputmode="numeric" autocomplete="one-time-code" required /></label><button class="button">{{ i18n.text('activateMfa') }}</button></form></div></div>
+          <p class="notice">{{ i18n.text('mfaSetupFlowHelp') }}</p><div class="setup-grid"><div class="qr-panel"><img [src]="qrCode()" alt="Microsoft Authenticator QR Code" /></div><div><h2>{{ i18n.text('scanQr') }}</h2><p>{{ i18n.text('scanQrHelp') }}</p><p class="secret"><span>{{ i18n.text('manualKey') }}</span><code>{{ setup()!.secret }}</code><small>{{ i18n.text('manualKeyHelp') }}</small></p><h2>{{ i18n.text('confirmCode') }}</h2><form class="form" (ngSubmit)="confirm()"><span class="field-label">{{ i18n.text('sixDigitCode') }}</span><app-one-time-code [(value)]="code" [label]="i18n.text('sixDigitCode')" (completed)="completeSetupCode($event)" /><button class="button" [disabled]="confirming() || code.length !== 6">{{ i18n.text('activateMfa') }}</button></form></div></div>
         } @else {
           <p class="status-ok"><i class="bi bi-shield-check"></i> {{ i18n.text('mfaActive') }}</p>
           <p>{{ i18n.text('recoveryAvailable', { count: status()?.recovery_codes_remaining ?? 0 }) }}</p>
@@ -43,7 +44,7 @@ interface RecoveryCodes { recovery_codes: string[]; }
   styles: [`.settings-shell{min-height:100vh;background:#f4f7fb;padding:2rem}.settings-top{max-width:900px;margin:0 auto 1rem;display:flex;justify-content:space-between;align-items:center}.brand-button{border:0;background:transparent;cursor:pointer}.settings-card{max-width:900px;margin:auto;padding:2rem}.setup-grid{display:grid;grid-template-columns:280px 1fr;gap:2rem}.qr-panel{background:white;border:1px solid #dce3ec;border-radius:16px;padding:1rem;display:grid;place-items:center}.qr-panel img{width:100%;max-width:240px}.secret{display:flex;flex-direction:column;gap:.4rem}.secret code,.codes code{background:#edf3f8;padding:.65rem;border-radius:8px}.codes{display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem;margin:1rem 0}.status-ok{color:#087b60;font-weight:800;font-size:1.15rem}.recovery-panel{margin-top:2rem;padding:1.25rem;border:1px solid #f0c36a;background:#fffaf0;border-radius:14px}@media(max-width:700px){.settings-shell{padding:1rem}.settings-top{align-items:flex-start;gap:1rem}.settings-top .button-row{justify-content:flex-end}.setup-grid{grid-template-columns:1fr}.codes{grid-template-columns:1fr}}`],
 })
 export class SecurityPageComponent implements OnInit {
-  readonly loading = signal(true); readonly status = signal<MfaStatus | null>(null); readonly setup = signal<MfaSetup | null>(null); readonly qrCode = signal(''); readonly recoveryCodes = signal<string[]>([]);
+  readonly loading = signal(true); readonly confirming = signal(false); readonly status = signal<MfaStatus | null>(null); readonly setup = signal<MfaSetup | null>(null); readonly qrCode = signal(''); readonly recoveryCodes = signal<string[]>([]);
   code = ''; password = '';
   constructor(private readonly api: ApiService, private readonly auth: AuthService, private readonly route: ActivatedRoute, private readonly router: Router, private readonly feedback: FeedbackService, readonly i18n: I18nService) {}
   async ngOnInit() { if (!await this.auth.restore()) { await this.router.navigate(['/login']); return; } await this.loadStatus(); this.loading.set(false); }
@@ -56,7 +57,8 @@ export class SecurityPageComponent implements OnInit {
       await this.navigateAfterSecurity();
     } catch (error) { await this.feedback.error(error); }
   }
-  async confirm() { try { const result = await firstValueFrom(this.api.post<RecoveryCodes>('/auth/mfa/confirm', { code: this.code })); this.recoveryCodes.set(result.recovery_codes); this.setup.set(null); this.code=''; await this.auth.refreshContext(); await this.loadStatus(); await Swal.fire({ icon: 'success', title: this.i18n.text('mfaEnabled'), html: `<p>${this.i18n.text('mfaEnabledFlowHelp')}</p><p><strong>${this.i18n.text('saveCodes')}</strong><br>${this.i18n.text('saveCodesHelp')}</p>`, confirmButtonText: this.i18n.text('reviewRecoveryCodes'), confirmButtonColor: '#a82035' }); } catch (error) { await this.feedback.error(error); } }
+  async confirm() { if (this.confirming() || this.code.length !== 6) return; this.confirming.set(true); try { const result = await firstValueFrom(this.api.post<RecoveryCodes>('/auth/mfa/confirm', { code: this.code })); this.recoveryCodes.set(result.recovery_codes); this.setup.set(null); this.code=''; await this.auth.refreshContext(); await this.loadStatus(); await Swal.fire({ icon: 'success', title: this.i18n.text('mfaEnabled'), html: `<p>${this.i18n.text('mfaEnabledFlowHelp')}</p><p><strong>${this.i18n.text('saveCodes')}</strong><br>${this.i18n.text('saveCodesHelp')}</p>`, confirmButtonText: this.i18n.text('reviewRecoveryCodes'), confirmButtonColor: '#a82035' }); } catch (error) { await this.feedback.error(error); } finally { this.confirming.set(false); } }
+  completeSetupCode(code: string): void { this.code = code; void this.confirm(); }
   async regenerate() { try { const result = await firstValueFrom(this.api.post<RecoveryCodes>('/auth/mfa/recovery-codes', { password: this.password, code: this.code })); this.recoveryCodes.set(result.recovery_codes); this.password=''; this.code=''; await this.loadStatus(); } catch (error) { await this.feedback.error(error); } }
   async disable() { try { await firstValueFrom(this.api.deleteWithBody('/auth/mfa', { password: this.password, code: this.code })); this.password=''; this.code=''; this.recoveryCodes.set([]); await this.auth.refreshContext(); await this.loadStatus(); await this.feedback.warning(this.i18n.text('mfaDisabled')); } catch (error) { await this.feedback.error(error); } }
   downloadCodes() { const blob=new Blob([this.recoveryCodes().join('\n')+'\n'],{type:'text/plain'}); const url=URL.createObjectURL(blob); const link=document.createElement('a'); link.href=url; link.download='rubrica-recovery-codes.txt'; link.click(); URL.revokeObjectURL(url); }

@@ -32,6 +32,26 @@ const cases: Record<string, { filename: string; pages: number; legacy: boolean }
   pc: { filename: 'documento.pdf', pages: 2, legacy: false },
 };
 
+test('mostra a bandeira de cada idioma suportado', async ({ page }) => {
+  await page.goto('/login');
+  await page.locator('.language-picker summary').click();
+
+  await expect(page.locator('.language-options .language-flag')).toHaveText(['🇺🇸', '🇧🇷', '🇪🇸', '🇯🇵']);
+});
+
+test('mostra três planos compactos e abre o fluxo empresarial', async ({ page }) => {
+  await page.route('**/contact/config', route => route.fulfill({ status: 200, contentType: 'application/json', body: '{"turnstile_site_key":""}' }));
+  await page.goto('/');
+
+  const cards = page.locator('.pricing-grid .price-card');
+  await expect(cards).toHaveCount(3);
+  await expect(cards.last().locator('a')).toHaveAttribute('href', '/enterprise');
+  await page.goto('/enterprise');
+  await expect(page).toHaveURL(/\/enterprise$/);
+  await expect(page.locator('input[name="company"]')).toBeVisible();
+  await expect(page.locator('select[name="teamSize"]')).toBeVisible();
+});
+
 test('exibe arquivo no painel e na assinatura sem leitor nativo', async ({ page }, testInfo) => {
   page.on('console', message => { if (message.type() === 'error') console.error('browser:', message.text()); });
   page.on('pageerror', error => console.error('page:', error.message));
@@ -51,7 +71,6 @@ test('exibe arquivo no painel e na assinatura sem leitor nativo', async ({ page 
   const signer = { id: 'signer-1', name: 'João', email: 'joao@example.com', status: 'viewed', signed_at: null };
 
   await page.addInitScript(({ legacy }) => {
-    sessionStorage.setItem('rubrica.access-token', 'e2e-token');
     if (legacy) {
       delete (Promise as unknown as { withResolvers?: unknown }).withResolvers;
       delete (AbortSignal as unknown as { any?: unknown }).any;
@@ -61,11 +80,12 @@ test('exibe arquivo no painel e na assinatura sem leitor nativo', async ({ page 
   await page.route('**/*', async route => {
     const path = new URL(route.request().url()).pathname;
     const json = (value: unknown) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(value) });
+    if (path === '/auth/refresh') return json({ access_token: 'e2e-token' });
     if (path === '/access-control/context') return json({ version: 1, subject: 'tester', preferred_locale: 'pt-BR', mfa_enabled: true, mfa_setup_required: false, roles: ['signature_operator'], permission_keys: ['documents:read', 'documents:write', 'signature_requests:read', 'signature_requests:write', 'signing:read', 'signing:write'] });
     if (path === '/tenants') return json([{ id: 'tenant-1', name: 'Teste', slug: 'teste', role: 'operator', currency: 'BRL' }]);
     if (path === '/documents') return json([document]);
     if (path === '/signature-requests') return json([]);
-    if (path === '/signing/links/token-1') return json({ request, signer, document_title: document.title, original_filename: scenario.filename, stamp: null, viewer_mode: 'signer' });
+    if (path === '/signing/links/token-1') return json({ request, signer, document_title: document.title, original_filename: scenario.filename, account_country: 'JP', stamp: null, viewer_mode: 'signer' });
     if (path === '/signing/links/token-1/view') return json(signer);
     if (path === '/documents/doc-1/preview' || path === '/signing/links/token-1/document') {
       return route.fulfill({ status: 200, contentType: 'application/pdf', headers: { 'content-disposition': `inline; filename="documento.pdf"; filename*=UTF-8''${encodeURIComponent(scenario.filename)}` }, body: pdf });
@@ -89,7 +109,57 @@ test('exibe arquivo no painel e na assinatura sem leitor nativo', async ({ page 
   await expect(page.locator('.signing-document-pane .error')).toHaveCount(0);
   await page.locator('.signing-document-pane .pdf-page').first().click({ position: { x: 80, y: 80 } });
   await expect(page.locator('.signature-stamp')).toBeVisible();
+  await expect(page.locator('.signature-stamp .stamp-country')).toHaveText('🇯🇵');
   await expect(page.locator('.signing-actions .button').first()).toBeEnabled();
   await expect.poll(() => page.evaluate(() => typeof Promise.withResolvers)).toBe('function');
   await expect.poll(() => page.evaluate(() => typeof AbortSignal.any)).toBe('function');
+});
+
+test('preenche MFA em seis posições e envia automaticamente', async ({ page }) => {
+  let submittedCode = '';
+  await page.route('**/*', async route => {
+    const path = new URL(route.request().url()).pathname;
+    const json = (value: unknown) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(value) });
+    if (path === '/auth/login') return json({ mfa_required: true, mfa_ticket: 'mfa-ticket-for-browser-test-1234567890', expires_in: 300 });
+    if (path === '/auth/mfa/challenge') {
+      submittedCode = JSON.parse(route.request().postData() || '{}').code;
+      return json({ access_token: 'e2e-token' });
+    }
+    if (path === '/access-control/context') return json({ version: 2, subject: 'aiko@example.jp', preferred_locale: 'ja-JP', mfa_enabled: true, mfa_setup_required: false, roles: ['signature_admin'], permission_keys: ['*'] });
+    if (path === '/tenants') return json([{ id: 'tenant-jp', name: 'Aiko', slug: 'aiko', role: 'admin', currency: 'JPY' }]);
+    return route.continue();
+  });
+
+  await page.goto('/login');
+  await page.locator('input[name="email"]').fill('aiko@example.jp');
+  await page.locator('input[name="password"]').fill('correct-password');
+  await page.locator('form button').click();
+  const digits = page.locator('app-one-time-code input');
+  await expect(digits).toHaveCount(6);
+  for (const [index, digit] of [...'123456'].entries()) await digits.nth(index).fill(digit);
+
+  await expect.poll(() => submittedCode).toBe('123456');
+  await expect(page).toHaveURL(/\/tenant\/aiko\/dashboard$/);
+});
+
+test('cadastro usa o país emissor do documento e mostra a bandeira', async ({ page }) => {
+  let registration: Record<string, unknown> = {};
+  await page.route('**/*', async route => {
+    if (new URL(route.request().url()).pathname === '/auth/register') {
+      registration = JSON.parse(route.request().postData() || '{}');
+      return route.fulfill({ status: 200, contentType: 'application/json', body: '{"accepted":true}' });
+    }
+    return route.continue();
+  });
+
+  await page.goto('/register');
+  await page.locator('input[name="name"]').fill('山田 太郎');
+  await page.locator('input[name="email"]').fill('aiko@example.jp');
+  await page.locator('input[name="country"]').fill('JP');
+  await expect(page.locator('.country-flag')).toHaveText('🇯🇵');
+  await page.locator('input[name="document"]').fill('TR1234567');
+  await page.locator('form button').click();
+
+  await expect.poll(() => registration['identity_document_country']).toBe('JP');
+  expect(registration).not.toHaveProperty('country_code');
 });

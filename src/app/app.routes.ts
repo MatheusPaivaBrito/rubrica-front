@@ -8,6 +8,7 @@ import { LegalPageComponent } from './pages/legal-page.component';
 export const routes: Routes = [
   { path: '', pathMatch: 'full', component: LandingPageComponent },
   { path: 'contact', component: LegalPageComponent, data: { page: 'contact' } },
+  { path: 'enterprise', component: LegalPageComponent, data: { page: 'enterprise' } },
   { path: 'privacy', component: LegalPageComponent, data: { page: 'privacy' } },
   { path: 'terms', component: LegalPageComponent, data: { page: 'terms' } },
   { path: 'data-deletion', component: LegalPageComponent, data: { page: 'data-deletion' } },

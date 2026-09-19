@@ -1,10 +1,11 @@
 import { AfterViewInit, Component, ElementRef, EventEmitter, Input, OnChanges, OnDestroy, Output, QueryList, SimpleChanges, ViewChildren, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import { firstValueFrom, Subscription } from 'rxjs';
 import { GlobalWorkerOptions, getDocument, PDFDocumentLoadingTask, PDFDocumentProxy } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 import { ApiService } from '../core/api.service';
 import { StampPosition } from '../core/models';
+import { countryFlag } from '../core/countries';
+import { I18nService } from '../core/i18n.service';
 
 GlobalWorkerOptions.workerSrc = '/pdf.worker.compat.mjs?v=6.3.289';
 
@@ -19,7 +20,7 @@ interface PdfPageView {
   standalone: true,
   template: `
     <div class="pdf-canvas-viewer" [class.readonly]="readonly">
-      @if (loading()) { <p class="pdf-loading">Preparando o documento…</p> }
+      @if (loading()) { <p class="pdf-loading">{{ i18n.text('preparingPdf') }}</p> }
       @if (error()) { <p class="error">{{ error() }}</p> }
       @for (page of pages(); track page.number) {
         <div
@@ -40,17 +41,17 @@ interface PdfPageView {
               (pointerup)="finishDrag($event)"
               (pointercancel)="finishDrag($event)"
             >
-              <span>Assinado por</span>
+              @if (signerFlag()) { <span class="stamp-country" [attr.aria-label]="signerCountry">{{ signerFlag() }}</span> }
+              <span>{{ i18n.text('signedBy') }}</span>
               <strong>{{ signerName }}</strong>
               @if (signerIdentity) { <small class="stamp-identity">{{ signerIdentity }}</small> }
-              <small>{{ stampDate | date:'dd/MM/yyyy HH:mm' }}</small>
+              <small>{{ i18n.formatDate(stampDate) }}</small>
             </div>
           }
         </div>
       }
     </div>
   `,
-  imports: [DatePipe],
 })
 export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDestroy {
   @Input() token = '';
@@ -58,6 +59,7 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
   @Input() documentEndpoint = 'document';
   @Input() signerName = '';
   @Input() signerIdentity = '';
+  @Input() signerCountry = '';
   @Input() stampDate: string | Date = new Date();
   @Input() placement: StampPosition | null = null;
   @Input() readonly = false;
@@ -73,7 +75,7 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
   private renderingDocument: PDFDocumentProxy | null = null;
   private dragging = false;
 
-  constructor(private readonly api: ApiService) {}
+  constructor(private readonly api: ApiService, readonly i18n: I18nService) {}
 
   ngAfterViewInit(): void {
     this.canvasesSubscription = this.canvases.changes.subscribe(() => void this.renderPages());
@@ -116,6 +118,8 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
     this.dragging = false;
   }
 
+  signerFlag(): string { return countryFlag(this.signerCountry); }
+
   private async loadDocument(): Promise<void> {
     if (!this.sourceData && !this.token) return;
     this.loading.set(true);
@@ -137,7 +141,7 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
       this.pages.set(pageViews);
       queueMicrotask(() => void this.renderPages());
     } catch (error) {
-      const message = 'Não foi possível exibir o PDF. Use o botão de download para abrir o arquivo.';
+      const message = this.i18n.text('pdfRenderFailed');
       this.error.set(message);
       console.error('PDF rendering failed', error);
     } finally {
@@ -173,7 +177,7 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
       }
     } catch (error) {
       if (this.document === document) {
-        this.error.set('Não foi possível exibir o PDF. Use o botão de download para abrir o arquivo.');
+        this.error.set(this.i18n.text('pdfRenderFailed'));
         console.error('PDF rendering failed', error);
       }
     } finally {
