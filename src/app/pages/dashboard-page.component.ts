@@ -292,5 +292,5 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     window.scrollTo(0, this.modalScrollY);
   }
   private async run(action: () => Promise<void>): Promise<void> { this.submitting.set(true); try { await action(); } catch (error) { await this.feedback.error(error); } finally { this.submitting.set(false); } }
-  private setFile(file: File | null): void { if (!file) return; if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) { void this.feedback.warning(this.i18n.text('pdfOnly'), this.i18n.text('invalidFile')); return; } this.file = file; }
+  private setFile(file: File | null): void { if (!file) return; if (file.size > 50 * 1024 * 1024) { void this.feedback.warning(this.i18n.text('tooLarge'), this.i18n.text('invalidFile')); return; } if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) { void this.feedback.warning(this.i18n.text('pdfOnly'), this.i18n.text('invalidFile')); return; } this.file = file; }
 }
