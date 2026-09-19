@@ -7,10 +7,14 @@ import { LegalPageComponent } from './pages/legal-page.component';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', component: LandingPageComponent },
-  { path: 'contato', component: LegalPageComponent, data: { page: 'contato' } },
-  { path: 'privacidade', component: LegalPageComponent, data: { page: 'privacidade' } },
-  { path: 'termos', component: LegalPageComponent, data: { page: 'termos' } },
-  { path: 'exclusao-de-dados', component: LegalPageComponent, data: { page: 'exclusao-de-dados' } },
+  { path: 'contact', component: LegalPageComponent, data: { page: 'contact' } },
+  { path: 'privacy', component: LegalPageComponent, data: { page: 'privacy' } },
+  { path: 'terms', component: LegalPageComponent, data: { page: 'terms' } },
+  { path: 'data-deletion', component: LegalPageComponent, data: { page: 'data-deletion' } },
+  { path: 'contato', pathMatch: 'full', redirectTo: 'contact' },
+  { path: 'privacidade', pathMatch: 'full', redirectTo: 'privacy' },
+  { path: 'termos', pathMatch: 'full', redirectTo: 'terms' },
+  { path: 'exclusao-de-dados', pathMatch: 'full', redirectTo: 'data-deletion' },
   { path: 'login', component: LoginPageComponent },
   { path: 'register', component: AccountPageComponent },
   { path: 'forgot-password', component: AccountPageComponent },

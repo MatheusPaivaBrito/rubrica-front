@@ -69,8 +69,8 @@ const messages: Record<Locale, Catalog> = {
 @Injectable({ providedIn: 'root' })
 export class I18nService {
   private readonly browser = isPlatformBrowser(inject(PLATFORM_ID));
-  // The first client render must match the Portuguese prerendered HTML.
-  readonly locale = signal<Locale>('pt-BR');
+  // Public pages are prerendered in the product's primary language.
+  readonly locale = signal<Locale>('en');
 
   constructor() {
     afterNextRender(() => {

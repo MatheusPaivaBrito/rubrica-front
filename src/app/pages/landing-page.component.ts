@@ -39,7 +39,7 @@ const copy = {
         </div>
       </section>
       <section class="final-cta"><img src="icons/rubrica-mark.png" alt="" /><h2>{{ t().cta }}</h2><a class="landing-button" routerLink="/register">{{ t().primary }}</a></section>
-      <footer class="landing-footer"><a class="landing-brand" routerLink="/"><img src="icons/rubrica-mark.png" alt="" /><strong>Rubrica</strong></a><nav><a routerLink="/contato">{{ t().contact }}</a><a routerLink="/privacidade">{{ t().privacy }}</a><a routerLink="/termos">{{ t().terms }}</a><a routerLink="/exclusao-de-dados">{{ t().deletion }}</a></nav><p>© {{ year }} {{ t().rights }}</p></footer>
+      <footer class="landing-footer"><a class="landing-brand" routerLink="/"><img src="icons/rubrica-mark.png" alt="" /><strong>Rubrica</strong></a><nav><a routerLink="/contact">{{ t().contact }}</a><a routerLink="/privacy">{{ t().privacy }}</a><a routerLink="/terms">{{ t().terms }}</a><a routerLink="/data-deletion">{{ t().deletion }}</a></nav><p>© {{ year }} {{ t().rights }}</p></footer>
     </main>
   `,
 })
