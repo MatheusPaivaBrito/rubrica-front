@@ -40,15 +40,15 @@ import { LanguagePickerComponent } from '../components/language-picker.component
             </div>
             @if (!account()!.unlimited_signatures) {
               <div class="plans">
-                <button class="plan-option" [class.selected]="selectedPlan() === 'rubrica_base'" (click)="selectedPlan.set('rubrica_base')"><strong>Base · R$ 19,90/mês</strong><span>Até 25 arquivos por mês. Compartilhamento por link e QR Code.</span></button>
-                <button class="plan-option" [class.selected]="selectedPlan() === 'rubrica_intermediate'" (click)="selectedPlan.set('rubrica_intermediate')"><strong>Intermediário · R$ 24,90/mês</strong><span>Até 30 arquivos por mês e envio de convites por e-mail.</span></button>
+                <button class="plan-option" [class.selected]="selectedPlan() === 'rubrica_base'" (click)="selectedPlan.set('rubrica_base')"><strong>{{ i18n.text('basePlan') }}</strong><span>{{ i18n.text('priceAtCheckout', { currency: selectedTenantCurrency() }) }}</span><span>{{ i18n.text('basePlanHelp') }}</span></button>
+                <button class="plan-option" [class.selected]="selectedPlan() === 'rubrica_intermediate'" (click)="selectedPlan.set('rubrica_intermediate')"><strong>{{ i18n.text('intermediatePlan') }}</strong><span>{{ i18n.text('priceAtCheckout', { currency: selectedTenantCurrency() }) }}</span><span>{{ i18n.text('intermediatePlanHelp') }}</span></button>
               </div>
             }
             <div class="actions">
               @if (!account()!.unlimited_signatures) { <button class="button" [disabled]="submitting()" (click)="checkout()"><i class="bi bi-box-arrow-up-right"></i> {{ i18n.text('subscribe') }}</button> }
               @if (account()!.provider_customer_id || account()!.status !== 'not_configured') { <button class="button secondary" [disabled]="submitting()" (click)="portal()">{{ i18n.text('manageSubscription') }}</button> }
             </div>
-            @if (checkoutUrl()) { <div class="checkout-qr"><img [src]="checkoutQrCode()" alt="QR Code do checkout Stripe" /><div><strong>Finalize a assinatura</strong><p>Escaneie o QR Code ou abra o checkout neste dispositivo.</p><button class="button" (click)="openCheckout()">Abrir Stripe</button></div></div> }
+            @if (checkoutUrl()) { <div class="checkout-qr"><img [src]="checkoutQrCode()" [alt]="i18n.text('checkoutQrAlt')" /><div><strong>{{ i18n.text('checkoutFinalize') }}</strong><p>{{ i18n.text('checkoutScan') }}</p><button class="button" (click)="openCheckout()">{{ i18n.text('openStripe') }}</button></div></div> }
           }
         }
       </section>
@@ -67,6 +67,7 @@ export class BillingPageComponent implements OnInit {
   readonly selectedPlan = signal<'rubrica_base' | 'rubrica_intermediate'>('rubrica_base');
   readonly checkoutUrl = signal('');
   readonly checkoutQrCode = signal('');
+  readonly selectedTenantCurrency = computed(() => this.tenants().find(tenant => tenant.id === this.tenantId())?.currency ?? 'USD');
   readonly availability = computed(() => {
     const account = this.account();
     if (!account) return this.i18n.text('unavailable');
