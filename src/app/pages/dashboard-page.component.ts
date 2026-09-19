@@ -44,10 +44,10 @@ import { PdfStampViewerComponent } from '../components/pdf-stamp-viewer.componen
 
           @if (isAdmin() && tenants().length) {
             <article class="card table-card">
-              <div class="section-heading"><div><p class="eyebrow">{{ i18n.text('planUsage') }}</p><h2>{{ i18n.text('signaturesByAccount') }}</h2><p class="muted">{{ i18n.text('usageHelp') }}</p></div></div>
+              <div class="section-heading"><div><p class="eyebrow">{{ i18n.text('planUsage') }}</p><h2>{{ i18n.text('filesByAccount') }}</h2><p class="muted">{{ i18n.text('usageHelp') }}</p></div></div>
               <div class="table-wrap"><table class="data-table"><thead><tr><th>{{ i18n.text('account') }}</th><th>{{ i18n.text('plan') }}</th><th>{{ i18n.text('usage') }}</th><th>{{ i18n.text('availableNow') }}</th></tr></thead><tbody>
                 @for (tenant of tenants(); track tenant.id) {
-                  <tr><td><strong>{{ tenant.name }}</strong></td><td><span class="badge" [class.complete]="billingFor(tenant.id)?.unlimited_signatures">{{ billingFor(tenant.id)?.unlimited_signatures ? i18n.text('unlimited') : i18n.text('free') }}</span></td><td>{{ i18n.text('signatures', { count: billingFor(tenant.id)?.signatures_used ?? 0 }) }}</td><td><strong>{{ billingAvailability(tenant.id) }}</strong></td></tr>
+                  <tr><td><strong>{{ tenant.name }}</strong></td><td><span class="badge" [class.complete]="billingFor(tenant.id)?.unlimited_signatures">{{ billingPlanLabel(tenant.id) }}</span></td><td>{{ billingUsage(tenant.id) }}</td><td><strong>{{ billingAvailability(tenant.id) }}</strong></td></tr>
                 }
               </tbody></table></div>
             </article>
@@ -227,7 +227,9 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   private alpha3Country(country: string | null | undefined): string { return ({ BR: 'BRA', JP: 'JPN', PT: 'PRT', US: 'USA' } as Record<string, string>)[(country ?? '').toUpperCase()] ?? (country ?? '').toUpperCase(); }
   signatureProgress(request: SignatureRequest): number { return request.signer_count ? Math.round(request.signed_count / request.signer_count * 100) : 0; }
   billingFor(tenantId: string): BillingAccount | null { return this.billingAccounts()[tenantId] ?? null; }
-  billingAvailability(tenantId: string): string { const account = this.billingFor(tenantId); if (!account) return this.i18n.text('unavailable'); return account.unlimited_signatures ? this.i18n.text('unlimited') : this.i18n.text('remainingOf', { remaining: account.signatures_remaining ?? 0, limit: account.free_signatures_limit }); }
+  billingPlanLabel(tenantId: string): string { const account = this.billingFor(tenantId); if (!account) return this.i18n.text('unavailable'); if (account.complimentary_lifetime) return this.i18n.text('lifetimePlan'); if (account.current_product_code === 'rubrica_intermediate' && account.files_limit !== null) return this.i18n.text('intermediatePlan'); if (account.current_product_code === 'rubrica_base' && account.files_limit !== null) return this.i18n.text('basePlan'); return this.i18n.text('free'); }
+  billingUsage(tenantId: string): string { const account = this.billingFor(tenantId); if (!account) return this.i18n.text('unavailable'); return account.files_limit !== null ? this.i18n.text('files', { count: account.files_uploaded_in_period }) : this.i18n.text('signatures', { count: account.signatures_used }); }
+  billingAvailability(tenantId: string): string { const account = this.billingFor(tenantId); if (!account) return this.i18n.text('unavailable'); if (account.unlimited_files) return this.i18n.text('unlimited'); if (account.files_limit !== null) return this.i18n.text('filesRemainingOf', { remaining: account.files_remaining ?? 0, limit: account.files_limit }); return this.i18n.text('remainingOf', { remaining: account.signatures_remaining ?? 0, limit: account.free_signatures_limit }); }
 
   showUploadModal(): void { this.uploadModalOpen.set(true); this.syncModalLock(); }
   closeUploadModal(): void { this.uploadModalOpen.set(false); this.syncModalLock(); }

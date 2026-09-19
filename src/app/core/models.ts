@@ -29,6 +29,12 @@ export interface BillingAccount {
   signatures_used: number;
   signatures_remaining: number | null;
   unlimited_signatures: boolean;
+  files_uploaded_in_period: number;
+  files_limit: number | null;
+  files_remaining: number | null;
+  unlimited_files: boolean;
+  email_invitations_enabled: boolean;
+  usage_period_starts_at?: string | null;
   complimentary_lifetime: boolean;
   current_product_code?: string | null;
   provider_customer_id?: string | null;
