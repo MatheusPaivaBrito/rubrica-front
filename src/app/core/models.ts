@@ -40,6 +40,8 @@ export interface BillingAccount {
   provider_customer_id?: string | null;
   provider_subscription_id?: string | null;
   current_period_ends_at?: string | null;
+  cancel_at_period_end: boolean;
+  cancels_at?: string | null;
 }
 export interface BillingCheckout { checkout_url: string; }
 export interface BillingPortal { portal_url: string; }

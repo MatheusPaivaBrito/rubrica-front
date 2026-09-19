@@ -36,7 +36,7 @@ import { LanguagePickerComponent } from '../components/language-picker.component
             <div class="metrics">
               <article><small>{{ usageLabel() }}</small><strong>{{ usageValue() }}</strong></article>
               <article><small>{{ i18n.text('availableNow') }}</small><strong>{{ availability() }}</strong></article>
-              <article><small>{{ i18n.text('currentPeriod') }}</small><strong>{{ i18n.formatDate(account()!.current_period_ends_at) }}</strong></article>
+              <article><small>{{ account()!.cancel_at_period_end ? i18n.text('cancelsOn') : i18n.text('currentPeriod') }}</small><strong>{{ i18n.formatDate(account()!.cancels_at || account()!.current_period_ends_at) }}</strong></article>
             </div>
             @if (canSubscribe()) {
               <div class="plans">
