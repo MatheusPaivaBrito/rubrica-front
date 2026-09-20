@@ -22,6 +22,7 @@ export const routes: Routes = [
   { path: 'reset-password', component: AccountPageComponent },
   { path: 'verify-email', component: AccountPageComponent },
   { path: 'dashboard', loadComponent: () => import('./pages/dashboard-page.component').then(module => module.DashboardPageComponent) },
+  { path: 'tenant/a/:tenantAccountId/dashboard', loadComponent: () => import('./pages/dashboard-page.component').then(module => module.DashboardPageComponent) },
   { path: 'tenant/:tenantSlug/dashboard', loadComponent: () => import('./pages/dashboard-page.component').then(module => module.DashboardPageComponent) },
   { path: 'security', loadComponent: () => import('./pages/security-page.component').then(module => module.SecurityPageComponent) },
   { path: 'plan', loadComponent: () => import('./pages/billing-page.component').then(module => module.BillingPageComponent) },

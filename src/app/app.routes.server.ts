@@ -12,6 +12,10 @@ export const serverRoutes: ServerRoute[] = [
     renderMode: RenderMode.Client,
   },
   {
+    path: 'tenant/a/:tenantAccountId/dashboard',
+    renderMode: RenderMode.Client,
+  },
+  {
     path: 'tenant/:tenantSlug/dashboard',
     renderMode: RenderMode.Client,
   },

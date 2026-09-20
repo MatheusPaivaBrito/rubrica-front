@@ -21,6 +21,13 @@ interface LoginResponse { access_token: string; }
 export interface MfaChallenge { mfa_required: true; mfa_ticket: string; expires_in: number; }
 const mfaDeferredKey = 'rubrica_mfa_deferred_for_session';
 
+export function tenantDashboardUrl(slug: string): string {
+  const accountPrefix = 'account-';
+  return slug.startsWith(accountPrefix)
+    ? `/tenant/a/${encodeURIComponent(slug.slice(accountPrefix.length))}/dashboard`
+    : `/tenant/${encodeURIComponent(slug)}/dashboard`;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   readonly context = signal<AccessContext | null>(null);
@@ -85,7 +92,7 @@ export class AuthService {
   async dashboardUrl(): Promise<string> {
     try {
       const tenants = await firstValueFrom(this.http.get<TenantItem[]>('/tenants'));
-      return tenants.length ? `/tenant/${tenants[0].slug}/dashboard` : '/dashboard';
+      return tenants.length ? tenantDashboardUrl(tenants[0].slug) : '/dashboard';
     } catch {
       return '/dashboard';
     }
