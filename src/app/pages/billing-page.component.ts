@@ -1,5 +1,4 @@
 import { Component, OnInit, computed, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import QRCode from 'qrcode';
@@ -13,7 +12,7 @@ import { LanguagePickerComponent } from '../components/language-picker.component
 
 @Component({
   standalone: true,
-  imports: [FormsModule, RouterLink, LanguagePickerComponent],
+  imports: [RouterLink, LanguagePickerComponent],
   template: `
     <main class="billing-shell">
       <header class="billing-top">
@@ -28,9 +27,25 @@ import { LanguagePickerComponent } from '../components/language-picker.component
         @if (loading()) { <p class="notice">{{ i18n.text('loading') }}</p> }
         @else if (!tenants().length) { <p class="notice warning">{{ i18n.text('billingAdminOnly') }}</p> }
         @else {
-          <label class="tenant-select">{{ i18n.text('chooseTenant') }}
-            <select [ngModel]="tenantId()" (ngModelChange)="selectTenant($event)">@for (tenant of tenants(); track tenant.id) { <option [value]="tenant.id">{{ tenant.name }} · {{ tenant.currency }}</option> }</select>
-          </label>
+          <div class="tenant-select">
+            <span>{{ i18n.text('chooseTenant') }}</span>
+            <details class="country-picker document-type-picker billing-tenant-picker" #tenantMenu>
+              <summary [attr.aria-label]="i18n.text('chooseTenant')">
+                <i class="bi bi-building country-picker-mark" aria-hidden="true"></i>
+                <span class="country-picker-value"><strong>{{ selectedTenantLabel() }}</strong></span>
+                <i class="bi bi-chevron-down picker-chevron" aria-hidden="true"></i>
+              </summary>
+              <div class="country-options billing-tenant-options" role="listbox" [attr.aria-label]="i18n.text('chooseTenant')">
+                @for (tenant of tenants(); track tenant.id) {
+                  <button type="button" role="option" [attr.aria-selected]="tenant.id === tenantId()" [class.active]="tenant.id === tenantId()" (click)="selectTenant(tenant.id, tenantMenu)">
+                    <i class="bi bi-building country-option-mark" aria-hidden="true"></i>
+                    <span><strong>{{ tenant.name }}</strong><small>{{ tenant.currency }}</small></span>
+                    @if (tenant.id === tenantId()) { <i class="bi bi-check2" aria-hidden="true"></i> }
+                  </button>
+                }
+              </div>
+            </details>
+          </div>
           @if (account()) {
             <div class="plan-banner"><div><small>{{ i18n.text('plan') }}</small><h2>{{ planName() }}</h2><p>{{ planHelp() }}</p></div><span class="status" [attr.data-status]="account()!.complimentary_lifetime ? 'complimentary' : account()!.status">{{ account()!.complimentary_lifetime ? i18n.text('complimentary') : statusLabel(account()!.status) }}</span></div>
             <div class="metrics">
@@ -55,7 +70,7 @@ import { LanguagePickerComponent } from '../components/language-picker.component
     </main>
   `,
   styles: [`
-    .billing-shell{min-height:100vh;background:#f4f7fb;padding:2rem}.billing-top,.billing-card{max-width:980px;margin:auto}.billing-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}.top-actions,.actions{display:flex;gap:.75rem;align-items:center}.top-actions select,.tenant-select select{border:1px solid #cbd5e1;border-radius:10px;background:#fff;padding:.7rem}.billing-card{padding:2rem}.heading{display:flex;justify-content:space-between;gap:1rem}.heading>i{font-size:2.5rem;color:#635bff}.tenant-select{display:grid;gap:.45rem;max-width:420px;margin:2rem 0;font-weight:700}.plan-banner{display:flex;justify-content:space-between;gap:1rem;background:linear-gradient(135deg,#8f1d2c,#c63845);color:white;padding:1.5rem;border-radius:18px}.plan-banner h2{margin:.25rem 0}.plan-banner p{margin:0;opacity:.9}.status{align-self:flex-start;background:#fff;color:#641923;padding:.4rem .7rem;border-radius:999px;font-weight:800}.metrics,.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin:1rem 0}.metrics article{border:1px solid #dde5ee;border-radius:14px;padding:1.1rem;display:grid;gap:.5rem}.metrics strong{font-size:1.1rem}.plans{grid-template-columns:1fr 1fr}.plan-option{display:grid;gap:.45rem;padding:1rem;border:1px solid #d7dde5;border-radius:14px;background:#fff;text-align:left}.plan-option.selected{border-color:#a82035;box-shadow:0 0 0 2px #a8203522}.plan-option span{color:#64748b}.actions{justify-content:flex-end;margin-top:1.5rem}.checkout-qr{display:flex;align-items:center;justify-content:center;gap:1.5rem;margin-top:1.5rem;padding:1.25rem;border:1px solid #dde5ee;border-radius:16px}.checkout-qr img{width:190px;border-radius:10px}.checkout-qr p{color:#64748b}@media(max-width:700px){.billing-shell{padding:1rem}.billing-top{align-items:flex-start}.top-actions{flex-direction:column;align-items:stretch}.billing-card{padding:1.2rem}.plan-banner,.checkout-qr{flex-direction:column}.metrics,.plans{grid-template-columns:1fr}.actions{flex-direction:column}.actions .button{width:100%}}
+    .billing-shell{min-height:100vh;background:#f4f7fb;padding:2rem}.billing-top,.billing-card{max-width:980px;margin:auto}.billing-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}.top-actions,.actions{display:flex;gap:.75rem;align-items:center}.billing-card{padding:2rem}.heading{display:flex;justify-content:space-between;gap:1rem}.heading>i{font-size:2.5rem;color:#635bff}.tenant-select{display:grid;gap:.45rem;max-width:420px;margin:2rem 0;font-weight:700}.billing-tenant-picker{margin-top:0}.billing-tenant-options small{margin-left:.4rem}.plan-banner{display:flex;justify-content:space-between;gap:1rem;background:linear-gradient(135deg,#8f1d2c,#c63845);color:white;padding:1.5rem;border-radius:18px}.plan-banner h2{margin:.25rem 0}.plan-banner p{margin:0;opacity:.9}.status{align-self:flex-start;background:#fff;color:#641923;padding:.4rem .7rem;border-radius:999px;font-weight:800}.metrics,.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin:1rem 0}.metrics article{border:1px solid #dde5ee;border-radius:14px;padding:1.1rem;display:grid;gap:.5rem}.metrics strong{font-size:1.1rem}.plans{grid-template-columns:1fr 1fr}.plan-option{display:grid;gap:.45rem;padding:1rem;border:1px solid #d7dde5;border-radius:14px;background:#fff;text-align:left}.plan-option.selected{border-color:#a82035;box-shadow:0 0 0 2px #a8203522}.plan-option span{color:#64748b}.actions{justify-content:flex-end;margin-top:1.5rem}.checkout-qr{display:flex;align-items:center;justify-content:center;gap:1.5rem;margin-top:1.5rem;padding:1.25rem;border:1px solid #dde5ee;border-radius:16px}.checkout-qr img{width:190px;border-radius:10px}.checkout-qr p{color:#64748b}@media(max-width:700px){.billing-shell{padding:1rem}.billing-top{align-items:flex-start}.top-actions{flex-direction:column;align-items:stretch}.billing-card{padding:1.2rem}.plan-banner,.checkout-qr{flex-direction:column}.metrics,.plans{grid-template-columns:1fr}.actions{flex-direction:column}.actions .button{width:100%}}
   `],
 })
 export class BillingPageComponent implements OnInit {
@@ -108,7 +123,8 @@ export class BillingPageComponent implements OnInit {
     finally { this.loading.set(false); }
   }
 
-  async selectTenant(id: string): Promise<void> { this.tenantId.set(id); await this.loadAccount(); }
+  selectedTenantLabel(): string { const tenant = this.tenants().find(item => item.id === this.tenantId()); return tenant ? `${tenant.name} · ${tenant.currency}` : this.i18n.text('chooseTenant'); }
+  async selectTenant(id: string, menu?: HTMLDetailsElement): Promise<void> { if (menu) menu.open = false; this.tenantId.set(id); await this.loadAccount(); }
   statusLabel(status: string): string { const keys: Record<string, Parameters<I18nService['text']>[0]> = { active:'active', pending:'pending', past_due:'pastDue', cancelled:'cancelled', paused:'paused', not_configured:'notConfigured' }; return this.i18n.text(keys[status] ?? 'notConfigured'); }
   planName(): string { const account = this.account(); if (account?.complimentary_lifetime) return this.i18n.text('lifetimePlan'); if (account?.current_product_code === 'rubrica_intermediate' && this.fileLimit(account) !== null) return this.i18n.text('intermediatePlan'); if (account?.current_product_code === 'rubrica_base' && this.fileLimit(account) !== null) return this.i18n.text('basePlan'); return this.i18n.text('free'); }
   planHelp(): string { const account = this.account(); if (account?.complimentary_lifetime) return this.i18n.text('lifetimePlanHelp'); if (account?.current_product_code === 'rubrica_intermediate' && this.fileLimit(account) !== null) return this.i18n.text('intermediatePlanHelp'); if (account?.current_product_code === 'rubrica_base' && this.fileLimit(account) !== null) return this.i18n.text('basePlanHelp'); return this.i18n.text('fiveFree'); }

@@ -263,7 +263,28 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   async previewSignedRequest(): Promise<void> { const request = this.selectedRequest(); const document = this.documents().find(item => item.id === request?.document_id); if (!request || !document) return; await this.run(async () => { const data = await firstValueFrom(this.api.getArrayBuffer(`/signature-requests/${request.id}/signed-document`)); if (!data.byteLength) throw new Error('Signed document preview is empty'); this.previewHeading.set(this.i18n.text('stampedPdf')); this.previewDocument.set(document); this.previewData.set(data); this.syncModalLock(); }); }
   closePreview(): void { this.previewDocument.set(null); this.previewData.set(null); this.syncModalLock(); }
   downloadPreview(): void { const data = this.previewData(); const document = this.previewDocument(); if (!data || !document) return; const url = URL.createObjectURL(new Blob([data], { type: 'application/pdf' })); const anchor = window.document.createElement('a'); anchor.href = url; anchor.download = document.original_filename || 'documento.pdf'; window.document.body.appendChild(anchor); anchor.click(); anchor.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 60_000); }
-  async deleteDocument(document: DocumentItem): Promise<void> { const result = await Swal.fire({ icon: 'warning', title: this.i18n.text('deleteDocumentTitle'), text: this.i18n.text('deleteDocumentHelp'), showCancelButton: true, confirmButtonText: this.i18n.text('deleteAction'), cancelButtonText: this.i18n.text('cancel'), confirmButtonColor: '#b42318' }); if (!result.isConfirmed) return; await this.run(async () => { await firstValueFrom(this.api.delete(`/documents/${document.id}`)); this.documents.update((items) => items.filter((item) => item.id !== document.id)); }); }
+  async deleteDocument(document: DocumentItem): Promise<void> {
+    const result = await Swal.fire({ icon: 'warning', title: this.i18n.text('deleteDocumentTitle'), text: this.i18n.text('deleteDocumentHelp'), showCancelButton: true, confirmButtonText: this.i18n.text('deleteAction'), cancelButtonText: this.i18n.text('cancel'), confirmButtonColor: '#b42318' });
+    if (!result.isConfirmed) return;
+    this.submitting.set(true);
+    try {
+      await firstValueFrom(this.api.delete(`/documents/${document.id}`));
+      this.removeDeletedDocument(document.id);
+    } catch (error) {
+      const conflict = this.activeRequestConflict(error);
+      if (!conflict) { await this.feedback.error(error); return; }
+      const forced = await Swal.fire({ icon: 'warning', title: this.i18n.text('deleteActiveTitle'), text: this.i18n.text('deleteActiveHelp', { count: conflict.count }), showCancelButton: true, confirmButtonText: this.i18n.text('forceDelete'), cancelButtonText: this.i18n.text('cancel'), confirmButtonColor: '#b42318' });
+      if (!forced.isConfirmed) return;
+      try {
+        await firstValueFrom(this.api.delete(`/documents/${document.id}?force=true`));
+        this.removeDeletedDocument(document.id);
+      } catch (forcedError) {
+        await this.feedback.error(forcedError);
+      }
+    } finally {
+      this.submitting.set(false);
+    }
+  }
 
   async upload(): Promise<void> { if (!this.file || !this.tenantSlug) return; await this.run(async () => { const file = this.file!; const content = await file.arrayBuffer(); await firstValueFrom(this.api.postFile<DocumentItem>('/documents', content, file.type || 'application/pdf', { organization_id: this.tenantSlug, title: this.title, filename: file.name, content_type: file.type || 'application/pdf' })); this.title = ''; this.file = null; this.closeUploadModal(); await this.reload(); await Swal.fire({ icon: 'success', title: this.i18n.text('documentSent'), timer: 1500, showConfirmButton: false }); }); }
   async createRequest(): Promise<void> { const document = this.selectedDocument(); if (!document || !this.expiresAt) return; await this.run(async () => { const request = await firstValueFrom(this.api.post<SignatureRequest>('/signature-requests', { document_id: document.id, expires_at: dateTime.toUtcIso(this.expiresAt) })); this.requests.update((items) => [request, ...items]); this.closeRequestCreateModal(); await this.openRequestDetails(request); }); }
@@ -276,6 +297,8 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   async logout(): Promise<void> { try { await this.auth.logout(); } catch (error) { await this.feedback.error(error, this.i18n.text('logoutFailed')); } finally { await this.router.navigate(['/login']); } }
 
   private updateRequest(request: SignatureRequest): void { this.requests.update((items) => items.map((item) => item.id === request.id ? request : item)); this.selectedRequest.set(request); }
+  private removeDeletedDocument(documentId: string): void { this.documents.update((items) => items.filter((item) => item.id !== documentId)); this.requests.update((items) => items.filter((item) => item.document_id !== documentId)); }
+  private activeRequestConflict(error: unknown): { count: number } | null { const response = error as { status?: number; error?: { code?: string; active_request_count?: number } }; return response?.status === 409 && response.error?.code === 'document_has_active_requests' ? { count: Number(response.error.active_request_count) || 1 } : null; }
   private async reload(): Promise<void> { const [documents, requests] = await Promise.all([firstValueFrom(this.api.get<DocumentItem[]>('/documents')), firstValueFrom(this.api.get<SignatureRequest[]>('/signature-requests'))]); this.documents.set(documents); this.requests.set(requests.sort((a, b) => b.id.localeCompare(a.id, undefined, { numeric: true }))); }
   private async loadSigners(requestId: string): Promise<void> { this.signers.set(await firstValueFrom(this.api.get<Signer[]>(`/signature-requests/${requestId}/signers`))); }
   private async loadSignerContacts(): Promise<void> { const tenant = this.tenants().find(item => item.slug === this.tenantSlug); if (!tenant) return; this.signerContacts.set(await firstValueFrom(this.api.get<SignerContact[]>(`/tenants/${tenant.id}/signer-contacts`))); }
