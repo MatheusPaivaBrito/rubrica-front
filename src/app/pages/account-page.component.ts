@@ -128,7 +128,7 @@ export class AccountPageComponent implements OnInit {
   }
 
   documentOptions(): IdentityOption[] {
-    if (this.country === 'BR') return [{ value: 'BR_CPF', label: 'cpf' }, { value: 'PASSPORT', label: 'passport' }, { value: 'OTHER', label: 'other' }];
+    if (this.country === 'BR') return [{ value: 'BR_CPF', label: 'cpf' }, { value: 'BR_CNPJ', label: 'cnpj' }, { value: 'PASSPORT', label: 'passport' }, { value: 'OTHER', label: 'other' }];
     if (this.country === 'PT') return [{ value: 'PT_NIF', label: 'nif' }, { value: 'PASSPORT', label: 'passport' }, { value: 'OTHER', label: 'other' }];
     if (this.country === 'JP') return [{ value: 'PASSPORT', label: 'passport' }, { value: 'RESIDENCE_CARD', label: 'residenceCard' }, { value: 'DRIVER_LICENSE', label: 'driverLicense' }, { value: 'OTHER', label: 'other' }];
     return [{ value: 'PASSPORT', label: 'passport' }, { value: 'NATIONAL_ID', label: 'nationalId' }, { value: 'RESIDENCE_CARD', label: 'residenceCard' }, { value: 'DRIVER_LICENSE', label: 'driverLicense' }, { value: 'TAX_ID', label: 'taxId' }, { value: 'OTHER', label: 'other' }];
@@ -172,7 +172,7 @@ export class AccountPageComponent implements OnInit {
   documentTypeIcon(type: string): string {
     if (type === 'PASSPORT') return 'bi-passport';
     if (type === 'DRIVER_LICENSE') return 'bi-car-front';
-    if (type === 'TAX_ID' || type === 'BR_CPF' || type === 'PT_NIF') return 'bi-person-vcard';
+    if (type === 'TAX_ID' || type === 'BR_CPF' || type === 'BR_CNPJ' || type === 'PT_NIF') return 'bi-person-vcard';
     if (type === 'RESIDENCE_CARD') return 'bi-house-check';
     if (type === 'NATIONAL_ID') return 'bi-card-text';
     return 'bi-file-earmark-person';
@@ -183,15 +183,20 @@ export class AccountPageComponent implements OnInit {
       this.documentValue = digits.replace(/(\d{3})(?=\d)/g, '$1.').replace(/\.(\d{3})\.(\d{3})\.(\d{1,2})$/, '.$1.$2-$3');
       return;
     }
+    if (this.documentType === 'BR_CNPJ') {
+      const digits = value.replace(/\D/g, '').slice(0, 14);
+      this.documentValue = digits.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2');
+      return;
+    }
     if (this.documentType === 'PT_NIF') {
       this.documentValue = value.replace(/\D/g, '').slice(0, 9).replace(/(\d{3})(?=\d)/g, '$1 ').trimEnd();
       return;
     }
     this.documentValue = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, this.documentType === 'PASSPORT' ? 12 : 30);
   }
-  documentPlaceholder(): string { return this.documentType === 'BR_CPF' ? '000.000.000-00' : this.documentType === 'PT_NIF' ? '000 000 000' : this.documentType === 'PASSPORT' ? 'AB1234567' : ''; }
-  documentMaxLength(): number { return this.documentType === 'BR_CPF' ? 14 : this.documentType === 'PT_NIF' ? 11 : this.documentType === 'PASSPORT' ? 12 : 30; }
-  documentInputMode(): string { return this.documentType === 'BR_CPF' || this.documentType === 'PT_NIF' ? 'numeric' : 'text'; }
+  documentPlaceholder(): string { return this.documentType === 'BR_CPF' ? '000.000.000-00' : this.documentType === 'BR_CNPJ' ? '00.000.000/0000-00' : this.documentType === 'PT_NIF' ? '000 000 000' : this.documentType === 'PASSPORT' ? 'AB1234567' : ''; }
+  documentMaxLength(): number { return this.documentType === 'BR_CPF' ? 14 : this.documentType === 'BR_CNPJ' ? 18 : this.documentType === 'PT_NIF' ? 11 : this.documentType === 'PASSPORT' ? 12 : 30; }
+  documentInputMode(): string { return this.documentType === 'BR_CPF' || this.documentType === 'BR_CNPJ' || this.documentType === 'PT_NIF' ? 'numeric' : 'text'; }
   hasUppercase(): boolean { return /[A-Z]/.test(this.password); }
   hasLowercase(): boolean { return /[a-z]/.test(this.password); }
   hasNumber(): boolean { return /\d/.test(this.password); }
