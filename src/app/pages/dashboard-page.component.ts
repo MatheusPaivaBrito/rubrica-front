@@ -15,10 +15,11 @@ import { I18nService, Locale } from '../core/i18n.service';
 import { SUPPORTED_LANGUAGES } from '../core/countries';
 import { LanguagePickerComponent } from '../components/language-picker.component';
 import { PdfStampViewerComponent } from '../components/pdf-stamp-viewer.component';
+import { DateFilterComponent } from '../components/date-filter.component';
 
 @Component({
   standalone: true,
-  imports: [DecimalPipe, FormsModule, LanguagePickerComponent, PdfStampViewerComponent],
+  imports: [DecimalPipe, FormsModule, LanguagePickerComponent, PdfStampViewerComponent, DateFilterComponent],
   template: `
     <main class="shell">
       <header class="topbar">
@@ -57,7 +58,7 @@ import { PdfStampViewerComponent } from '../components/pdf-stamp-viewer.componen
           <article class="card table-card">
             <div class="section-heading">
               <div><p class="eyebrow">{{ i18n.text('monitoring') }}</p><h2>{{ i18n.text('requests') }}</h2><p class="muted">{{ i18n.text('requestsHelp') }}</p></div>
-              <div class="list-toolbar"><label>{{ i18n.text('search') }}<input [(ngModel)]="requestSearch" (ngModelChange)="resetRequestLimit()" [placeholder]="i18n.text('nameOrFile')" /></label><label>{{ i18n.text('date') }}<input type="date" [(ngModel)]="requestDate" (ngModelChange)="resetRequestLimit()" /></label><label>{{ i18n.text('show') }}<select [(ngModel)]="requestFilter" (ngModelChange)="resetRequestLimit()"><option value="all">{{ i18n.text('all') }}</option><option value="open">{{ i18n.text('open') }}</option><option value="draft">{{ i18n.text('drafts') }}</option><option value="completed">{{ i18n.text('completedPlural') }}</option></select></label></div>
+              <div class="list-toolbar"><label>{{ i18n.text('search') }}<input [(ngModel)]="requestSearch" (ngModelChange)="resetRequestLimit()" [placeholder]="i18n.text('nameOrFile')" /></label><app-date-filter [label]="i18n.text('date')" [(value)]="requestDate" (valueChange)="resetRequestLimit()" /><div class="toolbar-field"><span>{{ i18n.text('show') }}</span><details class="toolbar-picker status-filter" #requestStatusMenu (toggle)="toolbarPickerToggled($event)"><summary><span>{{ requestFilterLabel() }}</span><i class="bi bi-chevron-down picker-chevron" aria-hidden="true"></i></summary><div class="toolbar-options" role="listbox">@for (option of requestFilterOptions(); track option.value) { <button type="button" role="option" [class.active]="requestFilter === option.value" [attr.aria-selected]="requestFilter === option.value" (click)="selectRequestFilter(option.value, requestStatusMenu)"><span>{{ i18n.text(option.label) }}</span>@if (requestFilter === option.value) { <i class="bi bi-check2"></i> }</button> }</div></details></div></div>
             </div>
             <div class="table-wrap">
               <table class="data-table">
@@ -80,7 +81,7 @@ import { PdfStampViewerComponent } from '../components/pdf-stamp-viewer.componen
           </article>
 
           <article class="card table-card">
-            <div class="section-heading"><div><p class="eyebrow">{{ i18n.text('collection') }}</p><h2>{{ i18n.text('documentsPlural') }}</h2><p class="muted">{{ i18n.text('documentsHelp') }}</p></div><div class="section-actions"><div class="list-toolbar"><label>{{ i18n.text('search') }}<input [(ngModel)]="documentSearch" (ngModelChange)="resetDocumentLimit()" [placeholder]="i18n.text('nameOrFile')" /></label><label>{{ i18n.text('date') }}<input type="date" [(ngModel)]="documentDate" (ngModelChange)="resetDocumentLimit()" /></label></div><button class="button secondary" (click)="showUploadModal()">{{ i18n.text('uploadPdf') }}</button></div></div>
+            <div class="section-heading"><div><p class="eyebrow">{{ i18n.text('collection') }}</p><h2>{{ i18n.text('documentsPlural') }}</h2><p class="muted">{{ i18n.text('documentsHelp') }}</p></div><div class="section-actions"><div class="list-toolbar"><label>{{ i18n.text('search') }}<input [(ngModel)]="documentSearch" (ngModelChange)="resetDocumentLimit()" [placeholder]="i18n.text('nameOrFile')" /></label><app-date-filter [label]="i18n.text('date')" [(value)]="documentDate" (valueChange)="resetDocumentLimit()" /></div><button class="button secondary" (click)="showUploadModal()">{{ i18n.text('uploadPdf') }}</button></div></div>
             <div class="table-wrap">
               <table class="data-table">
                 <thead><tr><th>{{ i18n.text('document') }}</th><th>{{ i18n.text('file') }}</th><th>{{ i18n.text('version') }}</th><th>{{ i18n.text('status') }}</th><th class="actions-column">{{ i18n.text('actions') }}</th></tr></thead>
@@ -212,6 +213,10 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   visibleDocuments(): DocumentItem[] { return this.matchingDocuments().slice(0, this.documentLimit); }
   resetRequestLimit(): void { this.requestLimit = 5; }
   resetDocumentLimit(): void { this.documentLimit = 5; }
+  requestFilterOptions(): Array<{ value: string; label: 'all' | 'open' | 'drafts' | 'completedPlural' }> { return [{ value: 'all', label: 'all' }, { value: 'open', label: 'open' }, { value: 'draft', label: 'drafts' }, { value: 'completed', label: 'completedPlural' }]; }
+  requestFilterLabel(): string { const option = this.requestFilterOptions().find(item => item.value === this.requestFilter); return this.i18n.text(option?.label ?? 'all'); }
+  selectRequestFilter(value: string, menu: HTMLDetailsElement): void { this.requestFilter = value; this.resetRequestLimit(); menu.removeAttribute('open'); }
+  toolbarPickerToggled(event: Event): void { const current = event.target as HTMLDetailsElement; if (!current.open) return; current.closest('.list-toolbar')?.querySelectorAll<HTMLDetailsElement>('details[open]').forEach(menu => { if (menu !== current) menu.removeAttribute('open'); }); }
   requestLink(): string {
     const request = this.selectedRequest();
     const storedLink = request ? this.requestLinks()[request.id] || '' : '';

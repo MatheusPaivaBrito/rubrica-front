@@ -359,6 +359,35 @@ input:focus, select:focus { outline: 3px solid rgba(168, 32, 53, .16); border-co
 .list-toolbar { display: flex; align-items: end; justify-content: flex-end; gap: .65rem; flex-wrap: wrap; }
 .list-toolbar label { display: grid; gap: .3rem; min-width: 150px; color: #475467; font-size: .78rem; font-weight: 750; }
 .list-toolbar input, .list-toolbar select { min-height: 40px; padding: .5rem .65rem; }
+.list-toolbar app-date-filter, .list-toolbar .toolbar-field { min-width: 150px; }
+.toolbar-field { display: grid; gap: .3rem; color: #475467; font-size: .78rem; font-weight: 750; }
+.toolbar-picker { position: relative; font-size: .88rem; font-weight: 600; }
+.toolbar-picker > summary { display: flex; align-items: center; justify-content: space-between; gap: .75rem; min-height: 40px; padding: .5rem .65rem; border: 1px solid #cfd8e6; border-radius: 9px; color: #18212f; background: #fff; cursor: pointer; list-style: none; }
+.toolbar-picker > summary::-webkit-details-marker { display: none; }
+.toolbar-picker > summary:hover { border-color: #a9b7ca; }
+.toolbar-picker > summary:focus-visible, .toolbar-picker[open] > summary { outline: none; border-color: #a82035; box-shadow: 0 0 0 3px rgba(168, 32, 53, .14); }
+.toolbar-picker[open] .picker-chevron { transform: rotate(180deg); }
+.toolbar-picker .placeholder { color: #667085; }
+.toolbar-options, .date-popover { position: absolute; z-index: 40; top: calc(100% + .4rem); right: 0; border: 1px solid #d8dee8; border-radius: 12px; color: #344054; background: #fff; box-shadow: 0 18px 42px rgba(30, 41, 59, .18); }
+.toolbar-options { display: grid; width: 100%; min-width: 170px; padding: .4rem; }
+.toolbar-options button { display: flex; align-items: center; justify-content: space-between; gap: .7rem; width: 100%; padding: .65rem .7rem; border: 0; border-radius: 8px; color: #344054; background: transparent; text-align: left; cursor: pointer; }
+.toolbar-options button:hover, .toolbar-options button:focus-visible, .toolbar-options button.active { outline: none; color: #8f1d2c; background: #fff0ed; }
+.date-popover { width: 286px; padding: .8rem; }
+.date-popover header, .date-popover footer { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.date-popover header { margin-bottom: .55rem; }
+.date-popover header strong { color: #30191d; font-size: .92rem; text-transform: capitalize; }
+.date-popover header button, .date-popover footer button { border: 0; border-radius: 8px; color: #8f1d2c; background: transparent; cursor: pointer; }
+.date-popover header button { display: grid; width: 34px; height: 34px; place-items: center; }
+.date-popover header button:hover, .date-popover footer button:hover { background: #fff0ed; }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: .2rem; }
+.calendar-grid.weekdays span { padding: .25rem 0; color: #667085; font-size: .7rem; text-align: center; text-transform: uppercase; }
+.calendar-grid.days button, .calendar-grid.days > span { min-height: 32px; }
+.calendar-grid.days button { border: 0; border-radius: 8px; color: #344054; background: transparent; cursor: pointer; }
+.calendar-grid.days button:hover, .calendar-grid.days button:focus-visible { outline: none; color: #8f1d2c; background: #fff0ed; }
+.calendar-grid.days button.today { box-shadow: inset 0 0 0 1px #d9a4aa; }
+.calendar-grid.days button.selected { color: #fff; background: #a82035; box-shadow: none; font-weight: 800; }
+.date-popover footer { margin-top: .55rem; padding-top: .5rem; border-top: 1px solid #edf0f5; }
+.date-popover footer button { padding: .4rem .5rem; font-size: .78rem; font-weight: 750; }
 .list-footer { display: flex; align-items: center; justify-content: center; gap: 1rem; padding: .85rem 1rem; border-top: 1px solid #edf0f5; color: #667085; background: #fbfcfe; font-size: .85rem; }
 .table-wrap { width: 100%; overflow-x: auto; }
 .data-table { width: 100%; border-collapse: collapse; color: #344054; font-size: .9rem; }
@@ -451,7 +480,8 @@ input:focus, select:focus { outline: 3px solid rgba(168, 32, 53, .16); border-co
   .table-card { overflow: visible; border: 0; background: transparent; box-shadow: none; }
   .table-card .section-heading { margin-bottom: .7rem; padding: 1rem; border: 1px solid #e3e8f0; border-radius: 13px; background: #fff; }
   .section-actions, .list-toolbar { align-items: stretch; flex-direction: column; width: 100%; }
-  .list-toolbar label { width: 100%; }
+  .list-toolbar label, .list-toolbar app-date-filter, .list-toolbar .toolbar-field { width: 100%; }
+  .date-popover { right: auto; left: 0; width: min(286px, calc(100vw - 3rem)); }
   .section-actions > .button { width: 100%; }
   .list-footer { margin-top: .7rem; border: 1px solid #e3e8f0; border-radius: 13px; }
   .table-wrap { overflow: visible; }
