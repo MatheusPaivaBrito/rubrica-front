@@ -9,7 +9,7 @@ import { I18nService } from '../core/i18n.service';
     <div class="toolbar-field">
       <span>{{ label }}</span>
       <details class="toolbar-picker date-filter" #menu (toggle)="toggled($event)">
-        <summary><span [class.placeholder]="!value">{{ formattedValue() }}</span><i class="bi bi-calendar3" aria-hidden="true"></i></summary>
+        <summary [attr.aria-label]="label + ': ' + formattedValue()"><span class="date-filter-value" [class.placeholder]="!value" [attr.data-value]="formattedValue()" aria-hidden="true"></span><i class="bi bi-calendar3" aria-hidden="true"></i></summary>
         <section class="date-popover">
           <header><button type="button" (click)="moveMonth(-1)" [attr.aria-label]="i18n.text('previousMonth')"><i class="bi bi-chevron-left"></i></button><strong>{{ monthLabel() }}</strong><button type="button" (click)="moveMonth(1)" [attr.aria-label]="i18n.text('nextMonth')"><i class="bi bi-chevron-right"></i></button></header>
           <div class="calendar-grid weekdays">@for (weekday of weekdays(); track $index) { <span>{{ weekday }}</span> }</div>
