@@ -94,7 +94,7 @@ export class BillingPageComponent implements OnInit {
           this.account.set(account);
           synchronized = true;
         } catch (error) {
-          if (returnedFromUpdate) await this.feedback.error(error);
+          await this.feedback.error(error);
         }
       }
       if (returnedFromUpdate && synchronized) {
