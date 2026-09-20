@@ -9,7 +9,7 @@ import { FeedbackService } from '../core/feedback.service';
 import { I18nService, MessageKey } from '../core/i18n.service';
 import { LanguagePickerComponent } from '../components/language-picker.component';
 import { PasswordFieldComponent } from '../components/password-field.component';
-import { countryFlag, SUPPORTED_COUNTRIES } from '../core/countries';
+import { SUPPORTED_COUNTRIES } from '../core/countries';
 
 interface IdentityOption { value: string; label: MessageKey }
 
@@ -31,23 +31,20 @@ interface IdentityOption { value: string; label: MessageKey }
             <span class="field-label">{{ i18n.text('documentCountry') }}</span>
             <details class="country-picker" #countryMenu (toggle)="pickerToggled($event)">
               <summary [attr.aria-label]="i18n.text('documentCountry')">
-                <span class="country-picker-mark" aria-hidden="true">{{ country ? countryFlag(country) : '🌐' }}</span>
                 <span class="country-picker-value">
                   <strong>{{ selectedCountryName() }}</strong>
-                  @if (country) { <small>{{ country }}</small> }
                 </span>
                 <i class="bi bi-chevron-down picker-chevron" aria-hidden="true"></i>
               </summary>
               <div class="country-options" role="listbox" [attr.aria-label]="i18n.text('documentCountry')">
+                <label class="country-search"><i class="bi bi-search" aria-hidden="true"></i><input name="countrySearch" [(ngModel)]="countrySearch" [placeholder]="i18n.text('searchCountry')" autocomplete="off" (click)="$event.stopPropagation()" (keydown.enter)="$event.preventDefault()" /></label>
                 <button type="button" role="option" [attr.aria-selected]="!country" [class.active]="!country" (click)="selectCountry('', countryMenu)">
-                  <span class="country-option-mark" aria-hidden="true">🌐</span>
-                  <span><strong>{{ i18n.text('doNotProvide') }}</strong></span>
+                  <span class="country-option-label"><strong>{{ i18n.text('doNotProvide') }}</strong></span>
                   @if (!country) { <i class="bi bi-check2" aria-hidden="true"></i> }
                 </button>
-                @for (item of supportedCountries; track item.code) {
+                @for (item of filteredCountries(); track item.code) {
                   <button type="button" role="option" [attr.aria-selected]="country === item.code" [class.active]="country === item.code" (click)="selectCountry(item.code, countryMenu)">
-                    <span class="country-option-mark" aria-hidden="true">{{ countryFlag(item.code) }}</span>
-                    <span><strong>{{ i18n.text(item.nameKey) }}</strong><small>{{ item.code }}</small></span>
+                    <span class="country-option-label"><strong>{{ i18n.text(item.nameKey) }}</strong></span>
                     @if (country === item.code) { <i class="bi bi-check2" aria-hidden="true"></i> }
                   </button>
                 }
@@ -112,10 +109,9 @@ interface IdentityOption { value: string; label: MessageKey }
 })
 export class AccountPageComponent implements OnInit {
   readonly supportedCountries = SUPPORTED_COUNTRIES;
-  readonly countryFlag = countryFlag;
   titleKey: MessageKey = 'account';
   mode = '';
-  name = ''; email = ''; password = ''; passwordConfirmation = ''; country = ''; documentType = 'PASSPORT'; documentValue = '';
+  name = ''; email = ''; password = ''; passwordConfirmation = ''; country = ''; countrySearch = ''; documentType = 'PASSPORT'; documentValue = '';
   readonly passwordPattern = '(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9\\s]).{8,128}';
   returnUrl: string | null = null;
   private token = '';
@@ -142,10 +138,19 @@ export class AccountPageComponent implements OnInit {
     const selected = this.supportedCountries.find(item => item.code === this.country);
     return selected ? this.i18n.text(selected.nameKey) : this.i18n.text('chooseCountry');
   }
+  filteredCountries() {
+    const query = this.countrySearch.trim().toLocaleLowerCase(this.i18n.locale());
+    if (!query) return this.supportedCountries;
+    return this.supportedCountries.filter(item =>
+      item.code.toLowerCase().includes(query)
+      || this.i18n.text(item.nameKey).toLocaleLowerCase(this.i18n.locale()).includes(query)
+    );
+  }
   selectCountry(country: string, menu: HTMLDetailsElement): void {
     this.country = country;
     this.documentType = this.documentOptions()[0]?.value ?? 'PASSPORT';
     this.documentValue = '';
+    this.countrySearch = '';
     menu.removeAttribute('open');
   }
   pickerToggled(event: Event): void {
