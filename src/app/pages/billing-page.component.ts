@@ -86,6 +86,21 @@ export class BillingPageComponent implements OnInit {
       const tenants = (await firstValueFrom(this.api.get<TenantItem[]>('/tenants'))).filter(item => item.role === 'admin');
       this.tenants.set(tenants);
       if (tenants.length) { this.tenantId.set(tenants[0].id); await this.loadAccount(); }
+      const returnedFromUpdate = this.route.snapshot.queryParamMap.get('billing') === 'updated';
+      let synchronized = false;
+      if (tenants.length && this.account()?.provider_subscription_id) {
+        try {
+          const account = await firstValueFrom(this.api.post<BillingAccount>(`/billing/tenants/${this.tenantId()}/account/sync`, {}));
+          this.account.set(account);
+          synchronized = true;
+        } catch (error) {
+          if (returnedFromUpdate) await this.feedback.error(error);
+        }
+      }
+      if (returnedFromUpdate && synchronized) {
+        await this.feedback.success(this.i18n.text('planUpdateConfirmed'));
+        await this.router.navigate([], { queryParams: {}, replaceUrl: true });
+      }
       const checkout = this.route.snapshot.queryParamMap.get('checkout');
       if (checkout === 'success') await this.feedback.success(this.i18n.text('checkoutSuccess'));
       if (checkout === 'cancelled') await this.feedback.warning(this.i18n.text('checkoutCancelled'));
