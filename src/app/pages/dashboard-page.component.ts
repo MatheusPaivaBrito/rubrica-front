@@ -35,7 +35,7 @@ import { DateFilterComponent } from '../components/date-filter.component';
         } @else {
           <header class="dashboard-header">
             <div><p class="eyebrow">{{ i18n.text('overview') }}</p><h1>{{ i18n.text('signatureCenter') }}</h1><p class="muted">{{ i18n.text('dashboardHelp') }}</p></div>
-            <div class="header-actions">@if (isAdmin()) { <button class="button secondary" (click)="billing()"><i class="bi bi-credit-card"></i> {{ i18n.text('billing') }}</button> }</div>
+            <div class="header-actions">@if (canManageBilling()) { <button class="button secondary" (click)="billing()"><i class="bi bi-credit-card"></i> {{ i18n.text('billing') }}</button> }</div>
           </header>
 
           <section class="stats-grid" aria-label="Resumo">
@@ -186,6 +186,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   expiresAt = '';
   file: File | null = null;
   private tenantSlug = '';
+  private tenantId = '';
   private modalScrollY = 0;
   private modalBodyStyle: string | null = null;
   private modalLocked = false;
@@ -198,12 +199,13 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
 
   constructor(readonly auth: AuthService, readonly i18n: I18nService, private readonly api: ApiService, private readonly route: ActivatedRoute, private readonly router: Router, private readonly feedback: FeedbackService) {}
 
-  async ngOnInit(): Promise<void> { const context = await this.auth.restore(); if (!context) { await this.router.navigate(['/login']); return; } try { if (context.mfa_setup_required && !this.auth.isMfaDeferredForSession()) { await this.router.navigate(['/security']); return; } const dashboardUrl = await this.auth.dashboardUrl(); const accountId = this.route.snapshot.paramMap.get('tenantAccountId'); const legacySlug = this.route.snapshot.paramMap.get('tenantSlug'); const routeSlug = accountId ? `account-${accountId}` : legacySlug; if (!routeSlug) { await this.router.navigateByUrl(dashboardUrl, { replaceUrl: true }); return; } if (!accountId && routeSlug.startsWith('account-')) { await this.router.navigateByUrl(tenantDashboardUrl(routeSlug), { replaceUrl: true }); return; } const tenants = await firstValueFrom(this.api.get<TenantItem[]>('/tenants')); const selectedTenant = tenants.find(tenant => tenant.slug === routeSlug); if (!selectedTenant) { await this.router.navigateByUrl(dashboardUrl, { replaceUrl: true }); return; } this.tenants.set(tenants); this.tenantSlug = selectedTenant.slug; if (this.canManage()) await Promise.all([this.reload(), this.loadBilling(tenants)]); } catch (error) { await this.feedback.error(error, this.i18n.text('dashboardLoadFailed')); } finally { this.loading.set(false); } }
+  async ngOnInit(): Promise<void> { const context = await this.auth.restore(); if (!context) { await this.router.navigate(['/login']); return; } try { if (context.mfa_setup_required && !this.auth.isMfaDeferredForSession()) { await this.router.navigate(['/security']); return; } const dashboardUrl = await this.auth.dashboardUrl(); const accountId = this.route.snapshot.paramMap.get('tenantAccountId'); const legacySlug = this.route.snapshot.paramMap.get('tenantSlug'); const routeSlug = accountId ? `account-${accountId}` : legacySlug; if (!routeSlug) { await this.router.navigateByUrl(dashboardUrl, { replaceUrl: true }); return; } if (!accountId && routeSlug.startsWith('account-')) { await this.router.navigateByUrl(tenantDashboardUrl(routeSlug), { replaceUrl: true }); return; } const tenants = await firstValueFrom(this.api.get<TenantItem[]>('/tenants')); const selectedTenant = tenants.find(tenant => tenant.slug === routeSlug); if (!selectedTenant) { await this.router.navigateByUrl(dashboardUrl, { replaceUrl: true }); return; } this.tenants.set(tenants); this.tenantSlug = selectedTenant.slug; this.tenantId = selectedTenant.id; if (this.canManage()) await Promise.all([this.reload(), this.loadBilling(tenants)]); } catch (error) { await this.feedback.error(error, this.i18n.text('dashboardLoadFailed')); } finally { this.loading.set(false); } }
   ngOnDestroy(): void { this.unlockPageScroll(); }
   security(): Promise<boolean> { return this.router.navigate(['/security']); }
-  billing(): Promise<boolean> { return this.router.navigate(['/plan']); }
+  billing(): Promise<boolean> { return this.router.navigate(['/plan'], { queryParams: { tenant: this.tenantId } }); }
   canManage(): boolean { return this.auth.can('documents:write') && this.auth.can('signature_requests:write'); }
   isAdmin(): boolean { const context = this.auth.context(); return context?.roles.includes('signature_admin') === true || context?.permission_keys.includes('*') === true; }
+  canManageBilling(): boolean { const account = this.billingFor(this.tenantId); return this.isAdmin() && Boolean(account && !account.complimentary_lifetime); }
   hasSignedSigners(): boolean { return this.signers().some((signer) => signer.status === 'signed'); }
   openRequestsCount(): number { return this.requests().filter((item) => item.status === 'open').length; }
   completedRequestsCount(): number { return this.requests().filter((item) => item.status === 'completed').length; }

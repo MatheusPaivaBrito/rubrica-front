@@ -100,7 +100,12 @@ export class BillingPageComponent implements OnInit {
     try {
       const tenants = (await firstValueFrom(this.api.get<TenantItem[]>('/tenants'))).filter(item => item.role === 'admin');
       this.tenants.set(tenants);
-      if (tenants.length) { this.tenantId.set(tenants[0].id); await this.loadAccount(); }
+      if (tenants.length) {
+        const requestedTenantId = this.route.snapshot.queryParamMap.get('tenant');
+        this.tenantId.set(tenants.some(item => item.id === requestedTenantId) ? requestedTenantId! : tenants[0].id);
+        await this.loadAccount();
+        if (await this.leaveComplimentaryBilling()) return;
+      }
       const returnedFromUpdate = this.route.snapshot.queryParamMap.get('billing') === 'updated';
       let synchronized = false;
       if (tenants.length && this.account()?.provider_subscription_id) {
@@ -124,7 +129,7 @@ export class BillingPageComponent implements OnInit {
   }
 
   selectedTenantLabel(): string { const tenant = this.tenants().find(item => item.id === this.tenantId()); return tenant ? `${tenant.name} · ${tenant.currency}` : this.i18n.text('chooseTenant'); }
-  async selectTenant(id: string, menu?: HTMLDetailsElement): Promise<void> { if (menu) menu.open = false; this.tenantId.set(id); await this.loadAccount(); }
+  async selectTenant(id: string, menu?: HTMLDetailsElement): Promise<void> { if (menu) menu.open = false; this.tenantId.set(id); await this.loadAccount(); await this.leaveComplimentaryBilling(); }
   statusLabel(status: string): string { const keys: Record<string, Parameters<I18nService['text']>[0]> = { active:'active', pending:'pending', past_due:'pastDue', cancelled:'cancelled', paused:'paused', not_configured:'notConfigured' }; return this.i18n.text(keys[status] ?? 'notConfigured'); }
   planName(): string { const account = this.account(); if (account?.complimentary_lifetime) return this.i18n.text('lifetimePlan'); if (account?.current_product_code === 'rubrica_intermediate' && this.fileLimit(account) !== null) return this.i18n.text('intermediatePlan'); if (account?.current_product_code === 'rubrica_base' && this.fileLimit(account) !== null) return this.i18n.text('basePlan'); return this.i18n.text('free'); }
   planHelp(): string { const account = this.account(); if (account?.complimentary_lifetime) return this.i18n.text('lifetimePlanHelp'); if (account?.current_product_code === 'rubrica_intermediate' && this.fileLimit(account) !== null) return this.i18n.text('intermediatePlanHelp'); if (account?.current_product_code === 'rubrica_base' && this.fileLimit(account) !== null) return this.i18n.text('basePlanHelp'); return this.i18n.text('fiveFree'); }
@@ -139,6 +144,7 @@ export class BillingPageComponent implements OnInit {
   openCheckout(): void { if (this.checkoutUrl()) window.location.assign(this.checkoutUrl()); }
 
   private async loadAccount(): Promise<void> { const account = await firstValueFrom(this.api.get<BillingAccount>(`/billing/tenants/${this.tenantId()}/account`)); this.account.set(account); if (account.current_product_code === 'rubrica_base' || account.current_product_code === 'rubrica_intermediate') this.selectedPlan.set(account.current_product_code); }
+  private async leaveComplimentaryBilling(): Promise<boolean> { if (!this.account()?.complimentary_lifetime) return false; await this.router.navigateByUrl(await this.auth.dashboardUrl(), { replaceUrl: true }); return true; }
   private fileLimit(account: BillingAccount): number | null { if (typeof account.files_limit === 'number') return account.files_limit; if (!['active', 'past_due'].includes(account.status)) return null; if (account.current_product_code === 'rubrica_base') return 25; if (account.current_product_code === 'rubrica_intermediate') return 30; return null; }
   private filesUsed(account: BillingAccount): number { return account.files_uploaded_in_period ?? 0; }
   private async redirect<T extends BillingCheckout | BillingPortal>(path: string, key: keyof T): Promise<void> {
