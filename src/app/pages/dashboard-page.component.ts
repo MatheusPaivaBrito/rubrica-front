@@ -11,7 +11,8 @@ import { AuthService, tenantDashboardUrl } from '../core/auth.service';
 import { FeedbackService } from '../core/feedback.service';
 import { BillingAccount, DocumentItem, SignatureEvidence, SignatureRequest, Signer, SignerContact, SigningLink, TenantItem } from '../core/models';
 import { dateTime } from '../core/date-time';
-import { I18nService } from '../core/i18n.service';
+import { I18nService, Locale } from '../core/i18n.service';
+import { SUPPORTED_LANGUAGES } from '../core/countries';
 import { LanguagePickerComponent } from '../components/language-picker.component';
 import { PdfStampViewerComponent } from '../components/pdf-stamp-viewer.component';
 
@@ -127,7 +128,7 @@ import { PdfStampViewerComponent } from '../components/pdf-stamp-viewer.componen
                   @if (selectedRequest()!.status === 'draft') {
                     <div><h3>{{ i18n.text('addSigner') }}</h3><p class="muted">{{ i18n.text('inviteSignerHelp') }}</p></div>
                     @if (signerContacts().length) { <div class="contact-picker"><label>{{ i18n.text('previousInvitees') }}<input [ngModel]="contactSearch()" (ngModelChange)="contactSearch.set($event)" (focus)="contactPickerOpen.set(true)" (blur)="contactPickerOpen.set(false)" name="contactSearch" [placeholder]="i18n.text('nameOrEmail')" autocomplete="off" /></label>@if (contactPickerOpen()) { <div class="contact-options" role="listbox">@for (contact of filteredContacts(); track contact.email) { <button type="button" role="option" [attr.aria-selected]="signerEmail === contact.email" (mousedown)="$event.preventDefault()" (click)="selectContact(contact)"><strong>{{ contact.name }}</strong><span>{{ contact.email }}</span></button> } @empty { <p>{{ i18n.text('noUser') }}</p> }</div> }</div> }
-                    <form class="form" (ngSubmit)="addSigner()"><label>{{ i18n.text('name') }}<input name="signerName" [(ngModel)]="signerName" required autocomplete="name" /></label><label>{{ i18n.text('email') }}<input name="signerEmail" type="email" [(ngModel)]="signerEmail" required autocomplete="email" /></label><label>{{ i18n.text('language') }}<select name="signerLocale" [(ngModel)]="signerLocale"><option value="pt-BR">Português</option><option value="en">English</option><option value="es">Español</option><option value="ja-JP">日本語</option></select></label><button class="button" [disabled]="submitting() || !signerName.trim() || !signerEmail.trim()">{{ i18n.text('add') }}</button></form><hr /><button class="button secondary full-width" (click)="openRequest()" [disabled]="submitting() || !signers().length">{{ i18n.text('openForSigning') }}</button>
+                    <form class="form" (ngSubmit)="addSigner()"><label>{{ i18n.text('name') }}<input name="signerName" [(ngModel)]="signerName" required autocomplete="name" /></label><label>{{ i18n.text('email') }}<input name="signerEmail" type="email" [(ngModel)]="signerEmail" required autocomplete="email" /></label><div class="signer-language-field"><span class="field-label">{{ i18n.text('language') }}</span><details class="country-picker document-type-picker signer-language-picker" #signerLanguageMenu><summary [attr.aria-label]="i18n.text('language')"><i class="bi bi-translate country-picker-mark" aria-hidden="true"></i><span class="country-picker-value"><strong>{{ selectedSignerLanguage() }}</strong></span><i class="bi bi-chevron-down picker-chevron" aria-hidden="true"></i></summary><div class="country-options signer-language-options" role="listbox" [attr.aria-label]="i18n.text('language')">@for (language of signerLanguages; track language.locale) { <button type="button" role="option" [attr.aria-selected]="signerLocale === language.locale" [class.active]="signerLocale === language.locale" (click)="selectSignerLanguage(language.locale, signerLanguageMenu)"><i class="bi bi-translate country-option-mark" aria-hidden="true"></i><span><strong>{{ language.label }}</strong></span>@if (signerLocale === language.locale) { <i class="bi bi-check2" aria-hidden="true"></i> }</button> }</div></details></div><button class="button" [disabled]="submitting() || !signerName.trim() || !signerEmail.trim()">{{ i18n.text('add') }}</button></form><hr /><button class="button secondary full-width" (click)="openRequest()" [disabled]="submitting() || !signers().length">{{ i18n.text('openForSigning') }}</button>
                   } @else {
                     <div><h3>{{ i18n.text('documentAccess') }}</h3><p class="muted">{{ i18n.text('shareUnique') }}</p></div>
                     @if (requestLink()) { <div class="link-panel"><small>{{ i18n.text('uniqueLink') }}</small><span>{{ requestLink() }}</span></div>@if (requestQrCode()) { <img class="signing-qr" [src]="requestQrCode()" alt="QR Code do link para assinatura" /> }<div class="button-row"><button class="button secondary compact" (click)="copyInvite()">{{ i18n.text('copyLink') }}</button><button class="button secondary compact" (click)="openInvite()">{{ i18n.text('openLink') }}</button>@if (requestQrCode()) { <a class="button secondary compact qr-download-button" [href]="requestQrCode()" [download]="qrCodeFilename()"><i class="bi bi-qr-code-scan" aria-hidden="true"></i> {{ i18n.text('downloadQrCode') }}</a> }</div> } @else { <p class="notice">{{ i18n.text('noRecoverableLink') }}</p> }
@@ -146,6 +147,7 @@ import { PdfStampViewerComponent } from '../components/pdf-stamp-viewer.componen
   `,
 })
 export class DashboardPageComponent implements OnInit, OnDestroy {
+  readonly signerLanguages = SUPPORTED_LANGUAGES;
   readonly documents = signal<DocumentItem[]>([]);
   readonly requests = signal<SignatureRequest[]>([]);
   readonly signers = signal<Signer[]>([]);
@@ -219,6 +221,8 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   }
   filteredContacts(): SignerContact[] { const query = this.contactSearch().trim().toLowerCase(); return this.signerContacts().filter(contact => !query || contact.name.toLowerCase().includes(query) || contact.email.includes(query)).slice(0, 8); }
   selectContact(contact: SignerContact): void { this.signerName = contact.name; this.signerEmail = contact.email; this.contactSearch.set(`${contact.name} · ${contact.email}`); this.contactPickerOpen.set(false); }
+  selectedSignerLanguage(): string { return this.signerLanguages.find(language => language.locale === this.signerLocale)?.label ?? 'English'; }
+  selectSignerLanguage(locale: Locale, menu: HTMLDetailsElement): void { this.signerLocale = locale; menu.removeAttribute('open'); }
   qrCodeFilename(): string { return `rubrica-assinatura-${this.selectedRequest()?.id ?? 'documento'}.png`; }
   fileSize(bytes: number | null): string { if (bytes === null) return this.i18n.text('unavailable'); if (bytes < 1024) return `${bytes} B`; if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`; return `${(bytes / 1024 / 1024).toFixed(1)} MB`; }
   requestStatusLabel(status: string): string { const keys = { draft: 'drafts', open: 'inSigning', completed: 'completedPlural', cancelled: 'cancelled', expired: 'expired' } as const; return status in keys ? this.i18n.text(keys[status as keyof typeof keys]) : status; }

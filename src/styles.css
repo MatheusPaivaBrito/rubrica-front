@@ -280,6 +280,9 @@ input:focus, select:focus { outline: 3px solid rgba(168, 32, 53, .16); border-co
 .country-search input:focus { outline: 0; box-shadow: none; }
 .document-type-picker { margin-top: -.55rem; }
 .document-type-picker .country-picker-mark, .document-type-picker .country-option-mark { color: #9f2437; font-size: 1.05rem; }
+.signer-language-field { display: grid; gap: .45rem; }
+.signer-language-picker { margin-top: 0; }
+.signer-language-options { z-index: 30; }
 .account-back { margin: 1.2rem 0 0; text-align: center; }
 .account-back a { color: #8f1d2c; font-weight: 750; text-decoration: none; }
 .account-back a:hover { text-decoration: underline; }
