@@ -353,6 +353,7 @@ input:focus, select:focus { outline: 3px solid rgba(168, 32, 53, .16); border-co
 .stat-card span { font-size: .82rem; font-weight: 750; text-transform: uppercase; letter-spacing: .055em; }
 .stat-card strong { align-self: end; font-size: 2rem; line-height: 1; letter-spacing: -.05em; }
 .table-card { padding: 0; overflow: hidden; }
+.table-card:has(.toolbar-picker[open]) { position: relative; z-index: 50; overflow: visible; }
 .table-card .section-heading { margin: 0; padding: 1.25rem 1.35rem; border-bottom: 1px solid #edf0f5; }
 .table-card .section-heading p { margin: 0; }
 .section-actions { display: flex; align-items: end; justify-content: flex-end; gap: .75rem; flex-wrap: wrap; }
@@ -368,6 +369,8 @@ input:focus, select:focus { outline: 3px solid rgba(168, 32, 53, .16); border-co
 .toolbar-picker > summary:focus-visible, .toolbar-picker[open] > summary { outline: none; border-color: #a82035; box-shadow: 0 0 0 3px rgba(168, 32, 53, .14); }
 .toolbar-picker[open] .picker-chevron { transform: rotate(180deg); }
 .toolbar-picker .placeholder { color: #667085; }
+.date-filter > summary, .date-popover { user-select: none; }
+.date-filter > summary > i { flex: 0 0 auto; animation: none; transform: none; transition: none; }
 .toolbar-options, .date-popover { position: absolute; z-index: 40; top: calc(100% + .4rem); right: 0; border: 1px solid #d8dee8; border-radius: 12px; color: #344054; background: #fff; box-shadow: 0 18px 42px rgba(30, 41, 59, .18); }
 .toolbar-options { display: grid; width: 100%; min-width: 170px; padding: .4rem; }
 .toolbar-options button { display: flex; align-items: center; justify-content: space-between; gap: .7rem; width: 100%; padding: .65rem .7rem; border: 0; border-radius: 8px; color: #344054; background: transparent; text-align: left; cursor: pointer; }
