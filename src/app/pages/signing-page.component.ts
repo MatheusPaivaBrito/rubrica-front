@@ -73,13 +73,14 @@ import { LanguagePickerComponent } from '../components/language-picker.component
           </section> }
 
           @if (!administrativeView()) { <p class="notice">{{ i18n.text('evidenceNotice') }}</p> }
+          @if (timestampEnabled()) { <p class="notice">{{ timestampHelpLabel() }}</p> }
           @if (serproidEligible()) { <p class="notice">{{ certificateHelpLabel() }}</p> }
           @if (message()) { <p class="notice">{{ message() }}</p> }
 
           <div class="signing-actions">
             @if (serproidEligible()) {
-              <button class="button" [disabled]="signing() || !placement()" (click)="sign(true)">{{ signing() ? i18n.text('signing') : certificateLabel() }}</button>
-              <button class="button secondary" [disabled]="signing() || !placement()" (click)="sign()">{{ evidenceOnlyLabel() }}</button>
+              <button class="button" [disabled]="signing() || !placement()" (click)="sign()">{{ signing() ? i18n.text('signing') : i18n.text('signDocument') }}</button>
+              <button class="button secondary" [disabled]="signing() || !placement()" (click)="sign(true)">{{ certificateLabel() }}</button>
             } @else if (!administrativeView()) {
               <button class="button" [disabled]="signing() || completed() || !placement()" (click)="sign()">
                 {{ signing() ? i18n.text('signing') : completed() ? statusLabel() : i18n.text('signDocument') }}
@@ -100,6 +101,7 @@ export class SigningPageComponent implements OnInit {
   readonly loading = signal(true);
   readonly signing = signal(false);
   readonly serproidEnabled = signal(false);
+  readonly timestampEnabled = signal(false);
   readonly completed = signal(false);
   readonly message = signal('');
   readonly error = signal('');
@@ -128,6 +130,10 @@ export class SigningPageComponent implements OnInit {
         const serproid = await firstValueFrom(this.api.get<{ enabled: boolean }>('/signing/serproid/config'));
         this.serproidEnabled.set(serproid.enabled);
       } catch { this.serproidEnabled.set(false); }
+      try {
+        const timestamp = await firstValueFrom(this.api.get<{ enabled: boolean }>('/signing/timestamp/config'));
+        this.timestampEnabled.set(timestamp.enabled);
+      } catch { this.timestampEnabled.set(false); }
       if (context.viewer_mode === 'signer' && context.signer.status === 'pending') {
         const signer = await firstValueFrom(this.api.post<Signer>(`/signing/links/${this.token}/view`, {}));
         this.context.update(current => current ? { ...current, signer: {
@@ -250,12 +256,12 @@ export class SigningPageComponent implements OnInit {
     return ({ 'pt-BR': 'Assinar com certificado Serpro ID', en: 'Sign with Serpro ID certificate', es: 'Firmar con certificado Serpro ID', 'ja-JP': 'Serpro ID 証明書で署名' } as Record<string, string>)[this.i18n.locale()] ?? 'Sign with Serpro ID certificate';
   }
 
-  evidenceOnlyLabel(): string {
-    return ({ 'pt-BR': 'Assinar somente com evidências', en: 'Sign with evidence only', es: 'Firmar solo con evidencias', 'ja-JP': '証拠情報のみで署名' } as Record<string, string>)[this.i18n.locale()] ?? 'Sign with evidence only';
+  certificateHelpLabel(): string {
+    return ({ 'pt-BR': 'Para documentos delicados, você também pode usar um certificado digital pelo Serpro ID.', en: 'For sensitive documents, you can also use a digital certificate through Serpro ID.', es: 'Para documentos delicados, también puede usar un certificado digital mediante Serpro ID.', 'ja-JP': '重要な文書では、Serpro ID 経由のデジタル証明書も使用できます。' } as Record<string, string>)[this.i18n.locale()] ?? 'You can also use a digital certificate through Serpro ID.';
   }
 
-  certificateHelpLabel(): string {
-    return ({ 'pt-BR': 'A opção principal usa seu certificado digital pelo Serpro ID. A assinatura somente com evidências não usa certificado digital.', en: 'The primary option uses your digital certificate through Serpro ID. Evidence-only signing does not use a digital certificate.', es: 'La opción principal usa su certificado digital mediante Serpro ID. La firma solo con evidencias no usa certificado digital.', 'ja-JP': '主なオプションは Serpro ID 経由でデジタル証明書を使用します。証拠情報のみの署名ではデジタル証明書を使用しません。' } as Record<string, string>)[this.i18n.locale()] ?? 'The primary option uses your digital certificate through Serpro ID.';
+  timestampHelpLabel(): string {
+    return ({ 'pt-BR': 'A assinatura principal recebe automaticamente um carimbo da Hora Legal Brasileira pela ACT SERPRO.', en: 'The main signature automatically receives a Brazilian Legal Time timestamp from ACT SERPRO.', es: 'La firma principal recibe automáticamente un sello de Hora Legal Brasileña de ACT SERPRO.', 'ja-JP': '通常の署名には ACT SERPRO によるブラジル法定時刻のタイムスタンプが自動で付与されます。' } as Record<string, string>)[this.i18n.locale()] ?? 'The signature automatically receives an ACT SERPRO timestamp.';
   }
 
   certificateDeniedLabel(): string {

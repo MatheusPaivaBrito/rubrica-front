@@ -40,4 +40,20 @@ describe('evidenceReportHtml', () => {
     expect(html).toContain('https://validar.iti.gov.br/');
     expect(html).not.toContain('Assinatura Rubrica por evidências');
   });
+
+  it('shows the trusted SERPRO timestamp when present', () => {
+    const row: SignatureEvidence = {
+      signature_id: 'signature', signer_id: 'signer', request_id: 'request', document_id: 'document', document_version: 1,
+      signed_at: '2026-09-21T22:00:00Z', signer_name: 'Matheus', signer_email: 'matheus@example.com', subject_hmac_sha256: 'subject',
+      original_sha256: 'original', evidence_sha256: 'evidence', artifact_sha256: 'artifact',
+      evidence: { trusted_timestamp: { provider: 'serpro-api-timestamp', authority: 'ACT SERPRO', timestamp: '2026-09-21T22:00:00Z', policy: '2.16.76', serial_number: '123', message_imprint: 'imprint', token_sha256: 'token' } },
+    };
+
+    const html = evidenceReportHtml([row], 'pt-BR', () => '21/09/2026 19:00');
+
+    expect(html).toContain('Hora Legal Brasileira certificada pela ACT SERPRO');
+    expect(html).toContain('ACT SERPRO');
+    expect(html).toContain('imprint');
+    expect(html).toContain('token');
+  });
 });

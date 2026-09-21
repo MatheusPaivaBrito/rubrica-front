@@ -15,6 +15,13 @@ const certificateCopy = {
   'ja-JP': { heading: '署名の種類', type: '方式', certified: 'Serpro ID デジタル証明書 (PAdES/CMS)', evidence: 'Rubrica の証拠情報による署名', fingerprint: '証明書の SHA-256', verify: '証明書の信頼チェーンと失効状態を独立して確認するには、署名済み PDF を ITI の VALIDAR に提出してください。' },
 } satisfies Record<Locale, Record<string, string>>;
 
+const timestampCopy = {
+  en: { heading: 'Trusted timestamp', certified: 'Brazilian Legal Time certified by ACT SERPRO', authority: 'Timestamp authority', time: 'Certified time', policy: 'Policy', serial: 'Serial number', imprint: 'Protected message digest', token: 'Timestamp token SHA-256' },
+  'pt-BR': { heading: 'Carimbo do tempo', certified: 'Hora Legal Brasileira certificada pela ACT SERPRO', authority: 'Autoridade de carimbo do tempo', time: 'Horário certificado', policy: 'Política', serial: 'Número de série', imprint: 'Resumo protegido pelo carimbo', token: 'SHA-256 do token de carimbo' },
+  es: { heading: 'Sello de tiempo', certified: 'Hora Legal Brasileña certificada por ACT SERPRO', authority: 'Autoridad de sellado de tiempo', time: 'Hora certificada', policy: 'Política', serial: 'Número de serie', imprint: 'Resumen protegido por el sello', token: 'SHA-256 del token de sello' },
+  'ja-JP': { heading: 'タイムスタンプ', certified: 'ACT SERPRO が認証したブラジル法定時刻', authority: 'タイムスタンプ局', time: '認証時刻', policy: 'ポリシー', serial: 'シリアル番号', imprint: '保護されたメッセージダイジェスト', token: 'タイムスタンプトークンの SHA-256' },
+} satisfies Record<Locale, Record<string, string>>;
+
 function escapeHtml(value: unknown): string {
   return String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]!));
 }
@@ -26,6 +33,7 @@ function object(value: unknown): Record<string, unknown> {
 export function evidenceReportHtml(rows: SignatureEvidence[], locale: Locale, formatDate: (value: string) => string): string {
   const t = copy[locale];
   const certText = certificateCopy[locale];
+  const timestampText = timestampCopy[locale];
   const field = (label: string, value: unknown, hash = false) => `<div style="display:grid;grid-template-columns:minmax(130px,35%) 1fr;gap:.5rem;padding:.35rem 0;border-bottom:1px solid #edf0f5"><dt style="color:#536176">${escapeHtml(label)}</dt><dd style="margin:0;overflow-wrap:anywhere;${hash ? 'font-family:monospace;font-size:.82em;' : ''}">${escapeHtml(value === null || value === undefined || value === '' || value === 'unknown' ? t.unavailable : value)}</dd></div>`;
   const localized = (value: unknown) => typeof value === 'string' && value in t ? t[value as keyof typeof t] : value;
   return rows.map(row => {
@@ -35,6 +43,7 @@ export function evidenceReportHtml(rows: SignatureEvidence[], locale: Locale, fo
     const location = object(evidence['geolocation']);
     const stamp = object(evidence['stamp']);
     const certificate = object(evidence['certificate_signature']);
+    const trustedTimestamp = object(evidence['trusted_timestamp']);
     const hasSerproCertificate = certificate['provider'] === 'serproid';
     const screen = client['screen_width'] && client['screen_height'] ? `${client['screen_width']} × ${client['screen_height']}` : undefined;
     const coordinates = location['status'] === 'granted' && location['latitude'] != null && location['longitude'] != null ? `${location['latitude']}, ${location['longitude']}` : undefined;
@@ -45,6 +54,7 @@ export function evidenceReportHtml(rows: SignatureEvidence[], locale: Locale, fo
       <h4 style="margin:1rem 0 .35rem">${escapeHtml(certText.heading)}</h4>
       ${field(certText.type, hasSerproCertificate ? certText.certified : certText.evidence)}
       ${hasSerproCertificate ? `${field(certText.fingerprint, certificate['certificate_sha256'], true)}<p style="color:#536176;font-size:.9em">${escapeHtml(certText.verify)} <a href="https://validar.iti.gov.br/" target="_blank" rel="noopener noreferrer">VALIDAR</a></p>` : ''}
+      ${trustedTimestamp['provider'] === 'serpro-api-timestamp' ? `<h4 style="margin:1rem 0 .35rem">${escapeHtml(timestampText.heading)}</h4><p style="color:#176b3a"><strong>${escapeHtml(timestampText.certified)}</strong></p>${field(timestampText.authority, trustedTimestamp['authority'])}${field(timestampText.time, formatDate(String(trustedTimestamp['timestamp'])))}${field(timestampText.policy, trustedTimestamp['policy'])}${field(timestampText.serial, trustedTimestamp['serial_number'])}${field(timestampText.imprint, trustedTimestamp['message_imprint'], true)}${field(timestampText.token, trustedTimestamp['token_sha256'], true)}` : ''}
       <h4 style="margin:1rem 0 .35rem">${escapeHtml(t.network)}</h4>
       ${field(t.ip, network['ip_address'])}${field(t.device, localized(network['device_type']))}${field(t.browser, network['user_agent'])}${field(t.platform, client['platform'])}${field(t.language, client['language'])}${screen ? field(t.screen, screen) : ''}${field(t.location, coordinates ?? localized(location['status']))}
       <h4 style="margin:1rem 0 .35rem">${escapeHtml(t.document)}</h4>
