@@ -134,7 +134,7 @@ export class LoginPageComponent implements AfterViewInit, OnDestroy {
         return;
       }
       await this.router.navigateByUrl(this.returnUrl || await this.auth.dashboardUrl());
-    } catch { await this.feedback.error(this.i18n.text('invalidCredentials'), this.i18n.text('loginFailed')); }
+    } catch (error) { await this.feedback.error(error, this.i18n.text('loginFailed')); }
     finally { if (!this.mfaTicket()) this.resetTurnstile(); this.loading.set(false); }
   }
 

@@ -95,7 +95,7 @@ export class FeedbackService {
       'cpf already registered': 'conflict',
     };
     const translated = translations[message.trim().toLowerCase()];
-    return translated ? this.i18n.text(translated) : this.statusMessage(status) || message;
+    return translated ? this.i18n.text(translated) : (status ? this.statusMessage(status) : '') || message;
   }
 
   private statusMessage(status: number): string {

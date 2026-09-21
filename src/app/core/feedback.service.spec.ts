@@ -19,6 +19,12 @@ describe('FeedbackService', () => {
     expect(service.message(error)).toContain('sessão');
   });
 
+  it('shows invalid credentials instead of a connection error on login', () => {
+    const error = new HttpErrorResponse({ status: 401, error: { detail: 'Invalid credentials' } });
+    expect(service.message(error)).toBe('E-mail ou senha incorretos.');
+    expect(service.message('E-mail ou senha incorretos.')).toBe('E-mail ou senha incorretos.');
+  });
+
   it('formats API validation errors', () => {
     const error = new HttpErrorResponse({ status: 422, error: { detail: [{ loc: ['body', 'cpf'], msg: 'Value error, CPF inválido' }] } });
     expect(service.message(error)).toBe('CPF: CPF inválido');
