@@ -9,7 +9,7 @@ import QRCode from 'qrcode';
 import { ApiService } from '../core/api.service';
 import { AuthService, tenantDashboardUrl } from '../core/auth.service';
 import { FeedbackService } from '../core/feedback.service';
-import { BillingAccount, DocumentItem, SignatureEvidence, SignatureRequest, Signer, SignerContact, SigningLink, TenantItem } from '../core/models';
+import { BillingAccount, DocumentItem, SignatureEvidence, SignatureMode, SignatureRequest, Signer, SignerContact, SigningLink, TenantItem } from '../core/models';
 import { dateTime } from '../core/date-time';
 import { evidenceDownloadLabel, evidenceReportHtml } from '../core/evidence-report';
 import { I18nService, Locale } from '../core/i18n.service';
@@ -123,7 +123,7 @@ import { DateFilterComponent } from '../components/date-filter.component';
           <header class="modal-header"><div><p class="eyebrow">{{ i18n.text('request') }} #{{ selectedRequest()!.id }}</p><h2>{{ selectedRequest()!.document_title }}</h2><span class="badge" [class.pending]="selectedRequest()!.status === 'draft'" [class.complete]="selectedRequest()!.status === 'completed'">{{ requestStatusLabel(selectedRequest()!.status) }}</span></div><button class="modal-close" (click)="closeRequestModal()" [attr.aria-label]="i18n.text('close')">×</button></header>
           <div class="modal-body">
             @if (detailsLoading()) { <p class="notice">{{ i18n.text('loadingDetails') }}</p> } @else {
-              <div class="metric-strip"><div><small>{{ i18n.text('signaturesLabel') }}</small><strong>{{ selectedRequest()!.signed_count }}/{{ selectedRequest()!.signer_count }}</strong></div><div><small>{{ i18n.text('version') }}</small><strong>{{ selectedRequest()!.document_version }}</strong></div><div><small>{{ i18n.text('deadline') }}</small><strong>{{ i18n.formatDate(selectedRequest()!.expires_at) }}</strong></div></div>
+              <div class="metric-strip"><div><small>{{ i18n.text('signaturesLabel') }}</small><strong>{{ selectedRequest()!.signed_count }}/{{ selectedRequest()!.signer_count }}</strong></div><div><small>{{ i18n.text('version') }}</small><strong>{{ selectedRequest()!.document_version }}</strong></div><div><small>{{ i18n.text('deadline') }}</small><strong>{{ i18n.formatDate(selectedRequest()!.expires_at) }}</strong></div>@if (selectedRequest()!.status !== 'draft') { <div><small>{{ signatureModeFieldLabel() }}</small><strong>{{ signatureModeLabel(selectedRequest()!.signature_mode) }}</strong></div> }</div>
               <div class="details-grid">
                 <section class="detail-panel"><div class="panel-heading"><div><h3>{{ i18n.text('signers') }}</h3><p class="muted">{{ i18n.text('linkedPeople') }}</p></div></div><div class="signer-list">@for (signer of signers(); track signer.id) { <div class="signer-row"><div><strong>{{ signer.name }}</strong><small>{{ signer.email }}</small>@if (signer.identity_document_masked) { <small class="signer-identity"><i class="bi bi-person-vcard"></i> {{ identityLabel(signer) }}</small> }@if (signer.signed_at) { <small>{{ i18n.text('signedAt', { date: i18n.formatDate(signer.signed_at) }) }}</small> }</div><span class="badge" [class.pending]="signer.status === 'pending' || signer.status === 'viewed'" [class.complete]="signer.status === 'signed'">{{ signerStatusLabel(signer.status) }}</span></div> } @empty { <div class="empty-state compact-empty"><strong>{{ i18n.text('noSigner') }}</strong><span>{{ i18n.text('addBeforeOpen') }}</span></div> }</div></section>
                 <section class="detail-panel action-panel">
@@ -293,7 +293,53 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   async upload(): Promise<void> { if (!this.file || !this.tenantSlug) return; await this.run(async () => { const file = this.file!; const content = await file.arrayBuffer(); await firstValueFrom(this.api.postFile<DocumentItem>('/documents', content, file.type || 'application/pdf', { organization_id: this.tenantSlug, title: this.title, filename: file.name, content_type: file.type || 'application/pdf' })); this.title = ''; this.file = null; this.closeUploadModal(); await this.reload(); await Swal.fire({ icon: 'success', title: this.i18n.text('documentSent'), timer: 1500, showConfirmButton: false }); }); }
   async createRequest(): Promise<void> { const document = this.selectedDocument(); if (!document || !this.expiresAt) return; await this.run(async () => { const request = await firstValueFrom(this.api.post<SignatureRequest>('/signature-requests', { document_id: document.id, expires_at: dateTime.toUtcIso(this.expiresAt) })); this.requests.update((items) => [request, ...items]); this.closeRequestCreateModal(); await this.openRequestDetails(request); }); }
   async addSigner(): Promise<void> { const request = this.selectedRequest(); if (!request || !this.signerName.trim() || !this.signerEmail.trim()) return; await this.run(async () => { await firstValueFrom(this.api.post<Signer>(`/signature-requests/${request.id}/signers`, { name: this.signerName.trim(), email: this.signerEmail.trim().toLowerCase(), preferred_locale: this.signerLocale })); this.signerName = ''; this.signerEmail = ''; this.signerLocale = this.i18n.locale(); this.contactSearch.set(''); await Promise.all([this.loadSigners(request.id), this.loadSignerContacts()]); const refreshed = await firstValueFrom(this.api.get<SignatureRequest>(`/signature-requests/${request.id}`)); this.updateRequest(refreshed); }); }
-  async openRequest(): Promise<void> { const request = this.selectedRequest(); if (!request) return; const result = await Swal.fire({ icon: 'question', title: this.i18n.text('openRequestTitle'), text: this.i18n.text('openRequestHelp'), showCancelButton: true, confirmButtonText: this.i18n.text('openForSigning'), cancelButtonText: this.i18n.text('back'), confirmButtonColor: '#a82035' }); if (!result.isConfirmed) return; await this.run(async () => { const opened = await firstValueFrom(this.api.post<SignatureRequest>(`/signature-requests/${request.id}/open`, {})); this.updateRequest(opened); const link = await firstValueFrom(this.api.post<SigningLink>(`/signature-requests/${request.id}/signing-link`, {})); await this.storeSigningLink(request.id, link.signing_url); }); }
+  async openRequest(): Promise<void> {
+    const request = this.selectedRequest();
+    if (!request) return;
+    const [timestampConfig, serproidConfig] = await Promise.allSettled([
+      firstValueFrom(this.api.get<{ enabled: boolean }>('/signing/timestamp/config')),
+      firstValueFrom(this.api.get<{ enabled: boolean }>('/signing/serproid/config')),
+    ]);
+    const timestampEnabled = timestampConfig.status === 'fulfilled' && timestampConfig.value.enabled;
+    const serproidEnabled = serproidConfig.status === 'fulfilled' && serproidConfig.value.enabled;
+    const result = await Swal.fire({
+      icon: 'question',
+      title: this.signatureModeTitle(),
+      text: this.signatureModeHelp(),
+      input: 'radio',
+      inputOptions: this.signatureModeOptions(timestampEnabled, serproidEnabled),
+      inputValue: timestampEnabled ? 'serpro_timestamp' : 'evidence',
+      inputValidator: value => value ? undefined : this.signatureModeRequired(),
+      showCancelButton: true,
+      confirmButtonText: this.i18n.text('openForSigning'),
+      cancelButtonText: this.i18n.text('back'),
+      confirmButtonColor: '#a82035',
+    });
+    if (!result.isConfirmed) return;
+    const signatureMode = result.value as SignatureMode;
+    await this.run(async () => {
+      const opened = await firstValueFrom(this.api.post<SignatureRequest>(`/signature-requests/${request.id}/open`, { signature_mode: signatureMode }));
+      this.updateRequest(opened);
+      const link = await firstValueFrom(this.api.post<SigningLink>(`/signature-requests/${request.id}/signing-link`, {}));
+      await this.storeSigningLink(request.id, link.signing_url);
+    });
+  }
+
+  private signatureModeOptions(timestampEnabled: boolean, serproidEnabled: boolean): Record<string, string> {
+    const locale = this.i18n.locale();
+    const options: Record<string, string> = {
+      evidence: ({ 'pt-BR': 'Somente evidências Rubrica', en: 'Rubrica evidence only', es: 'Solo evidencias Rubrica', 'ja-JP': 'Rubrica の証拠情報のみ' } as Record<string, string>)[locale],
+    };
+    if (timestampEnabled) options['serpro_timestamp'] = ({ 'pt-BR': 'Evidências + carimbo do tempo SERPRO', en: 'Evidence + SERPRO timestamp', es: 'Evidencias + sello de tiempo SERPRO', 'ja-JP': '証拠情報 + SERPRO タイムスタンプ' } as Record<string, string>)[locale];
+    if (serproidEnabled) options['serproid'] = ({ 'pt-BR': 'Certificado digital Serpro ID', en: 'Serpro ID digital certificate', es: 'Certificado digital Serpro ID', 'ja-JP': 'Serpro ID デジタル証明書' } as Record<string, string>)[locale];
+    return options;
+  }
+
+  private signatureModeTitle(): string { return ({ 'pt-BR': 'Escolha como o documento será assinado', en: 'Choose how the document will be signed', es: 'Elija cómo se firmará el documento', 'ja-JP': '署名方法を選択' } as Record<string, string>)[this.i18n.locale()]; }
+  private signatureModeHelp(): string { return ({ 'pt-BR': 'A modalidade será fixada ao abrir a solicitação. Serpro ID aceita um único signatário.', en: 'The method is locked when the request opens. Serpro ID supports one signer.', es: 'La modalidad queda fijada al abrir la solicitud. Serpro ID admite un firmante.', 'ja-JP': '依頼を開始すると方式は固定されます。Serpro ID は署名者1名に対応します。' } as Record<string, string>)[this.i18n.locale()]; }
+  private signatureModeRequired(): string { return ({ 'pt-BR': 'Escolha uma modalidade.', en: 'Choose a method.', es: 'Elija una modalidad.', 'ja-JP': '方式を選択してください。' } as Record<string, string>)[this.i18n.locale()]; }
+  signatureModeFieldLabel(): string { return ({ 'pt-BR': 'Modalidade', en: 'Method', es: 'Modalidad', 'ja-JP': '方式' } as Record<string, string>)[this.i18n.locale()]; }
+  signatureModeLabel(mode: SignatureMode): string { return this.signatureModeOptions(true, true)[mode] ?? mode; }
   async generateLink(): Promise<void> { const request = this.selectedRequest(); if (!request) return; if (this.requestLink()) { const result = await Swal.fire({ icon: 'warning', title: this.i18n.text('rotateLinkTitle'), text: this.i18n.text('rotateLinkHelp'), showCancelButton: true, confirmButtonText: this.i18n.text('rotateLink'), cancelButtonText: this.i18n.text('cancel'), confirmButtonColor: '#b42318' }); if (!result.isConfirmed) return; } await this.run(async () => { const link = await firstValueFrom(this.api.post<SigningLink>(`/signature-requests/${request.id}/signing-link`, {})); await this.storeSigningLink(request.id, link.signing_url); }); }
   async copyInvite(): Promise<void> { await this.run(async () => { await navigator.clipboard.writeText(this.requestLink()); await Swal.fire({ icon: 'success', title: this.i18n.text('linkCopied'), toast: true, position: 'top-end', timer: 1500, showConfirmButton: false }); }); }
   openInvite(): void { const link = this.requestLink(); if (link) window.open(link, '_blank', 'noopener,noreferrer'); }

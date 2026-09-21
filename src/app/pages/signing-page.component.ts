@@ -73,14 +73,13 @@ import { LanguagePickerComponent } from '../components/language-picker.component
           </section> }
 
           @if (!administrativeView()) { <p class="notice">{{ i18n.text('evidenceNotice') }}</p> }
-          @if (timestampEnabled()) { <p class="notice">{{ timestampHelpLabel() }}</p> }
-          @if (serproidEligible()) { <p class="notice">{{ certificateHelpLabel() }}</p> }
+          @if (signatureMode() === 'serpro_timestamp') { <p class="notice">{{ timestampHelpLabel() }}</p> }
+          @if (signatureMode() === 'serproid') { <p class="notice">{{ certificateHelpLabel() }}</p> }
           @if (message()) { <p class="notice">{{ message() }}</p> }
 
           <div class="signing-actions">
-            @if (serproidEligible()) {
-              <button class="button" [disabled]="signing() || !placement()" (click)="sign()">{{ signing() ? i18n.text('signing') : i18n.text('signDocument') }}</button>
-              <button class="button secondary" [disabled]="signing() || !placement()" (click)="sign(true)">{{ certificateLabel() }}</button>
+            @if (signatureMode() === 'serproid' && !administrativeView()) {
+              <button class="button" [disabled]="signing() || !placement() || !serproidEligible()" (click)="sign(true)">{{ signing() ? i18n.text('signing') : certificateLabel() }}</button>
             } @else if (!administrativeView()) {
               <button class="button" [disabled]="signing() || completed() || !placement()" (click)="sign()">
                 {{ signing() ? i18n.text('signing') : completed() ? statusLabel() : i18n.text('signDocument') }}
@@ -101,7 +100,6 @@ export class SigningPageComponent implements OnInit {
   readonly loading = signal(true);
   readonly signing = signal(false);
   readonly serproidEnabled = signal(false);
-  readonly timestampEnabled = signal(false);
   readonly completed = signal(false);
   readonly message = signal('');
   readonly error = signal('');
@@ -130,10 +128,6 @@ export class SigningPageComponent implements OnInit {
         const serproid = await firstValueFrom(this.api.get<{ enabled: boolean }>('/signing/serproid/config'));
         this.serproidEnabled.set(serproid.enabled);
       } catch { this.serproidEnabled.set(false); }
-      try {
-        const timestamp = await firstValueFrom(this.api.get<{ enabled: boolean }>('/signing/timestamp/config'));
-        this.timestampEnabled.set(timestamp.enabled);
-      } catch { this.timestampEnabled.set(false); }
       if (context.viewer_mode === 'signer' && context.signer.status === 'pending') {
         const signer = await firstValueFrom(this.api.post<Signer>(`/signing/links/${this.token}/view`, {}));
         this.context.update(current => current ? { ...current, signer: {
@@ -257,7 +251,7 @@ export class SigningPageComponent implements OnInit {
   }
 
   certificateHelpLabel(): string {
-    return ({ 'pt-BR': 'Para documentos delicados, você também pode usar um certificado digital pelo Serpro ID.', en: 'For sensitive documents, you can also use a digital certificate through Serpro ID.', es: 'Para documentos delicados, también puede usar un certificado digital mediante Serpro ID.', 'ja-JP': '重要な文書では、Serpro ID 経由のデジタル証明書も使用できます。' } as Record<string, string>)[this.i18n.locale()] ?? 'You can also use a digital certificate through Serpro ID.';
+    return ({ 'pt-BR': 'Esta solicitação exige assinatura com certificado digital pelo Serpro ID.', en: 'This request requires a digital certificate signature through Serpro ID.', es: 'Esta solicitud exige una firma con certificado digital mediante Serpro ID.', 'ja-JP': 'この依頼には Serpro ID 経由のデジタル証明書署名が必要です。' } as Record<string, string>)[this.i18n.locale()] ?? 'This request requires a Serpro ID certificate signature.';
   }
 
   timestampHelpLabel(): string {
@@ -269,9 +263,10 @@ export class SigningPageComponent implements OnInit {
   }
 
   administrativeView(): boolean { return this.context()?.viewer_mode === 'administrator'; }
+  signatureMode(): 'evidence' | 'serpro_timestamp' | 'serproid' { return this.context()?.request.signature_mode ?? 'evidence'; }
   serproidEligible(): boolean {
     const context = this.context();
-    if (!context || !this.serproidEnabled() || this.administrativeView() || this.completed()) return false;
+    if (!context || context.request.signature_mode !== 'serproid' || !this.serproidEnabled() || this.administrativeView() || this.completed()) return false;
     const lastPendingSigner = context.request.signer_count - context.request.signed_count === 1;
     return lastPendingSigner && ['BR_CPF', 'BR_CNPJ'].includes(context.signer.identity_document_type ?? '');
   }
