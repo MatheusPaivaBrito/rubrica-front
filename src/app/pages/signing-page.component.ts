@@ -73,14 +73,17 @@ import { LanguagePickerComponent } from '../components/language-picker.component
           </section> }
 
           @if (!administrativeView()) { <p class="notice">{{ i18n.text('evidenceNotice') }}</p> }
+          @if (serproidEligible()) { <p class="notice">{{ certificateHelpLabel() }}</p> }
           @if (message()) { <p class="notice">{{ message() }}</p> }
 
           <div class="signing-actions">
-            @if (!administrativeView()) { <button class="button" [disabled]="signing() || completed() || !placement()" (click)="sign()">
-              {{ signing() ? i18n.text('signing') : completed() ? statusLabel() : i18n.text('signDocument') }}
-            </button> }
-            @if (serproidEnabled() && !administrativeView() && !completed() && context()!.request.signer_count - context()!.request.signed_count === 1 && (context()!.signer.identity_document_type === 'BR_CPF' || context()!.signer.identity_document_type === 'BR_CNPJ')) {
-              <button class="button secondary" [disabled]="signing() || !placement()" (click)="sign(true)">{{ certificateLabel() }}</button>
+            @if (serproidEligible()) {
+              <button class="button" [disabled]="signing() || !placement()" (click)="sign(true)">{{ signing() ? i18n.text('signing') : certificateLabel() }}</button>
+              <button class="button secondary" [disabled]="signing() || !placement()" (click)="sign()">{{ evidenceOnlyLabel() }}</button>
+            } @else if (!administrativeView()) {
+              <button class="button" [disabled]="signing() || completed() || !placement()" (click)="sign()">
+                {{ signing() ? i18n.text('signing') : completed() ? statusLabel() : i18n.text('signDocument') }}
+              </button>
             }
             <button class="button secondary" [disabled]="signing()" (click)="download()">{{ context()!.request.signed_count > 0 ? i18n.text('downloadSignedPdf') : i18n.text('downloadPdf') }}</button>
             @if (!administrativeView()) { <button class="button subtle" [disabled]="signing() || completed()" (click)="decline()">{{ i18n.text('decline') }}</button> }
@@ -241,11 +244,25 @@ export class SigningPageComponent implements OnInit {
     return ({ 'pt-BR': 'Assinar com certificado Serpro ID', en: 'Sign with Serpro ID certificate', es: 'Firmar con certificado Serpro ID', 'ja-JP': 'Serpro ID 証明書で署名' } as Record<string, string>)[this.i18n.locale()] ?? 'Sign with Serpro ID certificate';
   }
 
+  evidenceOnlyLabel(): string {
+    return ({ 'pt-BR': 'Assinar somente com evidências', en: 'Sign with evidence only', es: 'Firmar solo con evidencias', 'ja-JP': '証拠情報のみで署名' } as Record<string, string>)[this.i18n.locale()] ?? 'Sign with evidence only';
+  }
+
+  certificateHelpLabel(): string {
+    return ({ 'pt-BR': 'A opção principal usa seu certificado digital pelo Serpro ID. A assinatura somente com evidências não usa certificado digital.', en: 'The primary option uses your digital certificate through Serpro ID. Evidence-only signing does not use a digital certificate.', es: 'La opción principal usa su certificado digital mediante Serpro ID. La firma solo con evidencias no usa certificado digital.', 'ja-JP': '主なオプションは Serpro ID 経由でデジタル証明書を使用します。証拠情報のみの署名ではデジタル証明書を使用しません。' } as Record<string, string>)[this.i18n.locale()] ?? 'The primary option uses your digital certificate through Serpro ID.';
+  }
+
   certificateDeniedLabel(): string {
     return ({ 'pt-BR': 'A autorização do certificado foi recusada. O documento continua pendente.', en: 'Certificate authorization was declined. The document remains pending.', es: 'Se rechazó la autorización del certificado. El documento sigue pendiente.', 'ja-JP': '証明書の承認が拒否されました。文書は未署名のままです。' } as Record<string, string>)[this.i18n.locale()] ?? 'Certificate authorization was declined.';
   }
 
   administrativeView(): boolean { return this.context()?.viewer_mode === 'administrator'; }
+  serproidEligible(): boolean {
+    const context = this.context();
+    if (!context || !this.serproidEnabled() || this.administrativeView() || this.completed()) return false;
+    const lastPendingSigner = context.request.signer_count - context.request.signed_count === 1;
+    return lastPendingSigner && ['BR_CPF', 'BR_CNPJ'].includes(context.signer.identity_document_type ?? '');
+  }
   documentEndpoint(): string { return (this.context()?.request.signed_count ?? 0) > 0 ? 'signed-document' : 'document'; }
   pageHint(): string {
     if (this.administrativeView()) return this.i18n.text('readonlyAdmin');
