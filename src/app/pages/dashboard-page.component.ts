@@ -11,6 +11,7 @@ import { AuthService, tenantDashboardUrl } from '../core/auth.service';
 import { FeedbackService } from '../core/feedback.service';
 import { BillingAccount, DocumentItem, SignatureEvidence, SignatureRequest, Signer, SignerContact, SigningLink, TenantItem } from '../core/models';
 import { dateTime } from '../core/date-time';
+import { evidenceDownloadLabel, evidenceReportHtml } from '../core/evidence-report';
 import { I18nService, Locale } from '../core/i18n.service';
 import { SUPPORTED_LANGUAGES } from '../core/countries';
 import { LanguagePickerComponent } from '../components/language-picker.component';
@@ -199,7 +200,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
 
   constructor(readonly auth: AuthService, readonly i18n: I18nService, private readonly api: ApiService, private readonly route: ActivatedRoute, private readonly router: Router, private readonly feedback: FeedbackService) {}
 
-  async ngOnInit(): Promise<void> { const context = await this.auth.restore(); if (!context) { await this.router.navigate(['/login']); return; } try { if (context.mfa_setup_required && !this.auth.isMfaDeferredForSession()) { await this.router.navigate(['/security']); return; } const dashboardUrl = await this.auth.dashboardUrl(); const accountId = this.route.snapshot.paramMap.get('tenantAccountId'); const legacySlug = this.route.snapshot.paramMap.get('tenantSlug'); const routeSlug = accountId ? `account-${accountId}` : legacySlug; if (!routeSlug) { await this.router.navigateByUrl(dashboardUrl, { replaceUrl: true }); return; } if (!accountId && routeSlug.startsWith('account-')) { await this.router.navigateByUrl(tenantDashboardUrl(routeSlug), { replaceUrl: true }); return; } const tenants = await firstValueFrom(this.api.get<TenantItem[]>('/tenants')); const selectedTenant = tenants.find(tenant => tenant.slug === routeSlug); if (!selectedTenant) { await this.router.navigateByUrl(dashboardUrl, { replaceUrl: true }); return; } this.tenants.set(tenants); this.tenantSlug = selectedTenant.slug; this.tenantId = selectedTenant.id; if (this.canManage()) await Promise.all([this.reload(), this.loadBilling(tenants)]); } catch (error) { await this.feedback.error(error, this.i18n.text('dashboardLoadFailed')); } finally { this.loading.set(false); } }
+  async ngOnInit(): Promise<void> { const context = await this.auth.restore(); if (!context) { await this.router.navigate(['/login']); return; } try { if (context.mfa_setup_required) { await this.router.navigate(['/security']); return; } const dashboardUrl = await this.auth.dashboardUrl(); const accountId = this.route.snapshot.paramMap.get('tenantAccountId'); const legacySlug = this.route.snapshot.paramMap.get('tenantSlug'); const routeSlug = accountId ? `account-${accountId}` : legacySlug; if (!routeSlug) { await this.router.navigateByUrl(dashboardUrl, { replaceUrl: true }); return; } if (!accountId && routeSlug.startsWith('account-')) { await this.router.navigateByUrl(tenantDashboardUrl(routeSlug), { replaceUrl: true }); return; } const tenants = await firstValueFrom(this.api.get<TenantItem[]>('/tenants')); const selectedTenant = tenants.find(tenant => tenant.slug === routeSlug); if (!selectedTenant) { await this.router.navigateByUrl(dashboardUrl, { replaceUrl: true }); return; } this.tenants.set(tenants); this.tenantSlug = selectedTenant.slug; this.tenantId = selectedTenant.id; if (this.canManage()) await Promise.all([this.reload(), this.loadBilling(tenants)]); } catch (error) { await this.feedback.error(error, this.i18n.text('dashboardLoadFailed')); } finally { this.loading.set(false); } }
   ngOnDestroy(): void { this.unlockPageScroll(); }
   security(): Promise<boolean> { return this.router.navigate(['/security']); }
   billing(): Promise<boolean> { return this.router.navigate(['/plan'], { queryParams: { tenant: this.tenantId } }); }
@@ -296,7 +297,33 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   async generateLink(): Promise<void> { const request = this.selectedRequest(); if (!request) return; if (this.requestLink()) { const result = await Swal.fire({ icon: 'warning', title: this.i18n.text('rotateLinkTitle'), text: this.i18n.text('rotateLinkHelp'), showCancelButton: true, confirmButtonText: this.i18n.text('rotateLink'), cancelButtonText: this.i18n.text('cancel'), confirmButtonColor: '#b42318' }); if (!result.isConfirmed) return; } await this.run(async () => { const link = await firstValueFrom(this.api.post<SigningLink>(`/signature-requests/${request.id}/signing-link`, {})); await this.storeSigningLink(request.id, link.signing_url); }); }
   async copyInvite(): Promise<void> { await this.run(async () => { await navigator.clipboard.writeText(this.requestLink()); await Swal.fire({ icon: 'success', title: this.i18n.text('linkCopied'), toast: true, position: 'top-end', timer: 1500, showConfirmButton: false }); }); }
   openInvite(): void { const link = this.requestLink(); if (link) window.open(link, '_blank', 'noopener,noreferrer'); }
-  async showEvidence(): Promise<void> { const rows = this.requestEvidence(); if (!rows.length) { await this.feedback.warning(this.i18n.text('evidenceUnavailable')); return; } const escape = (value: unknown) => String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]!)); const html = rows.map(row => `<section style="text-align:left;margin-bottom:1rem"><strong>${escape(row.signer_name)}</strong><br><small>${escape(this.i18n.formatDate(row.signed_at))}</small><pre style="white-space:pre-wrap;max-height:260px;overflow:auto;background:#f4f6f8;padding:.75rem">${escape(JSON.stringify(row, null, 2))}</pre></section>`).join(''); await Swal.fire({ title: this.i18n.text('signatureEvidence'), html, width: 850, confirmButtonText: this.i18n.text('close'), confirmButtonColor: '#a82035' }); }
+  async showEvidence(): Promise<void> {
+    const rows = this.requestEvidence();
+    if (!rows.length) { await this.feedback.warning(this.i18n.text('evidenceUnavailable')); return; }
+    const result = await Swal.fire({
+      title: this.i18n.text('signatureEvidence'),
+      html: `<div style="max-height:60vh;overflow:auto;padding:.25rem">${evidenceReportHtml(rows, this.i18n.locale(), value => this.i18n.formatDate(value))}</div>`,
+      width: 850,
+      showDenyButton: true,
+      denyButtonText: evidenceDownloadLabel(this.i18n.locale()),
+      denyButtonColor: '#a82035',
+      confirmButtonText: this.i18n.text('close'),
+      confirmButtonColor: '#25344b',
+    });
+    if (result.isDenied) this.downloadEvidence(rows);
+  }
+
+  private downloadEvidence(rows: SignatureEvidence[]): void {
+    const requestId = this.selectedRequest()?.id ?? rows[0].request_id;
+    const url = URL.createObjectURL(new Blob([JSON.stringify(rows, null, 2)], { type: 'application/json' }));
+    const anchor = window.document.createElement('a');
+    anchor.href = url;
+    anchor.download = `rubrica-evidencias-${requestId}.json`;
+    window.document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }
   async logout(): Promise<void> { try { await this.auth.logout(); } catch (error) { await this.feedback.error(error, this.i18n.text('logoutFailed')); } finally { await this.router.navigate(['/login']); } }
 
   private updateRequest(request: SignatureRequest): void { this.requests.update((items) => items.map((item) => item.id === request.id ? request : item)); this.selectedRequest.set(request); }

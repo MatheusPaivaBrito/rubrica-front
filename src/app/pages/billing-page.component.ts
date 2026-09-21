@@ -16,7 +16,7 @@ import { LanguagePickerComponent } from '../components/language-picker.component
   template: `
     <main class="billing-shell">
       <header class="billing-top">
-        <a routerLink="/dashboard" class="brand">Rubrica<span>.</span></a>
+        <a routerLink="/dashboard" class="brand-logo" aria-label="Rubrica"><img src="icons/rubrica-mark-name.png" alt="Rubrica Signature" /></a>
         <div class="top-actions">
           <app-language-picker />
           <a routerLink="/dashboard" class="button secondary">{{ i18n.text('backDashboard') }}</a>

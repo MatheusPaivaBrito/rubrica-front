@@ -19,7 +19,6 @@ export interface AccessContext {
 
 interface LoginResponse { access_token: string; }
 export interface MfaChallenge { mfa_required: true; mfa_ticket: string; expires_in: number; }
-const mfaDeferredKey = 'rubrica_mfa_deferred_for_session';
 
 export function tenantDashboardUrl(slug: string): string {
   const accountPrefix = 'account-';
@@ -35,11 +34,10 @@ export class AuthService {
 
   constructor(private readonly http: HttpClient, private readonly i18n: I18nService) {}
 
-  async login(email: string, password: string): Promise<AccessContext | MfaChallenge> {
-    const response = await firstValueFrom(this.http.post<LoginResponse | MfaChallenge>('/auth/login', { email, password }));
+  async login(email: string, password: string, turnstileToken?: string): Promise<AccessContext | MfaChallenge> {
+    const response = await firstValueFrom(this.http.post<LoginResponse | MfaChallenge>('/auth/login', { email, password, turnstile_token: turnstileToken || null }));
     if ('mfa_required' in response) return response;
     setAccessToken(response.access_token);
-    sessionStorage.removeItem(mfaDeferredKey);
     return this.loadContext();
   }
 
@@ -49,7 +47,6 @@ export class AuthService {
       code,
     }));
     setAccessToken(response.access_token);
-    sessionStorage.removeItem(mfaDeferredKey);
     return this.loadContext();
   }
 
@@ -69,7 +66,6 @@ export class AuthService {
     try { await firstValueFrom(this.http.post('/auth/logout', {})); }
     finally {
       setAccessToken(null);
-      if (this.browser) sessionStorage.removeItem(mfaDeferredKey);
       this.context.set(null);
     }
   }
@@ -80,14 +76,6 @@ export class AuthService {
   }
 
   refreshContext(): Promise<AccessContext> { return this.loadContext(); }
-
-  deferMfaForSession(): void {
-    if (this.browser) sessionStorage.setItem(mfaDeferredKey, 'true');
-  }
-
-  isMfaDeferredForSession(): boolean {
-    return this.browser && sessionStorage.getItem(mfaDeferredKey) === 'true';
-  }
 
   async dashboardUrl(): Promise<string> {
     try {

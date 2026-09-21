@@ -79,6 +79,9 @@ import { LanguagePickerComponent } from '../components/language-picker.component
             @if (!administrativeView()) { <button class="button" [disabled]="signing() || completed() || !placement()" (click)="sign()">
               {{ signing() ? i18n.text('signing') : completed() ? statusLabel() : i18n.text('signDocument') }}
             </button> }
+            @if (serproidEnabled() && !administrativeView() && !completed() && context()!.request.signer_count - context()!.request.signed_count === 1 && (context()!.signer.identity_document_type === 'BR_CPF' || context()!.signer.identity_document_type === 'BR_CNPJ')) {
+              <button class="button secondary" [disabled]="signing() || !placement()" (click)="sign(true)">{{ certificateLabel() }}</button>
+            }
             <button class="button secondary" [disabled]="signing()" (click)="download()">{{ context()!.request.signed_count > 0 ? i18n.text('downloadSignedPdf') : i18n.text('downloadPdf') }}</button>
             @if (!administrativeView()) { <button class="button subtle" [disabled]="signing() || completed()" (click)="decline()">{{ i18n.text('decline') }}</button> }
             @if (administrativeView()) { <button class="button" (click)="switchAccount()">{{ i18n.text('signInAsSigner') }}</button><button class="button subtle" (click)="goToDashboard()">{{ i18n.text('backDashboard') }}</button> }
@@ -93,6 +96,7 @@ export class SigningPageComponent implements OnInit {
   readonly placement = signal<StampPosition | null>(null);
   readonly loading = signal(true);
   readonly signing = signal(false);
+  readonly serproidEnabled = signal(false);
   readonly completed = signal(false);
   readonly message = signal('');
   readonly error = signal('');
@@ -114,6 +118,13 @@ export class SigningPageComponent implements OnInit {
     try {
       const context = await firstValueFrom(this.api.get<SigningContext>(`/signing/links/${this.token}`));
       this.applyContext(context);
+      const certificateOutcome = this.route.snapshot.queryParamMap.get('serproid');
+      if (certificateOutcome === 'success') this.message.set(this.i18n.text('signedSuccess'));
+      if (certificateOutcome === 'denied') this.message.set(this.certificateDeniedLabel());
+      try {
+        const serproid = await firstValueFrom(this.api.get<{ enabled: boolean }>('/signing/serproid/config'));
+        this.serproidEnabled.set(serproid.enabled);
+      } catch { this.serproidEnabled.set(false); }
       if (context.viewer_mode === 'signer' && context.signer.status === 'pending') {
         const signer = await firstValueFrom(this.api.post<Signer>(`/signing/links/${this.token}/view`, {}));
         this.context.update(current => current ? { ...current, signer: { ...current.signer, ...signer } } : current);
@@ -155,7 +166,7 @@ export class SigningPageComponent implements OnInit {
     }
   }
 
-  async sign(): Promise<void> {
+  async sign(useCertificate = false): Promise<void> {
     const stamp = this.placement();
     if (!stamp) {
       await this.feedback.warning(this.i18n.text('positionHelp'), this.i18n.text('positionSignature'));
@@ -186,7 +197,19 @@ export class SigningPageComponent implements OnInit {
       screen_width: window.screen?.width || null,
       screen_height: window.screen?.height || null,
     };
-    await this.answer('/sign', { consent: true, consent_version: 'rubrica-evidence-v1', stamp: { ...stamp, locale: this.i18n.locale(), timezone: dateTime.timezone() }, client, geolocation });
+    const command = { consent: true, consent_version: 'rubrica-evidence-v1', stamp: { ...stamp, locale: this.i18n.locale(), timezone: dateTime.timezone() }, client, geolocation };
+    if (useCertificate) {
+      this.signing.set(true);
+      try {
+        const result = await firstValueFrom(this.api.post<{ authorization_url: string }>(`/signing/links/${this.token}/serproid/start`, command));
+        window.location.assign(result.authorization_url);
+      } catch (error) {
+        this.signing.set(false);
+        await this.feedback.error(error, this.i18n.text('signFailed'));
+      }
+      return;
+    }
+    await this.answer('/sign', command);
   }
 
   async decline(): Promise<void> {
@@ -212,6 +235,14 @@ export class SigningPageComponent implements OnInit {
 
   statusLabel(): string {
     return this.context()?.signer.status === 'declined' ? this.i18n.text('declinedSignature') : this.i18n.text('signedDocument');
+  }
+
+  certificateLabel(): string {
+    return ({ 'pt-BR': 'Assinar com certificado Serpro ID', en: 'Sign with Serpro ID certificate', es: 'Firmar con certificado Serpro ID', 'ja-JP': 'Serpro ID 証明書で署名' } as Record<string, string>)[this.i18n.locale()] ?? 'Sign with Serpro ID certificate';
+  }
+
+  certificateDeniedLabel(): string {
+    return ({ 'pt-BR': 'A autorização do certificado foi recusada. O documento continua pendente.', en: 'Certificate authorization was declined. The document remains pending.', es: 'Se rechazó la autorización del certificado. El documento sigue pendiente.', 'ja-JP': '証明書の承認が拒否されました。文書は未署名のままです。' } as Record<string, string>)[this.i18n.locale()] ?? 'Certificate authorization was declined.';
   }
 
   administrativeView(): boolean { return this.context()?.viewer_mode === 'administrator'; }

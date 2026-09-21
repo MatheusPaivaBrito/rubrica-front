@@ -22,14 +22,14 @@ interface RecoveryCodes { recovery_codes: string[]; }
   imports: [FormsModule, LanguagePickerComponent, OneTimeCodeComponent, PasswordFieldComponent],
   template: `
     <main class="settings-shell">
-      <header class="settings-top"><button type="button" class="brand brand-button" (click)="returnToDashboard()">Rubrica<span>.</span></button><div class="button-row"><app-language-picker /><button class="button secondary" (click)="returnToDashboard()">{{ i18n.text('backDashboard') }}</button><button class="button secondary" (click)="logout()">{{ i18n.text('logout') }}</button></div></header>
+      <header class="settings-top"><button type="button" class="brand-logo brand-button" aria-label="Rubrica" (click)="returnToDashboard()"><img src="icons/rubrica-mark-name.png" alt="Rubrica Signature" /></button><div class="button-row"><app-language-picker />@if (status() && !status()?.setup_required) { <button class="button secondary" (click)="returnToDashboard()">{{ i18n.text('backDashboard') }}</button> }<button class="button secondary" (click)="logout()">{{ i18n.text('logout') }}</button></div></header>
       <section class="settings-card card">
         <p class="eyebrow">{{ i18n.text('security') }}</p><h1>Microsoft Authenticator</h1>
         <p class="muted">{{ i18n.text('securityHelp') }}</p>
         @if (loading()) { <p class="notice">{{ i18n.text('loadingSecurity') }}</p> }
         @else if (!status()?.enabled && !setup()) {
           @if (status()?.setup_required) { <p class="notice warning">{{ i18n.text('mfaRequired') }}</p> }
-          <div class="button-row"><button class="button" (click)="startSetup()">{{ i18n.text('configureAuthenticator') }}</button>@if (status()?.setup_required) { <button class="button secondary" (click)="deferMfa()">{{ i18n.text('later') }}</button> }</div>
+          <div class="button-row"><button class="button" (click)="startSetup()">{{ i18n.text('configureAuthenticator') }}</button></div>
         } @else if (setup()) {
           <p class="notice">{{ i18n.text('mfaSetupFlowHelp') }}</p><div class="setup-grid"><div class="qr-panel"><img [src]="qrCode()" alt="Microsoft Authenticator QR Code" /></div><div><h2>{{ i18n.text('scanQr') }}</h2><p>{{ i18n.text('scanQrHelp') }}</p><p class="secret"><span>{{ i18n.text('manualKey') }}</span><code>{{ setup()!.secret }}</code><small>{{ i18n.text('manualKeyHelp') }}</small></p><h2>{{ i18n.text('confirmCode') }}</h2><form class="form" (ngSubmit)="confirm()"><span class="field-label">{{ i18n.text('sixDigitCode') }}</span><app-one-time-code [(value)]="code" [label]="i18n.text('sixDigitCode')" (completed)="completeSetupCode($event)" /><button class="button" [disabled]="confirming() || code.length !== 6">{{ i18n.text('activateMfa') }}</button></form></div></div>
         } @else {
@@ -50,21 +50,13 @@ export class SecurityPageComponent implements OnInit {
   constructor(private readonly api: ApiService, private readonly auth: AuthService, private readonly route: ActivatedRoute, private readonly router: Router, private readonly feedback: FeedbackService, readonly i18n: I18nService) {}
   async ngOnInit() { if (!await this.auth.restore()) { await this.router.navigate(['/login']); return; } await this.loadStatus(); this.loading.set(false); }
   async startSetup() { try { const setup = await firstValueFrom(this.api.post<MfaSetup>('/auth/mfa/setup', {})); this.setup.set(setup); this.qrCode.set(await QRCode.toDataURL(setup.provisioning_uri, { width: 320, margin: 1 })); } catch (error) { await this.feedback.error(error); } }
-  async deferMfa() {
-    try {
-      await firstValueFrom(this.api.post('/auth/mfa/defer', {}));
-      this.auth.deferMfaForSession();
-      await this.auth.refreshContext();
-      await this.navigateAfterSecurity();
-    } catch (error) { await this.feedback.error(error); }
-  }
   async confirm() { if (this.confirming() || this.code.length !== 6) return; this.confirming.set(true); try { const result = await firstValueFrom(this.api.post<RecoveryCodes>('/auth/mfa/confirm', { code: this.code })); this.recoveryCodes.set(result.recovery_codes); this.setup.set(null); this.code=''; await this.auth.refreshContext(); await this.loadStatus(); await Swal.fire({ icon: 'success', title: this.i18n.text('mfaEnabled'), html: `<p>${this.i18n.text('mfaEnabledFlowHelp')}</p><p><strong>${this.i18n.text('saveCodes')}</strong><br>${this.i18n.text('saveCodesHelp')}</p>`, confirmButtonText: this.i18n.text('reviewRecoveryCodes'), confirmButtonColor: '#a82035' }); } catch (error) { await this.feedback.error(error); } finally { this.confirming.set(false); } }
   completeSetupCode(code: string): void { this.code = code; void this.confirm(); }
   async regenerate() { try { const result = await firstValueFrom(this.api.post<RecoveryCodes>('/auth/mfa/recovery-codes', { password: this.password, code: this.code })); this.recoveryCodes.set(result.recovery_codes); this.password=''; this.code=''; await this.loadStatus(); } catch (error) { await this.feedback.error(error); } }
   async disable() { try { await firstValueFrom(this.api.deleteWithBody('/auth/mfa', { password: this.password, code: this.code })); this.password=''; this.code=''; this.recoveryCodes.set([]); await this.auth.refreshContext(); await this.loadStatus(); await this.feedback.warning(this.i18n.text('mfaDisabled')); } catch (error) { await this.feedback.error(error); } }
   downloadCodes() { const blob=new Blob([this.recoveryCodes().join('\n')+'\n'],{type:'text/plain'}); const url=URL.createObjectURL(blob); const link=document.createElement('a'); link.href=url; link.download='rubrica-recovery-codes.txt'; link.click(); URL.revokeObjectURL(url); }
-  async returnToDashboard() { if (this.status()?.setup_required && !this.status()?.enabled) { await this.deferMfa(); return; } await this.navigateAfterSecurity(); }
+  async returnToDashboard() { if (!this.status() || (this.status()?.setup_required && !this.status()?.enabled)) return; await this.navigateAfterSecurity(); }
   async logout() { await this.auth.logout(); await this.router.navigate(['/login']); }
   private async loadStatus() { this.status.set(await firstValueFrom(this.api.get<MfaStatus>('/auth/mfa/status'))); }
-  private async navigateAfterSecurity(): Promise<void> { const candidate = this.route.snapshot.queryParamMap.get('returnUrl'); const destination = candidate?.startsWith('/tenant/') && candidate.endsWith('/dashboard') ? candidate : await this.auth.dashboardUrl(); await this.router.navigateByUrl(destination, { replaceUrl: true }); }
+  private async navigateAfterSecurity(): Promise<void> { const candidate = this.route.snapshot.queryParamMap.get('returnUrl'); const safeReturn = candidate === '/plan' || candidate === '/dashboard' || Boolean(candidate && (/^\/tenant\/[a-zA-Z0-9/_-]+\/dashboard$/.test(candidate) || /^\/signing\/[a-zA-Z0-9_-]+$/.test(candidate))); const destination = safeReturn ? candidate! : await this.auth.dashboardUrl(); await this.router.navigateByUrl(destination, { replaceUrl: true }); }
 }

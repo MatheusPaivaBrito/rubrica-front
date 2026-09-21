@@ -18,7 +18,7 @@ const copy = {
   template: `
     <main class="landing">
       <nav class="landing-nav" aria-label="Principal">
-        <a class="landing-brand" routerLink="/"><img src="icons/rubrica-mark.png" alt="" /><strong>Rubrica</strong></a>
+        <a class="landing-brand" routerLink="/" aria-label="Rubrica"><img src="icons/rubrica-mark-name.png" alt="Rubrica Signature" /></a>
         <div class="landing-links"><a href="#produto">{{ t().navProduct }}</a><a href="#seguranca">{{ t().navSecurity }}</a><a href="#preco">{{ t().navPrice }}</a></div>
         <div class="landing-actions"><app-language-picker /><a class="text-link" routerLink="/login">{{ t().enter }}</a><a class="landing-button small" routerLink="/register">{{ t().start }}</a></div>
       </nav>
@@ -40,7 +40,7 @@ const copy = {
         </div>
       </section>
       <section class="final-cta"><img src="icons/rubrica-mark.png" alt="" /><h2>{{ t().cta }}</h2><a class="landing-button" routerLink="/register">{{ t().primary }}</a></section>
-      <footer class="landing-footer"><a class="landing-brand" routerLink="/"><img src="icons/rubrica-mark.png" alt="" /><strong>Rubrica</strong></a><nav><a routerLink="/contact">{{ t().contact }}</a><a routerLink="/privacy">{{ t().privacy }}</a><a routerLink="/terms">{{ t().terms }}</a><a routerLink="/data-deletion">{{ t().deletion }}</a></nav><p>© {{ year }} {{ t().rights }}</p></footer>
+      <footer class="landing-footer"><a class="landing-brand" routerLink="/" aria-label="Rubrica"><img src="icons/rubrica-mark-name.png" alt="Rubrica Signature" /></a><nav><a routerLink="/contact">{{ t().contact }}</a><a routerLink="/privacy">{{ t().privacy }}</a><a routerLink="/terms">{{ t().terms }}</a><a routerLink="/data-deletion">{{ t().deletion }}</a></nav><p>© {{ year }} {{ t().rights }}</p></footer>
     </main>
   `,
 })
