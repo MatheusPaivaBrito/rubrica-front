@@ -130,7 +130,13 @@ export class SigningPageComponent implements OnInit {
       } catch { this.serproidEnabled.set(false); }
       if (context.viewer_mode === 'signer' && context.signer.status === 'pending') {
         const signer = await firstValueFrom(this.api.post<Signer>(`/signing/links/${this.token}/view`, {}));
-        this.context.update(current => current ? { ...current, signer: { ...current.signer, ...signer } } : current);
+        this.context.update(current => current ? { ...current, signer: {
+          ...current.signer,
+          ...signer,
+          identity_document_type: signer.identity_document_type ?? current.signer.identity_document_type,
+          identity_document_country: signer.identity_document_country ?? current.signer.identity_document_country,
+          identity_document_masked: signer.identity_document_masked ?? current.signer.identity_document_masked,
+        } } : current);
       }
     } catch (error) {
       this.error.set(this.feedback.message(error, this.i18n.text('invalidInvite')));
