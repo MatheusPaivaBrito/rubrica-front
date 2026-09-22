@@ -55,8 +55,8 @@ import { LanguagePickerComponent } from '../components/language-picker.component
             </div>
             @if (canSubscribe()) {
               <div class="plans">
-                <button class="plan-option" [class.selected]="selectedPlan() === 'rubrica_base'" (click)="selectedPlan.set('rubrica_base')"><strong>{{ i18n.text('basePlan') }}</strong><span>{{ i18n.text('priceAtCheckout', { currency: selectedTenantCurrency() }) }}</span><span>{{ i18n.text('basePlanHelp') }}</span></button>
-                <button class="plan-option" [class.selected]="selectedPlan() === 'rubrica_intermediate'" (click)="selectedPlan.set('rubrica_intermediate')"><strong>{{ i18n.text('intermediatePlan') }}</strong><span>{{ i18n.text('priceAtCheckout', { currency: selectedTenantCurrency() }) }}</span><span>{{ i18n.text('intermediatePlanHelp') }}</span></button>
+                <button class="plan-option" [class.selected]="selectedPlan() === 'rubrica_base'" (click)="selectedPlan.set('rubrica_base')"><strong>{{ i18n.text('basePlan') }}</strong><span>{{ planPrice('rubrica_base') }}</span><span>{{ i18n.text('basePlanHelp') }}</span></button>
+                <button class="plan-option" [class.selected]="selectedPlan() === 'rubrica_intermediate'" (click)="selectedPlan.set('rubrica_intermediate')"><strong>{{ i18n.text('intermediatePlan') }}</strong><span>{{ planPrice('rubrica_intermediate') }}</span><span>{{ i18n.text('intermediatePlanHelp') }}</span></button>
               </div>
             }
             <div class="actions">
@@ -138,6 +138,7 @@ export class BillingPageComponent implements OnInit {
   canSubscribe(): boolean { const account = this.account(); return Boolean(account && !account.complimentary_lifetime && this.fileLimit(account) === null && (!account.provider_subscription_id || ['cancelled', 'not_configured'].includes(account.status))); }
   showPortalAction(): boolean { const account = this.account(); return Boolean(account && !account.complimentary_lifetime && (account.provider_customer_id || account.status !== 'not_configured')); }
   portalActionLabel(): string { const account = this.account(); if (account?.cancel_at_period_end) return this.i18n.text('reactivateSubscription'); if (account?.current_product_code === 'rubrica_base' && this.fileLimit(account) !== null) return this.i18n.text('upgradePlan'); if (account?.current_product_code === 'rubrica_intermediate' && this.fileLimit(account) !== null) return this.i18n.text('changePlan'); return this.i18n.text('manageSubscription'); }
+  planPrice(plan: 'rubrica_base' | 'rubrica_intermediate'): string { if (this.selectedTenantCurrency() !== 'BRL') return this.i18n.text('priceAtCheckout', { currency: this.selectedTenantCurrency() }); return plan === 'rubrica_base' ? 'R$ 29,90/mês' : 'R$ 69,90/mês'; }
 
   async checkout(): Promise<void> { this.submitting.set(true); try { const result = await firstValueFrom(this.api.post<BillingCheckout>(`/billing/tenants/${this.tenantId()}/checkout`, { product_code: this.selectedPlan() })); this.checkoutUrl.set(result.checkout_url); this.checkoutQrCode.set(await QRCode.toDataURL(result.checkout_url, { width: 260, margin: 2 })); } catch (error) { await this.feedback.error(error); } finally { this.submitting.set(false); } }
   async portal(): Promise<void> { await this.redirect<BillingPortal>(`/billing/tenants/${this.tenantId()}/portal`, 'portal_url'); }
@@ -145,7 +146,7 @@ export class BillingPageComponent implements OnInit {
 
   private async loadAccount(): Promise<void> { const account = await firstValueFrom(this.api.get<BillingAccount>(`/billing/tenants/${this.tenantId()}/account`)); this.account.set(account); if (account.current_product_code === 'rubrica_base' || account.current_product_code === 'rubrica_intermediate') this.selectedPlan.set(account.current_product_code); }
   private async leaveComplimentaryBilling(): Promise<boolean> { if (!this.account()?.complimentary_lifetime) return false; await this.router.navigateByUrl(await this.auth.dashboardUrl(), { replaceUrl: true }); return true; }
-  private fileLimit(account: BillingAccount): number | null { if (typeof account.files_limit === 'number') return account.files_limit; if (!['active', 'past_due'].includes(account.status)) return null; if (account.current_product_code === 'rubrica_base') return 25; if (account.current_product_code === 'rubrica_intermediate') return 30; return null; }
+  private fileLimit(account: BillingAccount): number | null { if (typeof account.files_limit === 'number') return account.files_limit; if (!['active', 'past_due'].includes(account.status)) return null; if (account.current_product_code === 'rubrica_base') return 20; if (account.current_product_code === 'rubrica_intermediate') return 80; return null; }
   private filesUsed(account: BillingAccount): number { return account.files_uploaded_in_period ?? 0; }
   private async redirect<T extends BillingCheckout | BillingPortal>(path: string, key: keyof T): Promise<void> {
     this.submitting.set(true);
