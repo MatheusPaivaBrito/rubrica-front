@@ -241,7 +241,7 @@ input:focus, select:focus { outline: 3px solid rgba(168, 32, 53, .16); border-co
 .language-picker summary::-webkit-details-marker { display: none; }
 .language-picker summary:hover { border-color: #d9b8b5; background: #fff6f3; }
 .language-picker summary:focus-visible { outline: 3px solid rgba(168, 32, 53, .13); border-color: #b84a59; }
-.language-flag { display: inline-block; width: 1.5rem; font-size: 1.2rem; line-height: 1; text-align: center; }
+.language-flag { display: block; flex: 0 0 auto; width: 1.5rem; height: 1.05rem; border-radius: 2px; object-fit: cover; box-shadow: 0 0 0 1px rgba(65, 32, 38, .14); }
 .language-picker summary > span:not(.language-flag) { flex: 1; }
 .picker-chevron { color: #9b6870; font-size: .72rem; transition: transform .18s ease; }
 .language-picker[open] .picker-chevron { transform: rotate(180deg); }
@@ -286,7 +286,8 @@ input:focus, select:focus { outline: 3px solid rgba(168, 32, 53, .16); border-co
 .document-type-picker { margin-top: -.55rem; }
 .document-type-picker .country-picker-mark, .document-type-picker .country-option-mark { color: #9f2437; font-size: 1.05rem; }
 .signer-language-field { display: grid; gap: .45rem; }
-.signer-language-picker { margin-top: 0; }
+.signer-language-picker { display: block; width: 100%; margin-top: 0; }
+.signer-language-picker .language-picker, .signer-language-picker .language-picker summary { width: 100%; }
 .signer-language-options { z-index: 30; }
 .account-back { margin: 1.2rem 0 0; text-align: center; }
 .account-back a { color: #8f1d2c; font-weight: 750; text-decoration: none; }

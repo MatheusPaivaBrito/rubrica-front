@@ -33,11 +33,11 @@ import { PasswordFieldComponent } from '../components/password-field.component';
         }
         <button class="button" [disabled]="loading() || (mfaTicket() ? code.length !== 6 : form.invalid || verificationLoading() || verificationError() || (verificationRequired() && !turnstileToken()))">{{ loading() ? '…' : i18n.text(mfaTicket() ? 'confirmAuthenticatorCode' : 'enter') }}</button>
       </form>
-      <div class="auth-actions">
-        <a class="auth-action" routerLink="/forgot-password" [queryParams]="returnUrl ? { returnUrl } : undefined"><i class="bi bi-key"></i><span>{{ i18n.text('forgotPassword') }}</span></a>
-        <a class="auth-action primary" routerLink="/register" [queryParams]="returnUrl ? { returnUrl } : undefined"><i class="bi bi-person-plus"></i><span>{{ i18n.text('createAccount') }}</span><i class="bi bi-arrow-right"></i></a>
-      </div>
       @if (!mfaTicket()) {
+        <div class="auth-actions">
+          <a class="auth-action" routerLink="/forgot-password" [queryParams]="returnUrl ? { returnUrl } : undefined"><i class="bi bi-key"></i><span>{{ i18n.text('forgotPassword') }}</span></a>
+          <a class="auth-action primary" routerLink="/register" [queryParams]="returnUrl ? { returnUrl } : undefined"><i class="bi bi-person-plus"></i><span>{{ i18n.text('createAccount') }}</span><i class="bi bi-arrow-right"></i></a>
+        </div>
         <div #turnstileContainer class="login-turnstile"></div>
         @if (verificationError()) { <div class="notice warning" role="alert">{{ i18n.text('serviceUnavailable') }} <button type="button" class="button secondary compact" (click)="retryVerification()">{{ i18n.text('retryVerification') }}</button></div> }
       }
