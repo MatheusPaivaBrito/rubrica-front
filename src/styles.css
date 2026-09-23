@@ -136,7 +136,7 @@ button { cursor: pointer; }
   .landing-nav, .landing-hero, .trust-band, .steps, .feature-grid, .pricing-section, .final-cta, .landing-footer, .legal-nav, .legal-document { width: min(100% - 2rem, 1180px); }
   .landing-nav { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .55rem .75rem; min-height: 70px; padding-block: .65rem; }
   .landing-brand { grid-column: 1; grid-row: 1; }
-  .landing-brand img { width: 120px; height: 48px; }
+  .landing-brand img { width: 150px; height: 60px; }
   .landing-actions { display: contents; }
   .landing-actions app-language-picker { grid-column: 1; grid-row: 2; min-width: 0; }
   .landing-actions .language-picker summary { width: 100%; min-width: 0; }
