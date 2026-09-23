@@ -20,8 +20,8 @@ import { PasswordFieldComponent } from '../components/password-field.component';
     <main class="login-layout"><section class="card auth-card">
       <img class="auth-logo" src="icons/rubrica-mark-name.png" alt="Rubrica Signature" />
       <div class="auth-language"><app-language-picker /></div>
-      <h1>{{ i18n.text('login') }}</h1>
-      <p class="muted">{{ i18n.text('loginHelp') }}</p>
+      <div class="auth-heading"><h1>{{ i18n.text('login') }}</h1>
+      <p class="muted">{{ i18n.text('loginHelp') }}</p></div>
       <form class="form" (ngSubmit)="submit()" #form="ngForm">
         @if (!mfaTicket()) {
           <label>{{ i18n.text('email') }} <input name="email" type="email" [(ngModel)]="email" required autocomplete="email" /></label>
@@ -44,8 +44,10 @@ import { PasswordFieldComponent } from '../components/password-field.component';
     </section></main>
   `,
   styles: [`
-    .auth-logo{display:block;width:150px;height:60px;margin:0 0 .75rem;object-fit:contain;object-position:left center}
-    .login-turnstile{display:flex;min-height:0;margin:1rem 0 0;justify-content:center}
+    .auth-logo{display:block;width:175px;height:70px;margin:0 auto 1rem;object-fit:contain;object-position:center}
+    .auth-heading{margin-top:1.35rem}
+    .auth-heading h1{margin-bottom:.55rem}
+    .login-turnstile{display:flex;width:100%;min-height:0;margin:1rem 0 0;justify-content:center}
   `],
 })
 export class LoginPageComponent implements AfterViewInit, OnDestroy {
@@ -96,6 +98,9 @@ export class LoginPageComponent implements AfterViewInit, OnDestroy {
       this.widgetId = (window as TurnstileWindow).turnstile!.render(this.turnstileContainer.nativeElement, {
         sitekey: siteKey,
         action: 'login',
+        theme: 'light',
+        appearance: 'interaction-only',
+        size: 'flexible',
         callback: token => this.zone.run(() => this.turnstileToken.set(token)),
         'expired-callback': () => this.zone.run(() => this.turnstileToken.set('')),
         'error-callback': () => this.zone.run(() => { this.turnstileToken.set(''); this.verificationError.set(true); }),
@@ -152,7 +157,7 @@ export class LoginPageComponent implements AfterViewInit, OnDestroy {
 
 interface TurnstileWindow extends Window {
   turnstile?: {
-    render: (element: HTMLElement, options: { sitekey: string; action: string; callback: (token: string) => void; 'expired-callback': () => void; 'error-callback': () => void }) => string;
+    render: (element: HTMLElement, options: { sitekey: string; action: string; theme: 'light'; appearance: 'interaction-only'; size: 'flexible'; callback: (token: string) => void; 'expired-callback': () => void; 'error-callback': () => void }) => string;
     reset: (id: string) => void;
     remove: (id: string) => void;
   };
