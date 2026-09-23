@@ -18,7 +18,7 @@ import { PasswordFieldComponent } from '../components/password-field.component';
   imports: [FormsModule, RouterLink, LanguagePickerComponent, OneTimeCodeComponent, PasswordFieldComponent],
   template: `
     <main class="login-layout"><section class="card auth-card">
-      <img class="auth-logo" src="icons/rubrica-mark-name.png" alt="Rubrica Signature" />
+      <img class="auth-logo" src="icons/rubrica-brand/source/rubrica-lockup-primary.png" alt="Rubrica Signature" />
       <div class="auth-language"><app-language-picker /></div>
       <div class="auth-heading"><h1>{{ i18n.text('login') }}</h1>
       <p class="muted">{{ i18n.text('loginHelp') }}</p></div>

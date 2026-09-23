@@ -162,7 +162,6 @@ button { cursor: pointer; }
 .brand span { color: #f2a39f; }
 .brand-logo { display: inline-flex; align-items: center; line-height: 0; }
 .brand-logo img { display: block; width: 150px; height: 60px; object-fit: contain; }
-.dashboard-brand img { filter: brightness(0) invert(1); }
 .container { width: min(1180px, calc(100% - 3rem)); margin: 0 auto; padding: 2rem 0 4rem; }
 .grid { display: grid; gap: 1.25rem; }
 .dashboard-grid { grid-template-columns: minmax(0, 1.35fr) minmax(300px, .65fr); }

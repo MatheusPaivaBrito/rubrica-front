@@ -56,7 +56,7 @@ const shared: Record<Locale, UiCopy> = {
   standalone: true,
   imports: [RouterLink, FormsModule, LanguagePickerComponent],
   template: `
-    <main class="legal-shell"><nav class="legal-nav"><a class="landing-brand" routerLink="/" aria-label="Rubrica"><img src="icons/rubrica-mark-name.png" alt="Rubrica Signature" /></a><div class="landing-actions"><app-language-picker /><a class="landing-button small" routerLink="/login">{{ ui().signIn }}</a></div></nav>
+    <main class="legal-shell"><nav class="legal-nav"><a class="landing-brand" routerLink="/" aria-label="Rubrica"><img src="icons/rubrica-brand/source/rubrica-lockup-primary.png" alt="Rubrica Signature" /></a><div class="landing-actions"><app-language-picker /><a class="landing-button small" routerLink="/login">{{ ui().signIn }}</a></div></nav>
     <article class="legal-document"><a routerLink="/" class="back-link"><i class="bi bi-arrow-left"></i> {{ ui().back }}</a><span class="landing-eyebrow">{{ page().eyebrow }}</span><h1>{{ page().title }}</h1><p class="legal-intro">{{ page().intro }}</p>
     @for (section of page().sections; track section[0]) { <section><h2>{{ section[0] }}</h2><p>{{ section[1] }}</p></section> }
     @if (hasForm) {

@@ -18,17 +18,17 @@ const copy = {
   template: `
     <main class="landing">
       <nav class="landing-nav" aria-label="Principal">
-        <a class="landing-brand" routerLink="/" aria-label="Rubrica"><img src="icons/rubrica-mark-name.png" alt="Rubrica Signature" /></a>
+        <a class="landing-brand" routerLink="/" aria-label="Rubrica"><img src="icons/rubrica-brand/source/rubrica-lockup-primary.png" alt="Rubrica Signature" /></a>
         <div class="landing-links"><a href="#produto">{{ t().navProduct }}</a><a href="#seguranca">{{ t().navSecurity }}</a><a href="#preco">{{ t().navPrice }}</a></div>
         <div class="landing-actions"><app-language-picker /><a class="text-link" routerLink="/login">{{ t().enter }}</a><a class="landing-button small" routerLink="/register">{{ t().start }}</a></div>
       </nav>
 
       <section class="landing-hero" id="produto">
         <div class="hero-copy"><span class="landing-eyebrow">{{ t().eyebrow }}</span><h1>{{ t().title }}</h1><p>{{ t().lead }}</p><div class="hero-actions"><a class="landing-button" routerLink="/register">{{ t().primary }} <i class="bi bi-arrow-right"></i></a><a class="landing-button outline" href="#como-funciona">{{ t().secondary }}</a></div><div class="micro-trust"><span><i class="bi bi-check-circle-fill"></i> 5 grátis</span><span><i class="bi bi-check-circle-fill"></i> Sem cartão</span><span><i class="bi bi-check-circle-fill"></i> PT · EN · ES · 日本語</span></div></div>
-        <div class="hero-visual" aria-label="Fluxo de assinatura"><div class="document-demo"><div class="demo-top"><span></span><span></span><span></span></div><div class="demo-line wide"></div><div class="demo-line"></div><div class="demo-line short"></div><div class="demo-stamp"><img src="icons/rubrica-mark.png" alt="" /><div><small>ASSINADO POR</small><strong>Matheus</strong><span>Hash verificado · 14:32</span></div></div></div><div class="floating-proof"><i class="bi bi-shield-check"></i><span><strong>Documento íntegro</strong><small>SHA-256 verificado</small></span></div></div>
+        <div class="hero-visual" aria-label="Fluxo de assinatura"><div class="document-demo"><div class="demo-top"><span></span><span></span><span></span></div><div class="demo-line wide"></div><div class="demo-line"></div><div class="demo-line short"></div><div class="demo-stamp"><img src="icons/rubrica-brand/source/rubrica-mark-primary.png" alt="" /><div><small>ASSINADO POR</small><strong>Matheus</strong><span>Hash verificado · 14:32</span></div></div></div><div class="floating-proof"><i class="bi bi-shield-check"></i><span><strong>Documento íntegro</strong><small>SHA-256 verificado</small></span></div></div>
       </section>
 
-      <section class="trust-band" id="seguranca"><img src="icons/rubrica-mark.png" alt="" /><div><h2>{{ t().trust }}</h2><p>{{ t().trustCopy }}</p></div></section>
+      <section class="trust-band" id="seguranca"><img src="icons/rubrica-brand/source/rubrica-mark-primary.png" alt="" /><div><h2>{{ t().trust }}</h2><p>{{ t().trustCopy }}</p></div></section>
       <section class="steps" id="como-funciona"><article><b>01</b><i class="bi bi-file-earmark-arrow-up"></i><h3>{{ t().step1 }}</h3></article><article><b>02</b><i class="bi bi-person-plus"></i><h3>{{ t().step2 }}</h3></article><article><b>03</b><i class="bi bi-patch-check"></i><h3>{{ t().step3 }}</h3></article></section>
       <section class="feature-grid"><article><i class="bi bi-vector-pen"></i><h3>{{ t().feature1 }}</h3></article><article><i class="bi bi-shield-lock"></i><h3>{{ t().feature2 }}</h3></article><article><i class="bi bi-fingerprint"></i><h3>{{ t().feature3 }}</h3></article></section>
       <section class="pricing-section" id="preco">
@@ -39,8 +39,8 @@ const copy = {
           <article class="price-card enterprise"><span class="plan-name">{{ t().enterprise }}</span><p class="enterprise-copy">{{ t().enterpriseHelp }}</p><ul><li><i class="bi bi-check-circle-fill"></i>{{ t().enterpriseFeature }}</li><li><i class="bi bi-check-circle-fill"></i>{{ t().signaturesIncluded }}</li></ul><a class="landing-button outline" routerLink="/enterprise">{{ t().talkToSales }}</a></article>
         </div>
       </section>
-      <section class="final-cta"><img src="icons/rubrica-mark.png" alt="" /><h2>{{ t().cta }}</h2><a class="landing-button" routerLink="/register">{{ t().primary }}</a></section>
-      <footer class="landing-footer"><a class="landing-brand" routerLink="/" aria-label="Rubrica"><img src="icons/rubrica-mark-name.png" alt="Rubrica Signature" /></a><nav><a routerLink="/contact">{{ t().contact }}</a><a routerLink="/privacy">{{ t().privacy }}</a><a routerLink="/terms">{{ t().terms }}</a><a routerLink="/data-deletion">{{ t().deletion }}</a></nav><p>© {{ year }} {{ t().rights }}</p></footer>
+      <section class="final-cta"><img src="icons/rubrica-brand/source/rubrica-mark-primary.png" alt="" /><h2>{{ t().cta }}</h2><a class="landing-button" routerLink="/register">{{ t().primary }}</a></section>
+      <footer class="landing-footer"><a class="landing-brand" routerLink="/" aria-label="Rubrica"><img src="icons/rubrica-brand/source/rubrica-lockup-primary.png" alt="Rubrica Signature" /></a><nav><a routerLink="/contact">{{ t().contact }}</a><a routerLink="/privacy">{{ t().privacy }}</a><a routerLink="/terms">{{ t().terms }}</a><a routerLink="/data-deletion">{{ t().deletion }}</a></nav><p>© {{ year }} {{ t().rights }}</p></footer>
     </main>
   `,
 })

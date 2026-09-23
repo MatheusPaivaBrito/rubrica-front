@@ -22,7 +22,7 @@ interface RecoveryCodes { recovery_codes: string[]; }
   imports: [FormsModule, LanguagePickerComponent, OneTimeCodeComponent, PasswordFieldComponent],
   template: `
     <main class="settings-shell">
-      <header class="settings-top"><button type="button" class="brand-logo brand-button" aria-label="Rubrica" (click)="returnToDashboard()"><img src="icons/rubrica-mark-name.png" alt="Rubrica Signature" /></button><div class="button-row"><app-language-picker />@if (status() && !status()?.setup_required) { <button class="button secondary" (click)="returnToDashboard()">{{ i18n.text('backDashboard') }}</button> }<button class="button secondary" (click)="logout()">{{ i18n.text('logout') }}</button></div></header>
+      <header class="settings-top"><button type="button" class="brand-logo brand-button" aria-label="Rubrica" (click)="returnToDashboard()"><img src="icons/rubrica-brand/source/rubrica-lockup-primary.png" alt="Rubrica Signature" /></button><div class="button-row"><app-language-picker />@if (status() && !status()?.setup_required) { <button class="button secondary" (click)="returnToDashboard()">{{ i18n.text('backDashboard') }}</button> }<button class="button secondary" (click)="logout()">{{ i18n.text('logout') }}</button></div></header>
       <section class="settings-card card">
         <p class="eyebrow">{{ i18n.text('security') }}</p><h1>Microsoft Authenticator</h1>
         <p class="muted">{{ i18n.text('securityHelp') }}</p>
