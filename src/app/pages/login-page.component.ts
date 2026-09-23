@@ -18,15 +18,14 @@ import { PasswordFieldComponent } from '../components/password-field.component';
   imports: [FormsModule, RouterLink, LanguagePickerComponent, OneTimeCodeComponent, PasswordFieldComponent],
   template: `
     <main class="login-layout"><section class="card auth-card">
+      <img class="auth-logo" src="icons/rubrica-mark-name.png" alt="Rubrica Signature" />
       <div class="auth-language"><app-language-picker /></div>
-      <p class="eyebrow">Rubrica</p><h1>{{ i18n.text('login') }}</h1>
+      <h1>{{ i18n.text('login') }}</h1>
       <p class="muted">{{ i18n.text('loginHelp') }}</p>
       <form class="form" (ngSubmit)="submit()" #form="ngForm">
         @if (!mfaTicket()) {
           <label>{{ i18n.text('email') }} <input name="email" type="email" [(ngModel)]="email" required autocomplete="email" /></label>
           <app-password-field name="password" [(ngModel)]="password" [label]="i18n.text('password')" autocomplete="current-password" required />
-          <div #turnstileContainer class="login-turnstile"></div>
-          @if (verificationError()) { <div class="notice warning" role="alert">{{ i18n.text('serviceUnavailable') }} <button type="button" class="button secondary compact" (click)="retryVerification()">{{ i18n.text('retryVerification') }}</button></div> }
         } @else {
           <span class="field-label">{{ i18n.text('authenticatorCode') }}</span>
           <app-one-time-code [(value)]="code" [label]="i18n.text('authenticatorCode')" (completed)="completeMfa($event)" />
@@ -38,9 +37,16 @@ import { PasswordFieldComponent } from '../components/password-field.component';
         <a class="auth-action" routerLink="/forgot-password" [queryParams]="returnUrl ? { returnUrl } : undefined"><i class="bi bi-key"></i><span>{{ i18n.text('forgotPassword') }}</span></a>
         <a class="auth-action primary" routerLink="/register" [queryParams]="returnUrl ? { returnUrl } : undefined"><i class="bi bi-person-plus"></i><span>{{ i18n.text('createAccount') }}</span><i class="bi bi-arrow-right"></i></a>
       </div>
+      @if (!mfaTicket()) {
+        <div #turnstileContainer class="login-turnstile"></div>
+        @if (verificationError()) { <div class="notice warning" role="alert">{{ i18n.text('serviceUnavailable') }} <button type="button" class="button secondary compact" (click)="retryVerification()">{{ i18n.text('retryVerification') }}</button></div> }
+      }
     </section></main>
   `,
-  styles: [`.login-turnstile{min-height:0;margin:.25rem 0}`],
+  styles: [`
+    .auth-logo{display:block;width:150px;height:60px;margin:0 0 .75rem;object-fit:contain;object-position:left center}
+    .login-turnstile{display:flex;min-height:0;margin:1rem 0 0;justify-content:center}
+  `],
 })
 export class LoginPageComponent implements AfterViewInit, OnDestroy {
   @ViewChild('turnstileContainer') turnstileContainer?: ElementRef<HTMLElement>;

@@ -24,7 +24,7 @@ import { DateFilterComponent } from '../components/date-filter.component';
   template: `
     <main class="shell">
       <header class="topbar">
-        <div class="brand">Rubrica<span>.</span></div>
+        <div class="brand-logo dashboard-brand"><img src="icons/rubrica-mark-name.png" alt="Rubrica Signature" /></div>
         <div class="topbar-account"><app-language-picker /><span class="user-chip">{{ auth.context()?.subject }}</span><button class="button ghost" (click)="security()">{{ i18n.text('dashboardSecurity') }}</button><button class="button ghost" (click)="logout()">{{ i18n.text('logout') }}</button></div>
       </header>
 
