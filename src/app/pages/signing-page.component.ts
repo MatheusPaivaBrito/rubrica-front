@@ -60,8 +60,11 @@ import { LanguagePickerComponent } from '../components/language-picker.component
               <strong>{{ context()!.signer.name }}</strong>
               <span>{{ context()!.signer.email }}</span>
               @if (context()!.signer.identity_document_masked) { <span><i class="bi bi-person-vcard"></i> {{ identityLabel() }}</span> }
+              @if (context()!.signer.participant_role === 'company_representative' && context()!.signer.representation_snapshot) { <span><i class="bi bi-building"></i> {{ representativeLabel() }}: {{ organizationLabel(context()!.signer.representation_snapshot!) }}</span> }
             </section>
           }
+
+          @if (context()!.issuer_snapshot?.legal_name) { <section class="signing-summary"><small>{{ issuerLabel() }}</small><strong>{{ context()!.issuer_snapshot!.legal_name }}</strong><span>{{ context()!.issuer_snapshot!.registration_masked }}</span></section> }
 
           @if (!administrativeView()) { <section class="stamp-instructions" [class.ready]="placement()">
             <div class="mini-stamp"><span>{{ i18n.text('signedBy') }}</span><strong>{{ context()!.signer.name }}</strong>@if (identityLabel()) { <small class="stamp-identity">{{ identityLabel() }}</small> }<small>{{ stampDateLabel() }}</small></div>
@@ -239,6 +242,9 @@ export class SigningPageComponent implements OnInit {
   }
 
   identityLabel(): string { const signer = this.context()?.signer; if (!signer?.identity_document_masked) return ''; const type = (signer.identity_document_type ?? '').replace('BR_', '').replace('PT_', '').replaceAll('_', ' '); const country = this.alpha3Country(signer.identity_document_country); return [country, `${type} ${signer.identity_document_masked}`.trim()].filter(Boolean).join(' · '); }
+  organizationLabel(snapshot: NonNullable<Signer['representation_snapshot']>): string { return [snapshot.legal_name || snapshot.name, snapshot.registration_masked].filter(Boolean).join(' · '); }
+  representativeLabel(): string { return ({ 'pt-BR':'Representando', en:'Representing', es:'En representación de', 'ja-JP':'代表する会社' } as Record<string, string>)[this.i18n.locale()]; }
+  issuerLabel(): string { return ({ 'pt-BR':'Empresa emissora', en:'Issuing company', es:'Empresa emisora', 'ja-JP':'発行会社' } as Record<string, string>)[this.i18n.locale()]; }
 
   private alpha3Country(country: string | null | undefined): string { return ({ BR: 'BRA', JP: 'JPN', PT: 'PRT', US: 'USA' } as Record<string, string>)[(country ?? '').toUpperCase()] ?? (country ?? '').toUpperCase(); }
 

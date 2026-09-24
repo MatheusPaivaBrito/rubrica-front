@@ -1,6 +1,8 @@
 export interface DocumentItem { id: string; title: string; original_filename: string; version: number; status: string; created_at: string; created_by: string; sha256: string; size_bytes: number | null; signature_request_count: number; completed_signature_count: number; }
 export type SignatureMode = 'evidence' | 'serpro_timestamp' | 'serproid';
-export interface SignatureRequest { id: string; document_id: string; document_version: number; document_title: string; original_filename: string; status: string; expires_at: string; created_at: string; created_by: string; completed_at: string | null; signer_count: number; signed_count: number; signature_mode: SignatureMode; }
+export interface OrganizationSnapshot { tenant_id: string; legal_name?: string; name?: string; registration_country?: string; registration_type?: string; registration_masked?: string; }
+export type ParticipantRole = 'personal_signer' | 'external_signer' | 'company_representative' | 'corporate_seal';
+export interface SignatureRequest { id: string; document_id: string; document_version: number; document_title: string; original_filename: string; status: string; expires_at: string; created_at: string; created_by: string; completed_at: string | null; signer_count: number; signed_count: number; signature_mode: SignatureMode; issuer_snapshot?: OrganizationSnapshot | null; }
 export interface SigningLink { signing_url: string; }
 export interface SignatureEvidence {
   signature_id: string;
@@ -17,11 +19,11 @@ export interface SignatureEvidence {
   artifact_sha256: string;
   evidence: Record<string, unknown>;
 }
-export interface Signer { id: string; name: string; email: string; preferred_locale: 'pt-BR' | 'en' | 'es' | 'ja-JP'; status: string; signed_at: string | null; identity_document_type?: string | null; identity_document_country?: string | null; identity_document_masked?: string | null; }
+export interface Signer { id: string; name: string; email: string; preferred_locale: 'pt-BR' | 'en' | 'es' | 'ja-JP'; status: string; signed_at: string | null; identity_document_type?: string | null; identity_document_country?: string | null; identity_document_masked?: string | null; participant_role?: ParticipantRole; represented_tenant_id?: string | null; representation_snapshot?: OrganizationSnapshot | null; }
 export interface UserCreated { id: string; name: string; email: string; role: string; is_active: boolean; }
 export interface SignerOption { id: string; name: string; email: string; }
 export interface SignerContact { name: string; email: string; }
-export interface TenantItem { id: string; name: string; slug: string; role: string; currency: string; }
+export interface TenantItem { id: string; name: string; slug: string; role: string; currency: string; kind?: 'personal' | 'business'; legal_name?: string | null; registration_country?: string | null; registration_type?: string | null; registration_masked?: string | null; registration_status?: string | null; }
 export interface BillingAccount {
   id: string;
   tenant_id: string;
@@ -55,4 +57,5 @@ export interface SigningContext {
   account_country?: string | null;
   stamp: StampPosition | null;
   viewer_mode: 'signer' | 'administrator';
+  issuer_snapshot?: OrganizationSnapshot | null;
 }
