@@ -298,7 +298,7 @@ input:focus, select:focus { outline: 3px solid rgba(168, 32, 53, .16); border-co
 .signer-language-picker { display: block; width: 100%; margin-top: 0; }
 .signer-language-picker .language-picker, .signer-language-picker .language-picker summary { width: 100%; }
 .signer-language-options { z-index: 30; }
-.account-turnstile { display: block; margin-top: .15rem; }
+.account-turnstile { display: block; margin-top: 1rem; }
 .account-navigation { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; margin-top: 1.25rem; }
 .account-navigation a { display: inline-flex; align-items: center; justify-content: center; gap: .45rem; min-height: 44px; padding: .65rem .75rem; border: 1px solid #ead8d5; border-radius: 11px; color: #8f1d2c; background: #fffafa; font-weight: 750; text-align: center; text-decoration: none; }
 .account-navigation a:hover { border-color: #c98690; background: #fff1ef; }
