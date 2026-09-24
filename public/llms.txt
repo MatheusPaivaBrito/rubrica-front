@@ -1,0 +1,20 @@
+# Rubrica Signature
+
+> Rubrica is a SaaS platform for authenticated electronic PDF signatures with document integrity checks, audit evidence, signer invitations, and account security controls.
+
+## Public pages
+
+- [Homepage](https://rubricasignature.com/): Product overview, workflow, plans, and supporters.
+- [Pricing](https://rubricasignature.com/#preco): Essential, Professional, and business contact options.
+- [Security](https://rubricasignature.com/#seguranca): Summary of document integrity and signature evidence.
+- [Contact](https://rubricasignature.com/contact): Sales, support, and privacy contact form.
+- [Privacy policy](https://rubricasignature.com/privacy): How Rubrica handles personal data.
+- [Terms of use](https://rubricasignature.com/terms): Conditions for using the service.
+- [Data deletion](https://rubricasignature.com/data-deletion): How to request account and personal data deletion.
+
+## Application
+
+- [Sign in](https://rubricasignature.com/login): Access an existing Rubrica account.
+- [Create an account](https://rubricasignature.com/register): Start with a free account.
+
+Authenticated documents, signature invitations, evidence, and account data are private and must not be crawled or accessed without authorization.

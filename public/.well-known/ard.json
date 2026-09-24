@@ -1,0 +1,9 @@
+{
+  "specVersion": "1.0",
+  "host": {
+    "displayName": "Rubrica Signature",
+    "identifier": "https://rubricasignature.com",
+    "documentationUrl": "https://rubricasignature.com/"
+  },
+  "entries": []
+}

@@ -11,6 +11,9 @@ RUN rm -rf /usr/share/nginx/html/*
 COPY --from=build /app/dist/rubrica-web/browser /usr/share/nginx/html
 RUN test -f /usr/share/nginx/html/index.csr.html \
     && test -f /usr/share/nginx/html/index.html \
+    && test -f /usr/share/nginx/html/llms.txt \
+    && test -f /usr/share/nginx/html/.well-known/ai-catalog.json \
+    && test -f /usr/share/nginx/html/.well-known/ard.json \
     && test -f /usr/share/nginx/html/contact/index.html \
     && test -f /usr/share/nginx/html/enterprise/index.html \
     && grep -q "Contact" /usr/share/nginx/html/contact/index.html
