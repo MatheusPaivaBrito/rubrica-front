@@ -29,7 +29,7 @@ interface PdfPageView {
           [style.aspect-ratio]="page.width + ' / ' + page.height"
           (pointerdown)="placeStamp($event, page.number)"
         >
-          <canvas #pageCanvas [attr.aria-label]="'Página ' + page.number"></canvas>
+          <canvas #pageCanvas [attr.aria-label]="i18n.text('page') + ' ' + page.number"></canvas>
           @if (placement?.page === page.number) {
             <div
               class="signature-stamp"

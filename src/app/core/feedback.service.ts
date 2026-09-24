@@ -44,6 +44,10 @@ export class FeedbackService {
     await this.show('success', title, message);
   }
 
+  async info(message: string, title: string): Promise<void> {
+    await this.show('info', title, message);
+  }
+
   message(error: unknown, fallback = this.i18n.text('unexpectedError')): string {
     if (typeof error === 'string') return this.translate(error);
     if (!(error instanceof HttpErrorResponse) && !this.isHttpLike(error)) return fallback;

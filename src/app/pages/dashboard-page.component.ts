@@ -38,7 +38,7 @@ import { DateFilterComponent } from '../components/date-filter.component';
             <div class="header-actions">@if (canManageBilling()) { <button class="button secondary" (click)="billing()"><i class="bi bi-credit-card"></i> {{ i18n.text('billing') }}</button> }</div>
           </header>
 
-          <section class="stats-grid" aria-label="Resumo">
+          <section class="stats-grid" [attr.aria-label]="i18n.text('overview')">
             <article class="stat-card"><span>{{ i18n.text('documentsPlural') }}</span><strong>{{ documents().length }}</strong><small>{{ i18n.text('filesAvailable') }}</small></article>
             <article class="stat-card accent"><span>{{ i18n.text('inSigning') }}</span><strong>{{ openRequestsCount() }}</strong><small>{{ i18n.text('openRequests') }}</small></article>
             <article class="stat-card"><span>{{ i18n.text('completedPlural') }}</span><strong>{{ completedRequestsCount() }}</strong><small>{{ i18n.text('finishedProcesses') }}</small></article>
