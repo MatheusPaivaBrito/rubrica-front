@@ -96,7 +96,7 @@ export class LegalPageComponent implements AfterViewInit {
   }
 
   private loadTurnstile(siteKey: string): void {
-    const render = () => { const widget = (window as TurnstileWindow).turnstile; if (!widget || !this.turnstileContainer) { this.state = 'unavailable'; return; } this.widgetId = widget.render(this.turnstileContainer.nativeElement, { sitekey: siteKey, callback: token => this.zone.run(() => { this.turnstileToken = token; }), 'expired-callback': () => this.zone.run(() => { this.turnstileToken = ''; }), 'error-callback': () => this.zone.run(() => { this.turnstileToken = ''; this.state = 'error'; }) }); };
+    const render = () => { const widget = (window as TurnstileWindow).turnstile; if (!widget || !this.turnstileContainer) { this.state = 'unavailable'; return; } this.widgetId = widget.render(this.turnstileContainer.nativeElement, { sitekey: siteKey, action: this.isEnterprise ? 'enterprise_contact' : 'contact', theme: 'light', appearance: 'always', size: 'flexible', callback: token => this.zone.run(() => { this.turnstileToken = token; }), 'expired-callback': () => this.zone.run(() => { this.turnstileToken = ''; }), 'error-callback': () => this.zone.run(() => { this.turnstileToken = ''; this.state = 'error'; }) }); };
     if ((window as TurnstileWindow).turnstile) { render(); return; }
     const script = document.createElement('script'); script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'; script.async = true; script.onload = render; script.onerror = () => { this.state = 'unavailable'; }; document.head.appendChild(script);
   }
@@ -110,4 +110,4 @@ export class LegalPageComponent implements AfterViewInit {
   private resetTurnstile(): void { this.turnstileToken = ''; if (this.widgetId) (window as TurnstileWindow).turnstile?.reset(this.widgetId); }
 }
 
-interface TurnstileWindow extends Window { turnstile?: { render: (element: HTMLElement, options: { sitekey: string; callback: (token: string) => void; 'expired-callback': () => void; 'error-callback': () => void }) => string; reset: (id: string) => void }; }
+interface TurnstileWindow extends Window { turnstile?: { render: (element: HTMLElement, options: { sitekey: string; action: string; theme: 'light'; appearance: 'always'; size: 'flexible'; callback: (token: string) => void; 'expired-callback': () => void; 'error-callback': () => void }) => string; reset: (id: string) => void }; }
