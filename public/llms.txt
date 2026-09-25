@@ -5,7 +5,7 @@
 ## Public pages
 
 - [Homepage](https://rubricasignature.com/): Product overview, workflow, plans, and supporters.
-- [Pricing](https://rubricasignature.com/#preco): Essential, Professional, and business contact options.
+- [Pricing](https://rubricasignature.com/#preco): Essential, Professional, Team, and custom Enterprise options.
 - [Security](https://rubricasignature.com/#seguranca): Summary of document integrity and signature evidence.
 - [Contact](https://rubricasignature.com/contact): Sales, support, and privacy contact form.
 - [Privacy policy](https://rubricasignature.com/privacy): How Rubrica handles personal data.
