@@ -8,7 +8,7 @@ import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { FeedbackService } from '../core/feedback.service';
 import { I18nService } from '../core/i18n.service';
-import { BillingAccount, BillingCheckout, BillingPortal, TenantItem } from '../core/models';
+import { BillingAccount, BillingCheckout, BillingPortal, TenantItem, TenantMember } from '../core/models';
 import { LanguagePickerComponent } from '../components/language-picker.component';
 
 @Component({
@@ -67,8 +67,21 @@ import { LanguagePickerComponent } from '../components/language-picker.component
             @if (checkoutUrl()) { <div class="checkout-qr"><img [src]="checkoutQrCode()" [alt]="i18n.text('checkoutQrAlt')" /><div><strong>{{ i18n.text('checkoutFinalize') }}</strong><p>{{ i18n.text('checkoutScan') }}</p><button class="button" (click)="openCheckout()">{{ i18n.text('openStripe') }}</button></div></div> }
             @if (selectedTenant()?.kind === 'business') {
               <section class="business-card"><div><p class="eyebrow">{{ businessEyebrow() }}</p><h2>{{ selectedTenant()?.legal_name }}</h2><p class="muted">{{ selectedTenant()?.registration_masked }}</p></div><span class="status" data-status="active">{{ businessActiveLabel() }}</span></section>
+              <section class="team-card">
+                <div><p class="eyebrow">{{ teamEyebrow() }}</p><h2>{{ teamTitle() }}</h2><p class="muted">{{ teamHelp() }}</p></div>
+                <div class="member-list">
+                  @for (member of members(); track member.id) { <div class="member-row"><span><strong>{{ member.auth_user_id }}</strong><small>{{ roleLabel(member.role) }}</small></span><span class="status" [attr.data-status]="member.status">{{ member.status }}</span></div> }
+                </div>
+                @if (members().length < 3) {
+                  <form class="form member-form" (ngSubmit)="addMember()">
+                    <label>{{ memberEmailLabel() }}<input name="memberEmail" type="email" [(ngModel)]="memberEmail" required autocomplete="email" /></label>
+                    <label>{{ memberRoleLabel() }}<select name="memberRole" [(ngModel)]="memberRole"><option value="member">{{ roleLabel('member') }}</option><option value="auditor">{{ roleLabel('auditor') }}</option><option value="admin">{{ roleLabel('admin') }}</option></select></label>
+                    <button class="button" [disabled]="submitting() || !memberEmail.trim()">{{ addMemberLabel() }}</button>
+                  </form>
+                }
+              </section>
             } @else if (businessEligible()) {
-              <section class="business-card"><div><p class="eyebrow">{{ businessEyebrow() }}</p><h2>{{ businessTitle() }}</h2><p class="muted">{{ businessHelp() }}</p></div><form class="form business-form" (ngSubmit)="convertToBusiness()"><label>{{ legalNameLabel() }}<input name="legalName" [(ngModel)]="legalName" required maxlength="180" autocomplete="organization" /></label><label>CNPJ<input name="cnpj" [(ngModel)]="cnpj" required inputmode="numeric" placeholder="00.000.000/0000-00" /></label><button class="button" [disabled]="submitting() || !legalName.trim() || !cnpj.trim()">{{ convertBusinessLabel() }}</button></form></section>
+              <section class="business-card"><div><p class="eyebrow">{{ businessEyebrow() }}</p><h2>{{ businessPendingTitle() }}</h2><p class="muted">{{ businessPendingHelp() }}</p></div><span class="status" data-status="pending">{{ pendingLabel() }}</span></section>
             }
           }
         }
@@ -76,7 +89,7 @@ import { LanguagePickerComponent } from '../components/language-picker.component
     </main>
   `,
   styles: [`
-    .billing-shell{min-height:100vh;background:#f4f7fb;padding:2rem}.billing-top,.billing-card{max-width:980px;margin:auto}.billing-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}.top-actions,.actions{display:flex;gap:.75rem;align-items:center}.billing-card{padding:2rem}.heading{display:flex;justify-content:space-between;gap:1rem}.heading>i{font-size:2.5rem;color:#635bff}.tenant-select{display:grid;gap:.45rem;max-width:420px;margin:2rem 0;font-weight:700}.billing-tenant-picker{margin-top:0}.billing-tenant-options small{margin-left:.4rem}.plan-banner{display:flex;justify-content:space-between;gap:1rem;background:linear-gradient(135deg,#8f1d2c,#c63845);color:white;padding:1.5rem;border-radius:18px}.plan-banner h2{margin:.25rem 0}.plan-banner p{margin:0;opacity:.9}.status{align-self:flex-start;background:#fff;color:#641923;padding:.4rem .7rem;border-radius:999px;font-weight:800}.metrics,.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin:1rem 0}.metrics article{border:1px solid #dde5ee;border-radius:14px;padding:1.1rem;display:grid;gap:.5rem}.metrics strong{font-size:1.1rem}.plans{grid-template-columns:1fr 1fr}.plan-option{display:grid;gap:.45rem;padding:1rem;border:1px solid #d7dde5;border-radius:14px;background:#fff;text-align:left}.plan-option.selected{border-color:#a82035;box-shadow:0 0 0 2px #a8203522}.plan-option span{color:#64748b}.actions{justify-content:flex-end;margin-top:1.5rem}.checkout-qr{display:flex;align-items:center;justify-content:center;gap:1.5rem;margin-top:1.5rem;padding:1.25rem;border:1px solid #dde5ee;border-radius:16px}.checkout-qr img{width:190px;border-radius:10px}.checkout-qr p{color:#64748b}.business-card{display:flex;justify-content:space-between;gap:1.5rem;margin-top:2rem;padding:1.5rem;border:1px solid #e3c9cd;border-radius:18px;background:#fffaf9}.business-card h2{margin:.25rem 0}.business-form{min-width:360px}.business-form label{display:grid;gap:.4rem}@media(max-width:700px){.billing-shell{padding:1rem}.billing-top{align-items:flex-start}.top-actions{flex-direction:column;align-items:stretch}.billing-card{padding:1.2rem}.plan-banner,.checkout-qr,.business-card{flex-direction:column}.business-form{min-width:0}.metrics,.plans{grid-template-columns:1fr}.actions{flex-direction:column}.actions .button{width:100%}}
+    .billing-shell{min-height:100vh;background:#f4f7fb;padding:2rem}.billing-top,.billing-card{max-width:980px;margin:auto}.billing-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}.top-actions,.actions{display:flex;gap:.75rem;align-items:center}.billing-card{padding:2rem}.heading{display:flex;justify-content:space-between;gap:1rem}.heading>i{font-size:2.5rem;color:#635bff}.tenant-select{display:grid;gap:.45rem;max-width:420px;margin:2rem 0;font-weight:700}.billing-tenant-picker{margin-top:0}.billing-tenant-options small{margin-left:.4rem}.plan-banner{display:flex;justify-content:space-between;gap:1rem;background:linear-gradient(135deg,#8f1d2c,#c63845);color:white;padding:1.5rem;border-radius:18px}.plan-banner h2{margin:.25rem 0}.plan-banner p{margin:0;opacity:.9}.status{align-self:flex-start;background:#fff;color:#641923;padding:.4rem .7rem;border-radius:999px;font-weight:800}.metrics,.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin:1rem 0}.metrics article{border:1px solid #dde5ee;border-radius:14px;padding:1.1rem;display:grid;gap:.5rem}.metrics strong{font-size:1.1rem}.plans{grid-template-columns:1fr 1fr}.plan-option{display:grid;gap:.45rem;padding:1rem;border:1px solid #d7dde5;border-radius:14px;background:#fff;text-align:left}.plan-option.selected{border-color:#a82035;box-shadow:0 0 0 2px #a8203522}.plan-option span{color:#64748b}.actions{justify-content:flex-end;margin-top:1.5rem}.checkout-qr{display:flex;align-items:center;justify-content:center;gap:1.5rem;margin-top:1.5rem;padding:1.25rem;border:1px solid #dde5ee;border-radius:16px}.checkout-qr img{width:190px;border-radius:10px}.checkout-qr p{color:#64748b}.business-card,.team-card{margin-top:2rem;padding:1.5rem;border:1px solid #e3c9cd;border-radius:18px;background:#fffaf9}.business-card{display:flex;justify-content:space-between;gap:1.5rem}.business-card h2,.team-card h2{margin:.25rem 0}.member-list{display:grid;margin:1rem 0}.member-row{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.85rem 0;border-top:1px solid #eadadd}.member-row span:first-child{display:grid;gap:.2rem}.member-row small{color:#64748b}.member-form{display:grid;grid-template-columns:minmax(220px,1fr) 180px auto;gap:.75rem;align-items:end}.member-form label{display:grid;gap:.4rem}@media(max-width:700px){.billing-shell{padding:1rem}.billing-top{align-items:flex-start}.top-actions{flex-direction:column;align-items:stretch}.billing-card{padding:1.2rem}.plan-banner,.checkout-qr,.business-card{flex-direction:column}.metrics,.plans,.member-form{grid-template-columns:1fr}.actions{flex-direction:column}.actions .button,.member-form .button{width:100%}}
   `],
 })
 export class BillingPageComponent implements OnInit {
@@ -88,8 +101,9 @@ export class BillingPageComponent implements OnInit {
   readonly selectedPlan = signal<'rubrica_base' | 'rubrica_intermediate'>('rubrica_base');
   readonly checkoutUrl = signal('');
   readonly checkoutQrCode = signal('');
-  legalName = '';
-  cnpj = '';
+  readonly members = signal<TenantMember[]>([]);
+  memberEmail = '';
+  memberRole: TenantMember['role'] = 'member';
   readonly selectedTenantCurrency = computed(() => this.tenants().find(tenant => tenant.id === this.tenantId())?.currency ?? 'USD');
   readonly availability = computed(() => {
     const account = this.account();
@@ -150,19 +164,26 @@ export class BillingPageComponent implements OnInit {
   planPrice(plan: 'rubrica_base' | 'rubrica_intermediate'): string { if (this.selectedTenantCurrency() !== 'BRL') return this.i18n.text('priceAtCheckout', { currency: this.selectedTenantCurrency() }); return plan === 'rubrica_base' ? 'R$ 29,90/mês' : 'R$ 69,90/mês'; }
   businessEligible(): boolean { const account = this.account(); return Boolean(account?.complimentary_lifetime || (account?.current_product_code === 'rubrica_intermediate' && ['active', 'past_due'].includes(account.status))); }
   businessEyebrow(): string { return this.local({ 'pt-BR':'CONTA EMPRESARIAL', en:'BUSINESS ACCOUNT', es:'CUENTA EMPRESARIAL', 'ja-JP':'法人アカウント' }); }
-  businessTitle(): string { return this.local({ 'pt-BR':'Operar em nome de uma empresa', en:'Operate on behalf of a company', es:'Operar en nombre de una empresa', 'ja-JP':'会社名義で運用' }); }
-  businessHelp(): string { return this.local({ 'pt-BR':'Cadastre a razão social e o CNPJ. Essa identidade será registrada nos novos processos de assinatura.', en:'Register the legal name and CNPJ. This identity will be recorded in new signature processes.', es:'Registra la razón social y el CNPJ. Esta identidad se guardará en los nuevos procesos de firma.', 'ja-JP':'法人名とCNPJを登録します。この情報は新しい署名手続きに記録されます。' }); }
-  legalNameLabel(): string { return this.local({ 'pt-BR':'Razão social', en:'Legal name', es:'Razón social', 'ja-JP':'法人名' }); }
-  convertBusinessLabel(): string { return this.local({ 'pt-BR':'Ativar conta empresarial', en:'Activate business account', es:'Activar cuenta empresarial', 'ja-JP':'法人アカウントを有効化' }); }
+  businessPendingTitle(): string { return this.local({ 'pt-BR':'Conclua o cadastro empresarial no Stripe', en:'Complete the business registration in Stripe', es:'Completa el registro empresarial en Stripe', 'ja-JP':'Stripeで法人登録を完了してください' }); }
+  businessPendingHelp(): string { return this.local({ 'pt-BR':'O CNPJ e a razão social são importados do Stripe. A equipe será liberada assim que os dados válidos forem confirmados.', en:'The CNPJ and legal name are imported from Stripe. Team access is enabled after valid details are confirmed.', es:'El CNPJ y la razón social se importan de Stripe. El equipo se habilita después de confirmar datos válidos.', 'ja-JP':'CNPJと法人名はStripeから取得されます。有効な情報の確認後にチーム機能が有効になります。' }); }
+  pendingLabel(): string { return this.local({ 'pt-BR':'Pendente', en:'Pending', es:'Pendiente', 'ja-JP':'保留中' }); }
   businessActiveLabel(): string { return this.local({ 'pt-BR':'Ativa', en:'Active', es:'Activa', 'ja-JP':'有効' }); }
+  teamEyebrow(): string { return this.local({ 'pt-BR':'EQUIPE', en:'TEAM', es:'EQUIPO', 'ja-JP':'チーム' }); }
+  teamTitle(): string { return this.local({ 'pt-BR':'Contas do tenant', en:'Tenant accounts', es:'Cuentas del tenant', 'ja-JP':'テナントアカウント' }); }
+  teamHelp(): string { return this.local({ 'pt-BR':'O plano Profissional permite até 3 contas ativas, incluindo o administrador.', en:'Professional allows up to 3 active accounts, including the administrator.', es:'Profesional permite hasta 3 cuentas activas, incluido el administrador.', 'ja-JP':'プロフェッショナルでは管理者を含め最大3つの有効アカウントを利用できます。' }); }
+  memberEmailLabel(): string { return this.local({ 'pt-BR':'E-mail da conta existente', en:'Existing account email', es:'Correo de la cuenta existente', 'ja-JP':'既存アカウントのメール' }); }
+  memberRoleLabel(): string { return this.local({ 'pt-BR':'Papel', en:'Role', es:'Rol', 'ja-JP':'役割' }); }
+  addMemberLabel(): string { return this.local({ 'pt-BR':'Adicionar conta', en:'Add account', es:'Agregar cuenta', 'ja-JP':'アカウントを追加' }); }
+  roleLabel(role: TenantMember['role']): string { const labels = { admin: { 'pt-BR':'Administrador', en:'Administrator', es:'Administrador', 'ja-JP':'管理者' }, member: { 'pt-BR':'Membro', en:'Member', es:'Miembro', 'ja-JP':'メンバー' }, auditor: { 'pt-BR':'Auditor', en:'Auditor', es:'Auditor', 'ja-JP':'監査者' } } as const; return labels[role][this.i18n.locale()]; }
   private local(values: Record<'pt-BR' | 'en' | 'es' | 'ja-JP', string>): string { return values[this.i18n.locale()]; }
 
   async checkout(): Promise<void> { this.submitting.set(true); try { const result = await firstValueFrom(this.api.post<BillingCheckout>(`/billing/tenants/${this.tenantId()}/checkout`, { product_code: this.selectedPlan() })); this.checkoutUrl.set(result.checkout_url); this.checkoutQrCode.set(await QRCode.toDataURL(result.checkout_url, { width: 260, margin: 2 })); } catch (error) { await this.feedback.error(error); } finally { this.submitting.set(false); } }
-  async convertToBusiness(): Promise<void> { this.submitting.set(true); try { const updated = await firstValueFrom(this.api.post<TenantItem>(`/tenants/${this.tenantId()}/business`, { legal_name: this.legalName.trim(), cnpj: this.cnpj })); this.tenants.update(items => items.map(item => item.id === updated.id ? updated : item)); this.legalName = ''; this.cnpj = ''; await this.feedback.success(this.businessActiveLabel()); } catch (error) { await this.feedback.error(error); } finally { this.submitting.set(false); } }
+  async addMember(): Promise<void> { this.submitting.set(true); try { await firstValueFrom(this.api.post(`/tenants/${this.tenantId()}/members`, { auth_user_id: this.memberEmail.trim().toLowerCase(), role: this.memberRole })); this.memberEmail = ''; this.memberRole = 'member'; await this.loadMembers(); await this.feedback.success(this.addMemberLabel()); } catch (error) { await this.feedback.error(error); } finally { this.submitting.set(false); } }
   async portal(): Promise<void> { await this.redirect<BillingPortal>(`/billing/tenants/${this.tenantId()}/portal`, 'portal_url'); }
   openCheckout(): void { if (this.checkoutUrl()) window.location.assign(this.checkoutUrl()); }
 
-  private async loadAccount(): Promise<void> { const account = await firstValueFrom(this.api.get<BillingAccount>(`/billing/tenants/${this.tenantId()}/account`)); this.account.set(account); if (account.current_product_code === 'rubrica_base' || account.current_product_code === 'rubrica_intermediate') this.selectedPlan.set(account.current_product_code); }
+  private async loadAccount(): Promise<void> { const account = await firstValueFrom(this.api.get<BillingAccount>(`/billing/tenants/${this.tenantId()}/account`)); this.account.set(account); if (account.current_product_code === 'rubrica_base' || account.current_product_code === 'rubrica_intermediate') this.selectedPlan.set(account.current_product_code); if (this.selectedTenant()?.kind === 'business') await this.loadMembers(); else this.members.set([]); }
+  private async loadMembers(): Promise<void> { this.members.set(await firstValueFrom(this.api.get<TenantMember[]>(`/tenants/${this.tenantId()}/members`))); }
   private async leaveComplimentaryBilling(): Promise<boolean> { return false; }
   private fileLimit(account: BillingAccount): number | null { if (typeof account.files_limit === 'number') return account.files_limit; if (!['active', 'past_due'].includes(account.status)) return null; if (account.current_product_code === 'rubrica_base') return 20; if (account.current_product_code === 'rubrica_intermediate') return 80; return null; }
   private filesUsed(account: BillingAccount): number { return account.files_uploaded_in_period ?? 0; }

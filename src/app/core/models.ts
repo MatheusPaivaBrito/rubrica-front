@@ -23,7 +23,8 @@ export interface Signer { id: string; name: string; email: string; preferred_loc
 export interface UserCreated { id: string; name: string; email: string; role: string; is_active: boolean; }
 export interface SignerOption { id: string; name: string; email: string; }
 export interface SignerContact { name: string; email: string; }
-export interface TenantItem { id: string; name: string; slug: string; role: string; currency: string; kind?: 'personal' | 'business'; legal_name?: string | null; registration_country?: string | null; registration_type?: string | null; registration_masked?: string | null; registration_status?: string | null; }
+export interface TenantItem { id: string; name: string; slug: string; role: string; currency: string; kind?: 'personal' | 'business'; legal_name?: string | null; registration_country?: string | null; registration_type?: string | null; registration_masked?: string | null; registration_verification_status?: string | null; }
+export interface TenantMember { id: string; auth_user_id: string; role: 'admin' | 'member' | 'auditor'; status: string; joined_at?: string | null; }
 export interface BillingAccount {
   id: string;
   tenant_id: string;
