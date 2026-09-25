@@ -81,6 +81,14 @@ export class FeedbackService {
   }
 
   private translate(message: string, status = 0): string {
+    if (message.trim().toLowerCase() === 'the representative must be an active authorized tenant member') {
+      return {
+        'pt-BR': 'Para assinar como representante da empresa, use o e-mail de um administrador ou membro ativo deste tenant.',
+        en: 'To sign as a company representative, use the email of an active administrator or member of this tenant.',
+        es: 'Para firmar como representante de la empresa, usa el correo de un administrador o miembro activo de este tenant.',
+        'ja-JP': '会社代表者として署名するには、このテナントの有効な管理者またはメンバーのメールアドレスを使用してください。',
+      }[this.i18n.locale()];
+    }
     const translations: Record<string, MessageKey> = {
       'authentication required': 'sessionExpired',
       'invalid or expired access token': 'sessionExpired',

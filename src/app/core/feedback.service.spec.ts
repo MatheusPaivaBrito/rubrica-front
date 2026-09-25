@@ -30,6 +30,11 @@ describe('FeedbackService', () => {
     expect(service.message(error)).toBe('CPF: CPF inválido');
   });
 
+  it('explains that a company representative must belong to the tenant', () => {
+    const error = new HttpErrorResponse({ status: 422, error: { detail: 'The representative must be an active authorized tenant member' } });
+    expect(service.message(error)).toContain('administrador ou membro ativo');
+  });
+
   it('uses a friendly message when the server is unavailable', () => {
     expect(service.message(new HttpErrorResponse({ status: 503 }))).toContain('temporariamente indisponível');
   });
