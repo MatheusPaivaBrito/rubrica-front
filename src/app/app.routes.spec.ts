@@ -14,4 +14,9 @@ describe('public routes', () => {
     expect(routes.find(route => route.path === 'termos')?.redirectTo).toBe('terms');
     expect(routes.find(route => route.path === 'exclusao-de-dados')?.redirectTo).toBe('data-deletion');
   });
+
+  it('exposes canonical personal and business account routes', () => {
+    expect(routes.some(route => route.path === 'a/:accountSlug/dashboard')).toBe(true);
+    expect(routes.some(route => route.path === 't/:tenantSlug/a/:accountSlug/dashboard')).toBe(true);
+  });
 });
