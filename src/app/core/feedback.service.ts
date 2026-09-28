@@ -81,6 +81,42 @@ export class FeedbackService {
   }
 
   private translate(message: string, status = 0): string {
+    const pdfMessages: Record<string, Record<'pt-BR' | 'en' | 'es' | 'ja-JP', string>> = {
+      'pdf contains active or embedded content': {
+        'pt-BR': 'Este PDF contém conteúdo ativo ou incorporado, como scripts, formulários avançados ou anexos. Gere uma cópia simplificada pelo recurso Imprimir como PDF e tente novamente.',
+        en: 'This PDF contains active or embedded content such as scripts, advanced forms, or attachments. Create a flattened copy using Print to PDF and try again.',
+        es: 'Este PDF contiene contenido activo o incorporado, como scripts, formularios avanzados o archivos adjuntos. Crea una copia simplificada con Imprimir como PDF e inténtalo de nuevo.',
+        'ja-JP': 'このPDFにはスクリプト、高度なフォーム、添付ファイルなどのアクティブまたは埋め込みコンテンツが含まれています。PDFとして印刷して簡略化したコピーを作成し、再試行してください。',
+      },
+      'encrypted pdfs are not supported': {
+        'pt-BR': 'Este PDF é protegido por senha ou criptografado. Remova a proteção e tente novamente.',
+        en: 'This PDF is password protected or encrypted. Remove the protection and try again.',
+        es: 'Este PDF está protegido con contraseña o cifrado. Elimina la protección e inténtalo de nuevo.',
+        'ja-JP': 'このPDFはパスワード保護または暗号化されています。保護を解除して再試行してください。',
+      },
+      'pdf is malformed or unsupported': {
+        'pt-BR': 'A estrutura deste PDF é inválida ou não é compatível. Gere uma nova cópia usando Imprimir como PDF e tente novamente.',
+        en: 'This PDF has an invalid or unsupported structure. Create a new copy using Print to PDF and try again.',
+        es: 'La estructura de este PDF no es válida o no es compatible. Crea una copia nueva con Imprimir como PDF e inténtalo de nuevo.',
+        'ja-JP': 'このPDFの構造は無効または未対応です。PDFとして印刷して新しいコピーを作成し、再試行してください。',
+      },
+      'pdf page count is outside the allowed range': {
+        'pt-BR': 'O PDF precisa ter entre 1 e 1.000 páginas.',
+        en: 'The PDF must contain between 1 and 1,000 pages.',
+        es: 'El PDF debe tener entre 1 y 1.000 páginas.',
+        'ja-JP': 'PDFは1ページ以上1,000ページ以下である必要があります。',
+      },
+    };
+    const pdfMessage = pdfMessages[message.trim().toLowerCase()];
+    if (pdfMessage) return pdfMessage[this.i18n.locale()];
+    if (message.trim().toLowerCase() === 'the representative must be an active authorized tenant member') {
+      return {
+        'pt-BR': 'Para assinar como representante da empresa, use o e-mail de um administrador ou membro ativo deste tenant.',
+        en: 'To sign as a company representative, use the email of an active administrator or member of this tenant.',
+        es: 'Para firmar como representante de la empresa, usa el correo de un administrador o miembro activo de este tenant.',
+        'ja-JP': '会社代表者として署名するには、このテナントの有効な管理者またはメンバーのメールアドレスを使用してください。',
+      }[this.i18n.locale()];
+    }
     const translations: Record<string, MessageKey> = {
       'authentication required': 'sessionExpired',
       'invalid or expired access token': 'sessionExpired',

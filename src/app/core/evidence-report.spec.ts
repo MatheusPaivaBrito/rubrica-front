@@ -41,6 +41,24 @@ describe('evidenceReportHtml', () => {
     expect(html).not.toContain('Assinatura Rubrica por evidências');
   });
 
+  it('shows the frozen company identity for a representative signature', () => {
+    const row: SignatureEvidence = {
+      signature_id: 'signature-id', signer_id: 'signer-id', request_id: 'request-id', document_id: 'document-id',
+      document_version: 1, signed_at: '2026-09-21T12:00:00Z', signer_name: 'Representante',
+      signer_email: 'representante@example.com', subject_hmac_sha256: 'subject-hash', original_sha256: 'original-hash',
+      evidence_sha256: 'evidence-hash', artifact_sha256: 'artifact-hash',
+      evidence: { representation_snapshot: { legal_name: 'Rubrica Tecnologia Ltda.', registration_masked: '12.345.678/0001-90' } },
+    };
+
+    const html = evidenceReportHtml([row], 'pt-BR', () => '21/09/2026 09:00');
+
+    expect(html).toContain('Representação empresarial');
+    expect(html).toContain('Razão social');
+    expect(html).toContain('Rubrica Tecnologia Ltda.');
+    expect(html).toContain('CNPJ');
+    expect(html).toContain('12.345.678/0001-90');
+  });
+
   it('shows the trusted SERPRO timestamp when present', () => {
     const row: SignatureEvidence = {
       signature_id: 'signature', signer_id: 'signer', request_id: 'request', document_id: 'document', document_version: 1,

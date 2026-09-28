@@ -10,6 +10,7 @@ import { TenantItem } from './models';
 export interface AccessContext {
   version: number;
   subject: string;
+  account_public_slug: string;
   preferred_locale: 'pt-BR' | 'en' | 'es' | 'ja-JP';
   mfa_enabled: boolean;
   mfa_setup_required: boolean;
@@ -20,11 +21,11 @@ export interface AccessContext {
 interface LoginResponse { access_token: string; }
 export interface MfaChallenge { mfa_required: true; mfa_ticket: string; expires_in: number; }
 
-export function tenantDashboardUrl(slug: string): string {
-  const accountPrefix = 'account-';
-  return slug.startsWith(accountPrefix)
-    ? `/tenant/a/${encodeURIComponent(slug.slice(accountPrefix.length))}/dashboard`
-    : `/tenant/${encodeURIComponent(slug)}/dashboard`;
+export function tenantDashboardUrl(tenant: Pick<TenantItem, 'slug' | 'kind'>, accountPublicSlug: string): string {
+  const account = encodeURIComponent(accountPublicSlug);
+  return tenant.kind === 'business'
+    ? `/t/${encodeURIComponent(tenant.slug)}/a/${account}/dashboard`
+    : `/a/${account}/dashboard`;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -80,7 +81,8 @@ export class AuthService {
   async dashboardUrl(): Promise<string> {
     try {
       const tenants = await firstValueFrom(this.http.get<TenantItem[]>('/tenants'));
-      return tenants.length ? tenantDashboardUrl(tenants[0].slug) : '/dashboard';
+      const accountPublicSlug = this.context()?.account_public_slug;
+      return tenants.length && accountPublicSlug ? tenantDashboardUrl(tenants[0], accountPublicSlug) : '/dashboard';
     } catch {
       return '/dashboard';
     }

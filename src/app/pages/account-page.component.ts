@@ -20,7 +20,7 @@ interface IdentityOption { value: string; label: MessageKey }
   template: `
     <main class="login-layout account-layout"><section class="card auth-card account-card" [class.account-card-compact]="mode === 'forgot-password'">
       <header class="account-heading">
-        <a class="account-brand" routerLink="/" aria-label="Rubrica"><img src="icons/rubrica-brand/source/rubrica-lockup-primary.png" alt="Rubrica Signature" /></a>
+        <a class="account-brand" routerLink="/" aria-label="Rubrica"><img src="icons/rubrica-brand/lockup/384x384/rubrica-lockup-primary-384x384.png" alt="Rubrica Signature" /></a>
         <app-language-picker />
       </header>
       <div class="account-title"><p class="eyebrow">{{ i18n.text('secureAccess') }}</p><h1>{{ i18n.text(titleKey) }}</h1>@if (mode === 'register') { <p class="muted">{{ i18n.text('registerHelp') }}</p> } @else if (mode === 'forgot-password') { <p class="muted">{{ i18n.text('recoveryHelp') }}</p> }</div>
@@ -72,11 +72,10 @@ interface IdentityOption { value: string; label: MessageKey }
               <label>{{ i18n.text('documentNumber') }} <input name="document" [ngModel]="documentValue" (ngModelChange)="documentValueChanged($event)" [placeholder]="documentPlaceholder()" [maxlength]="documentMaxLength()" [attr.inputmode]="documentInputMode()" minlength="4" required autocomplete="off" /></label>
             }
           </fieldset>
-          <app-turnstile-widget class="account-turnstile" action="register" (tokenChange)="turnstileToken.set($event)" (stateChange)="turnstileStateChanged($event)" />
           <button class="button" [disabled]="verificationBlocked()">{{ i18n.text('createAccount') }}</button>
         </form>
       } @else if (mode === 'forgot-password') {
-        <form class="form" (ngSubmit)="requestReset()"><label>{{ i18n.text('email') }} <input name="email" type="email" [(ngModel)]="email" required autocomplete="email" /></label><app-turnstile-widget class="account-turnstile" action="password_recovery" (tokenChange)="turnstileToken.set($event)" (stateChange)="turnstileStateChanged($event)" /><button class="button" [disabled]="verificationBlocked()">{{ i18n.text('sendRecovery') }}</button></form>
+        <form class="form" (ngSubmit)="requestReset()"><label>{{ i18n.text('email') }} <input name="email" type="email" [(ngModel)]="email" required autocomplete="email" /></label><button class="button" [disabled]="verificationBlocked()">{{ i18n.text('sendRecovery') }}</button></form>
       } @else if (mode === 'reset-password') {
         <form class="form" (ngSubmit)="resetPassword()">
           <app-password-field name="password" [(ngModel)]="password" [label]="i18n.text('newPassword')" autocomplete="new-password" [minlength]="8" [maxlength]="128" [pattern]="passwordPattern" required />
@@ -106,6 +105,9 @@ interface IdentityOption { value: string; label: MessageKey }
         </section>
       </ng-template>
       <nav class="account-navigation" [attr.aria-label]="i18n.text('account')"><a routerLink="/"><i class="bi bi-house"></i> {{ i18n.text('backToHome') }}</a><a routerLink="/login" [queryParams]="returnUrl ? { returnUrl } : undefined"><i class="bi bi-arrow-left"></i> {{ i18n.text('backToLogin') }}</a></nav>
+      @if (mode === 'register' || mode === 'forgot-password') {
+        <app-turnstile-widget class="account-turnstile" [action]="mode === 'register' ? 'register' : 'password_recovery'" (tokenChange)="turnstileToken.set($event)" (stateChange)="turnstileStateChanged($event)" />
+      }
     </section></main>
   `,
 })
