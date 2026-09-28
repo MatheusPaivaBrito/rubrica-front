@@ -60,3 +60,5 @@ export interface SigningContext {
   viewer_mode: 'signer' | 'administrator';
   issuer_snapshot?: OrganizationSnapshot | null;
 }
+
+export interface TenantTeam { members: TenantMember[]; member_limit: number; active_count: number; requires_selection: boolean; can_manage: boolean; current_member_id: string; }

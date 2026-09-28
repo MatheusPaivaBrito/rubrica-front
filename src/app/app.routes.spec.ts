@@ -4,7 +4,7 @@ describe('public routes', () => {
   it('uses English canonical paths', () => {
     for (const path of ['contact', 'privacy', 'terms', 'data-deletion']) {
       const route = routes.find(candidate => candidate.path === path);
-      expect(route?.component).toBeTruthy();
+      expect(route?.component ?? route?.loadComponent).toBeTruthy();
     }
   });
 
@@ -18,5 +18,7 @@ describe('public routes', () => {
   it('exposes canonical personal and business account routes', () => {
     expect(routes.some(route => route.path === 'a/:accountSlug/dashboard')).toBe(true);
     expect(routes.some(route => route.path === 't/:tenantSlug/a/:accountSlug/dashboard')).toBe(true);
+    expect(routes.some(route => route.path === 'a/:accountSlug/plan')).toBe(true);
+    expect(routes.some(route => route.path === 't/:tenantSlug/a/:accountSlug/plan')).toBe(true);
   });
 });

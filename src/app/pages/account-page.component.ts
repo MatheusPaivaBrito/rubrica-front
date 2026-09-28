@@ -20,7 +20,7 @@ interface IdentityOption { value: string; label: MessageKey }
   template: `
     <main class="login-layout account-layout"><section class="card auth-card account-card" [class.account-card-compact]="mode === 'forgot-password'">
       <header class="account-heading">
-        <a class="account-brand" routerLink="/" aria-label="Rubrica"><img src="icons/rubrica-brand/source/rubrica-lockup-primary.png" alt="Rubrica Signature" /></a>
+        <a class="account-brand" routerLink="/" aria-label="Rubrica"><img src="icons/rubrica-brand/lockup/384x384/rubrica-lockup-primary-384x384.png" alt="Rubrica Signature" /></a>
         <app-language-picker />
       </header>
       <div class="account-title"><p class="eyebrow">{{ i18n.text('secureAccess') }}</p><h1>{{ i18n.text(titleKey) }}</h1>@if (mode === 'register') { <p class="muted">{{ i18n.text('registerHelp') }}</p> } @else if (mode === 'forgot-password') { <p class="muted">{{ i18n.text('recoveryHelp') }}</p> }</div>

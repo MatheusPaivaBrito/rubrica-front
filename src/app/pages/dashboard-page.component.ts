@@ -1,3 +1,4 @@
+import { WorkspaceSidebarComponent } from '../components/workspace-sidebar.component';
 import { DecimalPipe } from '@angular/common';
 import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -9,51 +10,38 @@ import QRCode from 'qrcode';
 import { ApiService } from '../core/api.service';
 import { AuthService, tenantDashboardUrl } from '../core/auth.service';
 import { FeedbackService } from '../core/feedback.service';
-import { BillingAccount, DocumentItem, SignatureEvidence, SignatureMode, SignatureRequest, Signer, SignerContact, SigningLink, TenantItem } from '../core/models';
+import { TenantTeam, BillingAccount, DocumentItem, SignatureEvidence, SignatureMode, SignatureRequest, Signer, SignerContact, SigningLink, TenantItem } from '../core/models';
 import { dateTime } from '../core/date-time';
 import { evidenceDownloadLabel, evidenceReportHtml } from '../core/evidence-report';
 import { I18nService, Locale } from '../core/i18n.service';
 import { LanguagePickerComponent } from '../components/language-picker.component';
 import { PdfStampViewerComponent } from '../components/pdf-stamp-viewer.component';
 import { DateFilterComponent } from '../components/date-filter.component';
+import { RubricaSelectComponent, RubricaSelectOption } from '../components/rubrica-select.component';
 
 @Component({
   standalone: true,
-  imports: [DecimalPipe, FormsModule, LanguagePickerComponent, PdfStampViewerComponent, DateFilterComponent],
+  imports: [WorkspaceSidebarComponent, DecimalPipe, FormsModule, LanguagePickerComponent, PdfStampViewerComponent, DateFilterComponent, RubricaSelectComponent],
   template: `
     <main class="shell">
-      <header class="topbar">
-        <div class="brand-logo dashboard-brand"><img src="icons/rubrica-brand/source/rubrica-lockup-inverse.png" alt="Rubrica Signature" /></div>
-        <div class="topbar-account"><app-language-picker /><span class="user-chip">{{ auth.context()?.subject }}</span><button class="button ghost" (click)="security()">{{ i18n.text('dashboardSecurity') }}</button><button class="button ghost" (click)="logout()">{{ i18n.text('logout') }}</button></div>
-      </header>
-
+      <div class="workspace-layout"><app-workspace-sidebar [tenant]="selectedTenant()" />
       <section class="container dashboard-container">
         @if (loading()) {
           <p class="notice">{{ i18n.text('workspaceLoading') }}</p>
-        } @else if (!canManage()) {
-          <section class="card empty-state"><h1>{{ i18n.text('connected') }}</h1><p class="muted">{{ i18n.text('signerLinkHelp') }}</p></section>
         } @else {
           <header class="dashboard-header">
             <div><p class="eyebrow">{{ i18n.text('overview') }}</p><h1>{{ i18n.text('signatureCenter') }}</h1><p class="muted">{{ i18n.text('dashboardHelp') }}</p></div>
-            <div class="header-actions">@if (canManageBilling()) { <button class="button secondary" (click)="billing()"><i class="bi bi-credit-card"></i> {{ i18n.text('billing') }}</button> }</div>
           </header>
 
           <section class="stats-grid" [attr.aria-label]="i18n.text('overview')">
             <article class="stat-card"><span>{{ i18n.text('documentsPlural') }}</span><strong>{{ documents().length }}</strong><small>{{ i18n.text('filesAvailable') }}</small></article>
             <article class="stat-card accent"><span>{{ i18n.text('inSigning') }}</span><strong>{{ openRequestsCount() }}</strong><small>{{ i18n.text('openRequests') }}</small></article>
             <article class="stat-card"><span>{{ i18n.text('completedPlural') }}</span><strong>{{ completedRequestsCount() }}</strong><small>{{ i18n.text('finishedProcesses') }}</small></article>
+            <article class="stat-card"><span>{{ totalSignaturesLabel() }}</span><strong>{{ totalSignaturesCount() }}</strong><small>{{ i18n.text('signaturesLabel') }}</small></article>
+            @if (isAdmin() && selectedTenant(); as tenant) {
+              <article class="stat-card"><span class="stat-label">{{ monthlyAllowanceLabel() }} <i class="bi bi-info-circle info-tooltip" tabindex="0" [attr.aria-label]="i18n.text('usageHelp')" [attr.data-tooltip]="i18n.text('usageHelp')"></i></span><strong>{{ billingQuotaSummary(tenant.id) }}</strong><small>{{ billingQuotaAvailable(tenant.id) }}</small></article>
+            }
           </section>
-
-          @if (isAdmin() && billingTenants().length) {
-            <article class="card table-card">
-              <div class="section-heading"><div><p class="eyebrow">{{ i18n.text('planUsage') }}</p><h2>{{ i18n.text('filesByAccount') }}</h2><p class="muted">{{ i18n.text('usageHelp') }}</p></div></div>
-              <div class="table-wrap"><table class="data-table"><thead><tr><th>{{ i18n.text('account') }}</th><th>{{ i18n.text('plan') }}</th><th>{{ i18n.text('usage') }}</th><th>{{ i18n.text('availableNow') }}</th></tr></thead><tbody>
-                @for (tenant of billingTenants(); track tenant.id) {
-                  <tr><td><strong>{{ tenant.name }}</strong></td><td><span class="badge" [class.complete]="billingFor(tenant.id)?.unlimited_signatures">{{ billingPlanLabel(tenant.id) }}</span></td><td>{{ billingUsage(tenant.id) }}</td><td><strong>{{ billingAvailability(tenant.id) }}</strong></td></tr>
-                }
-              </tbody></table></div>
-            </article>
-          }
 
           <article class="card table-card">
             <div class="section-heading">
@@ -81,7 +69,7 @@ import { DateFilterComponent } from '../components/date-filter.component';
           </article>
 
           <article class="card table-card">
-            <div class="section-heading"><div><p class="eyebrow">{{ i18n.text('collection') }}</p><h2>{{ i18n.text('documentsPlural') }}</h2><p class="muted">{{ i18n.text('documentsHelp') }}</p></div><div class="section-actions"><div class="list-toolbar"><label>{{ i18n.text('search') }}<input [(ngModel)]="documentSearch" (ngModelChange)="resetDocumentLimit()" [placeholder]="i18n.text('nameOrFile')" /></label><app-date-filter [label]="i18n.text('date')" [(value)]="documentDate" (valueChange)="resetDocumentLimit()" /></div><button class="button secondary" (click)="showUploadModal()">{{ i18n.text('uploadPdf') }}</button></div></div>
+            <div class="section-heading"><div><p class="eyebrow">{{ i18n.text('collection') }}</p><h2>{{ i18n.text('documentsPlural') }}</h2><p class="muted">{{ i18n.text('documentsHelp') }}</p></div><div class="section-actions"><div class="list-toolbar"><label>{{ i18n.text('search') }}<input [(ngModel)]="documentSearch" (ngModelChange)="resetDocumentLimit()" [placeholder]="i18n.text('nameOrFile')" /></label><app-date-filter [label]="i18n.text('date')" [(value)]="documentDate" (valueChange)="resetDocumentLimit()" /></div>@if (canManage()) { <button class="button secondary" (click)="showUploadModal()">{{ i18n.text('uploadPdf') }}</button> }</div></div>
             <div class="table-wrap">
               <table class="data-table">
                 <thead><tr><th>{{ i18n.text('document') }}</th><th>{{ i18n.text('file') }}</th><th>{{ i18n.text('version') }}</th><th>{{ i18n.text('status') }}</th><th class="actions-column">{{ i18n.text('actions') }}</th></tr></thead>
@@ -92,7 +80,7 @@ import { DateFilterComponent } from '../components/date-filter.component';
                       <td [attr.data-label]="i18n.text('file')"><div class="file-cell"><span class="file-name" [title]="document.original_filename"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i><span>{{ document.original_filename }}</span></span><small>{{ fileSize(document.size_bytes) }}</small></div></td>
                       <td [attr.data-label]="i18n.text('version')">{{ document.version }}</td>
                       <td><span class="badge">{{ document.status === 'ready' ? i18n.text('ready') : document.status }}</span><small>{{ i18n.text('requestCount', { count: document.signature_request_count }) }}</small></td>
-                      <td><div class="table-actions"><button class="button secondary compact" (click)="preview(document)">{{ i18n.text('view') }}</button><button class="button secondary compact" (click)="prepareRequest(document)">{{ i18n.text('requestSignature') }}</button><button class="button compact danger" (click)="deleteDocument(document)">{{ i18n.text('deleteAction') }}</button></div></td>
+                      <td><div class="table-actions"><button class="button secondary compact" (click)="preview(document)">{{ i18n.text('view') }}</button>@if (canManage()) { <button class="button secondary compact" (click)="prepareRequest(document)">{{ i18n.text('requestSignature') }}</button><button class="button compact danger" (click)="deleteDocument(document)">{{ i18n.text('deleteAction') }}</button> }</div></td>
                     </tr>
                   } @empty { <tr><td colspan="5"><div class="empty-state"><strong>{{ i18n.text('noDocuments') }}</strong><span>{{ i18n.text('firstPdf') }}</span></div></td></tr> }
                 </tbody>
@@ -113,7 +101,7 @@ import { DateFilterComponent } from '../components/date-filter.component';
       @if (requestCreateModalOpen() && selectedDocument()) {
         <div class="modal-backdrop" (click)="closeRequestCreateModal()"><section class="app-modal" (click)="$event.stopPropagation()">
           <header class="modal-header"><div><p class="eyebrow">{{ i18n.text('newRequest') }}</p><h2>{{ selectedDocument()!.title }}</h2><span class="muted">{{ selectedDocument()!.original_filename }}</span></div><button class="modal-close" (click)="closeRequestCreateModal()" [attr.aria-label]="i18n.text('close')">×</button></header>
-          <form class="modal-body form" (ngSubmit)="createRequest()"><p class="notice">{{ i18n.text('draftHelp') }}</p><label>{{ i18n.text('signingDeadline') }} <input type="datetime-local" name="expires" [(ngModel)]="expiresAt" required /></label><footer class="modal-footer"><button type="button" class="button secondary" (click)="closeRequestCreateModal()">{{ i18n.text('cancel') }}</button><button class="button" [disabled]="submitting()">{{ i18n.text('createRequest') }}</button></footer></form>
+          <form class="modal-body form" (ngSubmit)="createRequest()"><p class="notice">{{ i18n.text('draftHelp') }}</p><app-date-filter class="request-deadline-picker" [label]="i18n.text('signingDeadline')" [includeTime]="true" [(value)]="expiresAt" /><footer class="modal-footer"><button type="button" class="button secondary" (click)="closeRequestCreateModal()">{{ i18n.text('cancel') }}</button><button class="button" [disabled]="submitting() || !expiresAt">{{ i18n.text('createRequest') }}</button></footer></form>
         </section></div>
       }
 
@@ -129,7 +117,7 @@ import { DateFilterComponent } from '../components/date-filter.component';
                   @if (selectedRequest()!.status === 'draft') {
                     <div><h3>{{ i18n.text('addSigner') }}</h3><p class="muted">{{ i18n.text(emailInvitationsEnabled() ? 'inviteSignerHelp' : 'addSignerLinkHelp') }}</p></div>
                     @if (signerContacts().length) { <div class="contact-picker"><label>{{ i18n.text('previousInvitees') }}<input [ngModel]="contactSearch()" (ngModelChange)="contactSearch.set($event)" (focus)="contactPickerOpen.set(true)" (blur)="contactPickerOpen.set(false)" name="contactSearch" [placeholder]="i18n.text('nameOrEmail')" autocomplete="off" /></label>@if (contactPickerOpen()) { <div class="contact-options" role="listbox">@for (contact of filteredContacts(); track contact.email) { <button type="button" role="option" [attr.aria-selected]="signerEmail === contact.email" (mousedown)="$event.preventDefault()" (click)="selectContact(contact)"><strong>{{ contact.name }}</strong><span>{{ contact.email }}</span></button> } @empty { <p>{{ i18n.text('noUser') }}</p> }</div> }</div> }
-                    <form class="form" (ngSubmit)="addSigner()"><label>{{ participantTypeTitle() }}<select name="participantRole" [(ngModel)]="signerParticipantRole"><option value="external_signer">{{ externalSignerLabel() }}</option>@if (selectedTenant()?.kind === 'business') { <option value="company_representative">{{ companyRepresentativeLabel() }}</option> }</select><small class="muted">{{ participantTypeHelp() }}</small></label><label>{{ i18n.text('name') }}<input name="signerName" [(ngModel)]="signerName" required autocomplete="name" /></label><label>{{ i18n.text('email') }}<input name="signerEmail" type="email" [(ngModel)]="signerEmail" required autocomplete="email" /></label>@if (emailInvitationsEnabled()) { <div class="signer-language-field"><span class="field-label">{{ i18n.text('language') }}</span><app-language-picker class="signer-language-picker" [value]="signerLocale" (valueChange)="signerLocale = $event" /></div> }<button class="button" [disabled]="submitting() || !signerName.trim() || !signerEmail.trim()">{{ i18n.text('add') }}</button></form><hr /><button class="button secondary full-width" (click)="openRequest()" [disabled]="submitting() || !signers().length">{{ i18n.text('openForSigning') }}</button>
+                    <form class="form" (ngSubmit)="addSigner()"><div class="form-field"><span class="field-label">{{ participantTypeTitle() }}</span><app-rubrica-select [ariaLabel]="participantTypeTitle()" [value]="signerParticipantRole" [options]="participantRoleOptions()" (valueChange)="selectParticipantRole($event)" /><small class="muted">{{ participantTypeHelp() }}</small></div><label>{{ i18n.text('name') }}<input name="signerName" [(ngModel)]="signerName" required autocomplete="name" /></label><label>{{ i18n.text('email') }}<input name="signerEmail" type="email" [(ngModel)]="signerEmail" required autocomplete="email" /></label>@if (emailInvitationsEnabled()) { <div class="signer-language-field"><span class="field-label">{{ i18n.text('language') }}</span><app-language-picker class="signer-language-picker" [value]="signerLocale" (valueChange)="signerLocale = $event" /></div> }<button class="button" [disabled]="submitting() || !signerName.trim() || !signerEmail.trim()">{{ i18n.text('add') }}</button></form><hr /><button class="button secondary full-width" (click)="openRequest()" [disabled]="submitting() || !signers().length">{{ i18n.text('openForSigning') }}</button>
                   } @else {
                     <div><h3>{{ i18n.text('documentAccess') }}</h3><p class="muted">{{ i18n.text('shareUnique') }}</p></div>
                     @if (requestLink()) { <div class="link-panel"><small>{{ i18n.text('uniqueLink') }}</small><span>{{ requestLink() }}</span></div>@if (requestQrCode()) { <img class="signing-qr" [src]="requestQrCode()" alt="QR Code do link para assinatura" /> }<div class="button-row"><button class="button secondary compact" (click)="copyInvite()">{{ i18n.text('copyLink') }}</button><button class="button secondary compact" (click)="openInvite()">{{ i18n.text('openLink') }}</button>@if (requestQrCode()) { <a class="button secondary compact qr-download-button" [href]="requestQrCode()" [download]="qrCodeFilename()"><i class="bi bi-qr-code-scan" aria-hidden="true"></i> {{ i18n.text('downloadQrCode') }}</a> }</div> } @else { <p class="notice">{{ i18n.text('noRecoverableLink') }}</p> }
@@ -144,7 +132,7 @@ import { DateFilterComponent } from '../components/date-filter.component';
       }
 
       @if (previewDocument()) { <div class="modal-backdrop pdf-backdrop" (click)="closePreview()"><section class="pdf-modal" (click)="$event.stopPropagation()"><header><div><strong>{{ previewHeading() }} · {{ previewDocument()!.title }}</strong><small>{{ previewDocument()!.original_filename }}</small></div><div class="pdf-modal-actions"><button class="button secondary compact" (click)="downloadPreview()"><i class="bi bi-download"></i> {{ i18n.text('downloadPdf') }}</button><button class="modal-close" (click)="closePreview()" [attr.aria-label]="i18n.text('close')">×</button></div></header><div class="pdf-modal-content"><app-pdf-stamp-viewer [sourceData]="previewData()" [readonly]="true" /></div></section></div> }
-    </main>
+    </div></main>
   `,
 })
 export class DashboardPageComponent implements OnInit, OnDestroy {
@@ -199,23 +187,22 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
 
   constructor(readonly auth: AuthService, readonly i18n: I18nService, private readonly api: ApiService, private readonly route: ActivatedRoute, private readonly router: Router, private readonly feedback: FeedbackService) {}
 
-  async ngOnInit(): Promise<void> { const context = await this.auth.restore(); if (!context) { await this.router.navigate(['/login']); return; } try { if (context.mfa_setup_required) { await this.router.navigate(['/security']); return; } const dashboardUrl = await this.auth.dashboardUrl(); const accountSlug = this.route.snapshot.paramMap.get('accountSlug'); const tenantSlug = this.route.snapshot.paramMap.get('tenantSlug'); const legacyAccountId = this.route.snapshot.paramMap.get('tenantAccountId'); const tenants = await firstValueFrom(this.api.get<TenantItem[]>('/tenants')); const accountMatches = accountSlug === context.account_public_slug; let selectedTenant = accountMatches && tenantSlug ? tenants.find(tenant => tenant.slug === tenantSlug) : accountMatches ? tenants.find(tenant => tenant.kind !== 'business') : undefined; if (!selectedTenant && legacyAccountId) selectedTenant = tenants.find(tenant => tenant.slug === `account-${legacyAccountId}`); if (!selectedTenant && tenantSlug && !accountSlug) selectedTenant = tenants.find(tenant => tenant.slug === tenantSlug); if (!selectedTenant) { await this.router.navigateByUrl(dashboardUrl, { replaceUrl: true }); return; } const canonicalUrl = tenantDashboardUrl(selectedTenant, context.account_public_slug); if (this.router.url.split('?')[0] !== canonicalUrl) { await this.router.navigateByUrl(canonicalUrl, { replaceUrl: true }); return; } this.tenants.set(tenants); this.tenantSlug = selectedTenant.slug; this.tenantId = selectedTenant.id; if (this.canManage()) await Promise.all([this.reload(), this.loadBilling(tenants)]); } catch (error) { await this.feedback.error(error, this.i18n.text('dashboardLoadFailed')); } finally { this.loading.set(false); } }
+  async ngOnInit(): Promise<void> { const context = await this.auth.restore(); if (!context) { await this.router.navigate(['/login']); return; } try { if (context.mfa_setup_required) { await this.router.navigate(['/security']); return; } const dashboardUrl = await this.auth.dashboardUrl(); const accountSlug = this.route.snapshot.paramMap.get('accountSlug'); const tenantSlug = this.route.snapshot.paramMap.get('tenantSlug'); const legacyAccountId = this.route.snapshot.paramMap.get('tenantAccountId'); const tenants = await firstValueFrom(this.api.get<TenantItem[]>('/tenants')); const accountMatches = accountSlug === context.account_public_slug; let selectedTenant = accountMatches && tenantSlug ? tenants.find(tenant => tenant.slug === tenantSlug) : accountMatches ? tenants.find(tenant => tenant.kind !== 'business') : undefined; if (!selectedTenant && legacyAccountId) selectedTenant = tenants.find(tenant => tenant.slug === `account-${legacyAccountId}`); if (!selectedTenant && tenantSlug && !accountSlug) selectedTenant = tenants.find(tenant => tenant.slug === tenantSlug); if (!selectedTenant) { await this.router.navigateByUrl(dashboardUrl, { replaceUrl: true }); return; } const canonicalUrl = tenantDashboardUrl(selectedTenant, context.account_public_slug); if (this.router.url.split('?')[0] !== canonicalUrl) { await this.router.navigateByUrl(canonicalUrl, { replaceUrl: true }); return; } this.tenants.set(tenants); this.tenantSlug = selectedTenant.slug; this.tenantId = selectedTenant.id; if (selectedTenant.role === 'admin') { const team = await firstValueFrom(this.api.get<TenantTeam>(`/tenants/${this.tenantId}/team`)); if (team.requires_selection) { await this.router.navigateByUrl(canonicalUrl.replace(/dashboard$/, 'team')); return; } } await Promise.all([this.reload(), this.loadBilling(tenants)]); } catch (error) { await this.feedback.error(error, this.i18n.text('dashboardLoadFailed')); } finally { this.loading.set(false); } }
   ngOnDestroy(): void { this.unlockPageScroll(); }
   security(): Promise<boolean> { return this.router.navigate(['/security']); }
-  billing(): Promise<boolean> { return this.router.navigate(['/plan'], { queryParams: { tenant: this.tenantId } }); }
-  canManage(): boolean { return this.auth.can('documents:write') && this.auth.can('signature_requests:write'); }
-  isAdmin(): boolean { const context = this.auth.context(); return context?.roles.includes('signature_admin') === true || context?.permission_keys.includes('*') === true; }
-  canManageBilling(): boolean { const account = this.billingFor(this.tenantId); return this.isAdmin() && Boolean(account && !account.complimentary_lifetime); }
+  canManage(): boolean { return this.selectedTenant()?.role !== 'auditor' && this.auth.can('documents:write') && this.auth.can('signature_requests:write'); }
+  isAdmin(): boolean { return this.selectedTenant()?.role === 'admin'; }
   hasSignedSigners(): boolean { return this.signers().some((signer) => signer.status === 'signed'); }
   openRequestsCount(): number { return this.requests().filter((item) => item.status === 'open').length; }
   completedRequestsCount(): number { return this.requests().filter((item) => item.status === 'completed').length; }
+  totalSignaturesCount(): number { return this.requests().reduce((total, item) => total + item.signed_count, 0); }
   matchingRequests(): SignatureRequest[] { const query = this.requestSearch.trim().toLowerCase(); return this.requests().filter((item) => (this.requestFilter === 'all' || item.status === this.requestFilter) && (!this.requestDate || item.created_at.slice(0, 10) === this.requestDate) && (!query || item.document_title.toLowerCase().includes(query) || item.original_filename.toLowerCase().includes(query) || item.id.toLowerCase().includes(query))); }
   visibleRequests(): SignatureRequest[] { return this.matchingRequests().slice(0, this.requestLimit); }
   matchingDocuments(): DocumentItem[] { const query = this.documentSearch.trim().toLowerCase(); return this.documents().filter((item) => (!this.documentDate || item.created_at.slice(0, 10) === this.documentDate) && (!query || item.title.toLowerCase().includes(query) || item.original_filename.toLowerCase().includes(query) || item.created_by.toLowerCase().includes(query))); }
   visibleDocuments(): DocumentItem[] { return this.matchingDocuments().slice(0, this.documentLimit); }
   resetRequestLimit(): void { this.requestLimit = 5; }
   resetDocumentLimit(): void { this.documentLimit = 5; }
-  requestFilterOptions(): Array<{ value: string; label: 'all' | 'open' | 'drafts' | 'completedPlural' }> { return [{ value: 'all', label: 'all' }, { value: 'open', label: 'open' }, { value: 'draft', label: 'drafts' }, { value: 'completed', label: 'completedPlural' }]; }
+  requestFilterOptions(): { value: string; label: 'all' | 'open' | 'drafts' | 'completedPlural' }[] { return [{ value: 'all', label: 'all' }, { value: 'open', label: 'open' }, { value: 'draft', label: 'drafts' }, { value: 'completed', label: 'completedPlural' }]; }
   requestFilterLabel(): string { const option = this.requestFilterOptions().find(item => item.value === this.requestFilter); return this.i18n.text(option?.label ?? 'all'); }
   selectRequestFilter(value: string, menu: HTMLDetailsElement): void { this.requestFilter = value; this.resetRequestLimit(); menu.removeAttribute('open'); }
   toolbarPickerToggled(event: Event): void { const current = event.target as HTMLDetailsElement; if (!current.open) return; current.closest('.list-toolbar')?.querySelectorAll<HTMLDetailsElement>('details[open]').forEach(menu => { if (menu !== current) menu.removeAttribute('open'); }); }
@@ -234,13 +221,19 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   signerStatusLabel(status: string): string { const keys = { pending: 'pending', viewed: 'viewed', signed: 'signed', declined: 'declined' } as const; return status in keys ? this.i18n.text(keys[status as keyof typeof keys]) : status; }
   identityLabel(signer: Signer): string { const type = (signer.identity_document_type ?? '').replace('BR_', '').replace('PT_', '').replaceAll('_', ' '); const country = this.alpha3Country(signer.identity_document_country); return [country, `${type} ${signer.identity_document_masked ?? ''}`.trim()].filter(Boolean).join(' · '); }
   selectedTenant(): TenantItem | undefined { return this.tenants().find(item => item.id === this.tenantId); }
-  billingTenants(): TenantItem[] { return this.tenants().filter(item => item.role === 'admin' || item.role === 'auditor'); }
+  billingTenants(): TenantItem[] { return this.tenants().filter(item => item.role === 'admin'); }
   organizationLabel(snapshot: NonNullable<Signer['representation_snapshot']>): string { return [snapshot.legal_name || snapshot.name, snapshot.registration_masked].filter(Boolean).join(' · '); }
   participantRoleLabel(role: Signer['participant_role']): string { return role === 'company_representative' ? this.companyRepresentativeLabel() : this.externalSignerLabel(); }
   participantTypeTitle(): string { return this.localized({ 'pt-BR':'Como esta pessoa assinará?', en:'How will this person sign?', es:'¿Cómo firmará esta persona?', 'ja-JP':'この方の署名方法' }); }
   participantTypeHelp(): string { return this.signerParticipantRole === 'company_representative' ? this.localized({ 'pt-BR':'Use o e-mail de um administrador ou membro ativo deste tenant. A assinatura vinculará o CPF da pessoa ao CNPJ da empresa.', en:'Use the email of an active administrator or member of this tenant. The signature will bind the person’s CPF to the company’s CNPJ.', es:'Usa el correo de un administrador o miembro activo de este tenant. La firma vinculará el CPF de la persona al CNPJ de la empresa.', 'ja-JP':'このテナントの有効な管理者またはメンバーのメールアドレスを使用してください。署名に本人のCPFと会社のCNPJが記録されます。' }) : this.localized({ 'pt-BR':'A pessoa assinará em nome próprio, sem representar esta empresa.', en:'The person will sign in their own name without representing this company.', es:'La persona firmará en nombre propio, sin representar a esta empresa.', 'ja-JP':'会社を代表せず、本人名義で署名します。' }); }
   externalSignerLabel(): string { return this.localized({ 'pt-BR':'Signatário externo ou pessoa física', en:'External or personal signer', es:'Firmante externo o persona física', 'ja-JP':'外部署名者または個人' }); }
   companyRepresentativeLabel(): string { return this.localized({ 'pt-BR':'Representante da empresa', en:'Company representative', es:'Representante de la empresa', 'ja-JP':'会社代表者' }); }
+  participantRoleOptions(): RubricaSelectOption[] {
+    const options: RubricaSelectOption[] = [{ value: 'external_signer', label: this.externalSignerLabel() }];
+    if (this.selectedTenant()?.kind === 'business') options.push({ value: 'company_representative', label: this.companyRepresentativeLabel() });
+    return options;
+  }
+  selectParticipantRole(value: string): void { this.signerParticipantRole = value as 'external_signer' | 'company_representative'; }
   private localized(values: Record<Locale, string>): string { return values[this.i18n.locale()]; }
 
   private alpha3Country(country: string | null | undefined): string { return ({ BR: 'BRA', JP: 'JPN', PT: 'PRT', US: 'USA' } as Record<string, string>)[(country ?? '').toUpperCase()] ?? (country ?? '').toUpperCase(); }
@@ -249,6 +242,11 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   billingPlanLabel(tenantId: string): string { const account = this.billingFor(tenantId); if (!account) return this.i18n.text('unavailable'); if (account.complimentary_lifetime) return this.i18n.text('lifetimePlan'); if (account.current_product_code === 'rubrica_team' && this.billingFileLimit(account) !== null) return this.localized({ 'pt-BR':'Equipe', en:'Team', es:'Equipo', 'ja-JP':'チーム' }); if (account.current_product_code === 'rubrica_intermediate' && this.billingFileLimit(account) !== null) return this.i18n.text('intermediatePlan'); if (account.current_product_code === 'rubrica_base' && this.billingFileLimit(account) !== null) return this.i18n.text('basePlan'); return this.i18n.text('free'); }
   billingUsage(tenantId: string): string { const account = this.billingFor(tenantId); if (!account) return this.i18n.text('unavailable'); return this.billingFileLimit(account) !== null ? this.i18n.text('files', { count: account.files_uploaded_in_period ?? 0 }) : this.i18n.text('signatures', { count: account.signatures_used }); }
   billingAvailability(tenantId: string): string { const account = this.billingFor(tenantId); if (!account) return this.i18n.text('unavailable'); if (account.unlimited_files) return this.i18n.text('unlimited'); const limit = this.billingFileLimit(account); if (limit !== null) return this.i18n.text('filesRemainingOf', { remaining: account.files_remaining ?? Math.max(limit - (account.files_uploaded_in_period ?? 0), 0), limit }); return this.i18n.text('remainingOf', { remaining: account.signatures_remaining ?? 0, limit: account.free_signatures_limit }); }
+  billingQuotaSummary(tenantId: string): string { const account = this.billingFor(tenantId); if (!account) return this.i18n.text('unavailable'); if (account.unlimited_files) return this.i18n.text('unlimited'); const limit = this.billingFileLimit(account); const used = limit !== null ? account.files_uploaded_in_period ?? 0 : account.signatures_used; return `${used} de ${limit ?? account.free_signatures_limit}`; }
+  billingQuotaAvailable(tenantId: string): string { const account = this.billingFor(tenantId); if (!account) return this.i18n.text('unavailable'); if (account.unlimited_files) return this.i18n.text('unlimited'); const limit = this.billingFileLimit(account); return `${limit !== null ? this.i18n.text('files', { count: account.files_remaining ?? Math.max(limit - (account.files_uploaded_in_period ?? 0), 0) }) : this.i18n.text('signatures', { count: account.signatures_remaining ?? 0 })} ${this.availableLabel()}`; }
+  totalSignaturesLabel(): string { return this.localized({ 'pt-BR':'Total de assinaturas', en:'Total signatures', es:'Total de firmas', 'ja-JP':'署名総数' }); }
+  monthlyAllowanceLabel(): string { return this.localized({ 'pt-BR':'Franquia mensal', en:'Monthly allowance', es:'Cuota mensual', 'ja-JP':'月間利用枠' }); }
+  availableLabel(): string { return this.localized({ 'pt-BR':'disponíveis', en:'available', es:'disponibles', 'ja-JP':'利用可能' }); }
   emailInvitationsEnabled(): boolean { return this.billingFor(this.tenantId)?.email_invitations_enabled === true; }
 
   showUploadModal(): void { this.uploadModalOpen.set(true); this.syncModalLock(); }
@@ -384,7 +382,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   private async reload(): Promise<void> { const [documents, requests] = await Promise.all([firstValueFrom(this.api.get<DocumentItem[]>('/documents')), firstValueFrom(this.api.get<SignatureRequest[]>('/signature-requests'))]); this.documents.set(documents); this.requests.set(requests.sort((a, b) => b.id.localeCompare(a.id, undefined, { numeric: true }))); }
   private async loadSigners(requestId: string): Promise<void> { this.signers.set(await firstValueFrom(this.api.get<Signer[]>(`/signature-requests/${requestId}/signers`))); }
   private async loadSignerContacts(): Promise<void> { const tenant = this.tenants().find(item => item.slug === this.tenantSlug); if (!tenant) return; this.signerContacts.set(await firstValueFrom(this.api.get<SignerContact[]>(`/tenants/${tenant.id}/signer-contacts`))); }
-  private async loadBilling(tenants: TenantItem[]): Promise<void> { if (!this.isAdmin()) return; const manageableTenants = tenants.filter(tenant => tenant.role === 'admin' || tenant.role === 'auditor'); const results = await Promise.allSettled(manageableTenants.map(async tenant => [tenant.id, await firstValueFrom(this.api.get<BillingAccount>(`/billing/tenants/${tenant.id}/account`))] as const)); const accounts: Record<string, BillingAccount> = {}; for (const result of results) if (result.status === 'fulfilled') accounts[result.value[0]] = result.value[1]; this.billingAccounts.set(accounts); }
+  private async loadBilling(tenants: TenantItem[]): Promise<void> { if (!this.isAdmin()) return; const manageableTenants = tenants.filter(tenant => tenant.role === 'admin'); const results = await Promise.allSettled(manageableTenants.map(async tenant => [tenant.id, await firstValueFrom(this.api.get<BillingAccount>(`/billing/tenants/${tenant.id}/account`))] as const)); const accounts: Record<string, BillingAccount> = {}; for (const result of results) if (result.status === 'fulfilled') accounts[result.value[0]] = result.value[1]; this.billingAccounts.set(accounts); }
   private billingFileLimit(account: BillingAccount): number | null { if (typeof account.files_limit === 'number') return account.files_limit; if (!['active', 'past_due'].includes(account.status)) return null; if (account.current_product_code === 'rubrica_base') return 20; if (account.current_product_code === 'rubrica_intermediate') return 80; if (account.current_product_code === 'rubrica_team') return 200; return null; }
   private async loadAdminRequestDetails(request: SignatureRequest): Promise<void> { const [link, evidence] = await Promise.allSettled([firstValueFrom(this.api.get<SigningLink>(`/signature-requests/${request.id}/signing-link`)), firstValueFrom(this.api.get<SignatureEvidence[]>(`/signature-requests/${request.id}/evidence`))]); if (link.status === 'fulfilled') await this.storeSigningLink(request.id, link.value.signing_url); if (evidence.status === 'fulfilled') this.requestEvidence.set(evidence.value); }
   private async storeSigningLink(requestId: string, url: string): Promise<void> { this.requestLinks.update(items => ({ ...items, [requestId]: url })); this.requestQrCode.set(await QRCode.toDataURL(url, { width: 220, margin: 2 })); }

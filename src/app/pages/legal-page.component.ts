@@ -6,6 +6,7 @@ import { Meta, Title } from '@angular/platform-browser';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import { LanguagePickerComponent } from '../components/language-picker.component';
+import { RubricaSelectComponent, RubricaSelectOption } from '../components/rubrica-select.component';
 import { I18nService, Locale } from '../core/i18n.service';
 import { SeoService } from '../core/seo.service';
 
@@ -54,14 +55,14 @@ const shared: Record<Locale, UiCopy> = {
 
 @Component({
   standalone: true,
-  imports: [RouterLink, FormsModule, LanguagePickerComponent],
+  imports: [RouterLink, FormsModule, LanguagePickerComponent, RubricaSelectComponent],
   template: `
-    <main class="legal-shell"><nav class="legal-nav"><a class="landing-brand" routerLink="/" aria-label="Rubrica"><img src="icons/rubrica-brand/source/rubrica-lockup-primary.png" alt="Rubrica Signature" /></a><div class="landing-actions"><app-language-picker /><a class="landing-button small" routerLink="/login">{{ ui().signIn }}</a></div></nav>
+    <main class="legal-shell"><nav class="legal-nav"><a class="landing-brand" routerLink="/" aria-label="Rubrica"><img src="icons/rubrica-brand/lockup/384x384/rubrica-lockup-primary-384x384.png" alt="Rubrica Signature" /></a><div class="landing-actions"><app-language-picker /><a class="landing-button small" routerLink="/login">{{ ui().signIn }}</a></div></nav>
     <article class="legal-document"><a routerLink="/" class="back-link"><i class="bi bi-arrow-left"></i> {{ ui().back }}</a><span class="landing-eyebrow">{{ page().eyebrow }}</span><h1>{{ page().title }}</h1><p class="legal-intro">{{ page().intro }}</p>
     @for (section of page().sections; track section[0]) { <section><h2>{{ section[0] }}</h2><p>{{ section[1] }}</p></section> }
     @if (hasForm) {
       <form class="contact-form" (ngSubmit)="submit()" #contactForm="ngForm"><h2>{{ ui().formTitle }}</h2><div class="contact-fields"><label>{{ ui().name }}<input name="name" [(ngModel)]="form.name" required minlength="2" maxlength="120" autocomplete="name" /></label><label>{{ ui().email }}<input name="email" type="email" [(ngModel)]="form.email" required email maxlength="254" autocomplete="email" /></label></div>
-      @if (isEnterprise) { <div class="contact-fields"><label>{{ ui().company }}<input name="company" [(ngModel)]="form.company" required minlength="2" maxlength="160" autocomplete="organization" /></label><label>{{ ui().teamSize }}<select name="teamSize" [(ngModel)]="form.team_size" required><option value="1-20">{{ ui().sizeSmall }}</option><option value="21-100">{{ ui().sizeMedium }}</option><option value="101+">{{ ui().sizeLarge }}</option></select></label></div> } @else { <label>{{ ui().topic }}<select name="topic" [(ngModel)]="form.topic" required><option value="sales">{{ ui().sales }}</option><option value="support">{{ ui().support }}</option><option value="privacy">{{ ui().privacy }}</option></select></label> }
+      @if (isEnterprise) { <div class="contact-fields"><label>{{ ui().company }}<input name="company" [(ngModel)]="form.company" required minlength="2" maxlength="160" autocomplete="organization" /></label><div class="form-field"><span class="field-label">{{ ui().teamSize }}</span><app-rubrica-select [ariaLabel]="ui().teamSize" [value]="form.team_size" [options]="teamSizeOptions()" (valueChange)="form.team_size = $event" /></div></div> } @else { <div class="form-field"><span class="field-label">{{ ui().topic }}</span><app-rubrica-select [ariaLabel]="ui().topic" [value]="form.topic" [options]="topicOptions()" (valueChange)="form.topic = $event" /></div> }
       <label>{{ ui().message }}<textarea name="message" [(ngModel)]="form.message" required minlength="10" maxlength="3000" rows="6" [placeholder]="isEnterprise ? ui().enterprisePlaceholder : ui().placeholder"></textarea></label><label class="contact-honeypot" aria-hidden="true">Website<input name="website" [(ngModel)]="form.website" tabindex="-1" autocomplete="off" /></label><div #turnstileContainer class="contact-turnstile"></div>
       @if (state === 'sent') { <p class="contact-success" role="status">{{ ui().sent }}</p> } @if (state === 'error') { <p class="contact-error" role="alert">{{ ui().error }} <a href="mailto:contact@rubricasignature.com">contact@rubricasignature.com</a>.</p> } @if (state === 'unavailable') { <p class="contact-error" role="status">{{ ui().unavailable }} <a href="mailto:contact@rubricasignature.com">contact@rubricasignature.com</a>.</p> }
       <button class="landing-button" type="submit" [disabled]="contactForm.invalid || !turnstileToken || state === 'sending'">{{ state === 'sending' ? ui().sending : ui().send }}</button></form>
@@ -78,6 +79,8 @@ export class LegalPageComponent implements AfterViewInit {
   readonly hasForm = this.isContact || this.isEnterprise;
   @ViewChild('turnstileContainer') turnstileContainer?: ElementRef<HTMLElement>;
   form = { name: '', email: '', company: '', team_size: '1-20', topic: this.isEnterprise ? 'enterprise' : 'sales', message: '', website: '' };
+  teamSizeOptions(): RubricaSelectOption[] { return [{ value: '1-20', label: this.ui().sizeSmall }, { value: '21-100', label: this.ui().sizeMedium }, { value: '101+', label: this.ui().sizeLarge }]; }
+  topicOptions(): RubricaSelectOption[] { return [{ value: 'sales', label: this.ui().sales }, { value: 'support', label: this.ui().support }, { value: 'privacy', label: this.ui().privacy }]; }
   turnstileToken = '';
   state: 'idle' | 'sending' | 'sent' | 'error' | 'unavailable' = 'idle';
   private widgetId?: string;

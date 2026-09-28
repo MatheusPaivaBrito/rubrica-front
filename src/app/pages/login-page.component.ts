@@ -16,13 +16,13 @@ import { TurnstileState, TurnstileWidgetComponent } from '../components/turnstil
   imports: [FormsModule, RouterLink, LanguagePickerComponent, OneTimeCodeComponent, PasswordFieldComponent, TurnstileWidgetComponent],
   template: `
     <main class="login-layout"><section class="card auth-card">
-      <a class="auth-logo-link" routerLink="/" [attr.aria-label]="i18n.text('backToHome')"><img class="auth-logo" src="icons/rubrica-brand/source/rubrica-lockup-primary.png" alt="Rubrica Signature" /></a>
+      <a class="auth-logo-link" routerLink="/" [attr.aria-label]="i18n.text('backToHome')"><img class="auth-logo" src="icons/rubrica-brand/lockup/384x384/rubrica-lockup-primary-384x384.png" alt="Rubrica Signature" /></a>
       <div class="auth-language"><app-language-picker /></div>
       <div class="auth-heading"><h1>{{ i18n.text('login') }}</h1>
       <p class="muted">{{ i18n.text('loginHelp') }}</p></div>
       <form class="form" (ngSubmit)="submit()" #form="ngForm">
         @if (!mfaTicket()) {
-          <label>{{ i18n.text('email') }} <input name="email" type="email" [(ngModel)]="email" required autocomplete="email" /></label>
+          <label>{{ i18n.text('email') }} <input name="email" type="email" [(ngModel)]="email" required autocomplete="email" (paste)="pasteCredentials($event)" /></label>
           <app-password-field name="password" [(ngModel)]="password" [label]="i18n.text('password')" autocomplete="current-password" required />
         } @else {
           <span class="field-label">{{ i18n.text('authenticatorCode') }}</span>
@@ -43,7 +43,7 @@ import { TurnstileState, TurnstileWidgetComponent } from '../components/turnstil
   `,
   styles: [`
     .auth-logo-link{display:block;width:max-content;margin:0 auto 1rem;line-height:0}
-    .auth-logo{display:block;width:175px;height:70px;object-fit:contain;object-position:center}
+    .auth-logo{display:block;width:175px;height:70px;object-fit:cover;object-position:center}
     .auth-heading{margin-top:1.35rem}
     .auth-heading h1{margin-bottom:.55rem}
     .login-turnstile{display:block;margin:1rem 0 0}
@@ -65,6 +65,7 @@ export class LoginPageComponent {
   readonly returnUrl: string | null;
 
   constructor(private readonly auth: AuthService, private readonly router: Router, private readonly route: ActivatedRoute, private readonly feedback: FeedbackService, readonly i18n: I18nService) {
+    this.email = this.route.snapshot.queryParamMap.get('email')?.trim() || '';
     const candidate = this.route.snapshot.queryParamMap.get('returnUrl');
     this.returnUrl = candidate?.startsWith('/signing/') ? candidate : null;
   }
@@ -73,6 +74,16 @@ export class LoginPageComponent {
     this.verificationLoading.set(state.loading);
     this.verificationRequired.set(state.required);
     this.verificationError.set(state.error);
+  }
+
+  pasteCredentials(event: ClipboardEvent): void {
+    const clipboard = event.clipboardData?.getData('text/plain') || '';
+    const parts = clipboard.split(/\t|\r?\n/).map(value => value.trim()).filter(Boolean);
+    if (parts.length !== 2 || !parts[0].includes('@')) return;
+    event.preventDefault();
+    this.email = parts[0];
+    this.password = parts[1];
+    window.setTimeout(() => document.querySelector<HTMLInputElement>('.password-field input')?.focus());
   }
 
   async submit(): Promise<void> {
