@@ -14,6 +14,7 @@ export const routes: Routes = [
   { path: 'termos', pathMatch: 'full', redirectTo: 'terms' },
   { path: 'exclusao-de-dados', pathMatch: 'full', redirectTo: 'data-deletion' },
   { path: 'login', loadComponent: () => import('./pages/login-page.component').then(module => module.LoginPageComponent) },
+  { path: 'reactivate-account', loadComponent: () => import('./pages/account-reactivation-page.component').then(module => module.AccountReactivationPageComponent) },
   { path: 'register', loadComponent: () => import('./pages/account-page.component').then(module => module.AccountPageComponent) },
   { path: 'forgot-password', loadComponent: () => import('./pages/account-page.component').then(module => module.AccountPageComponent) },
   { path: 'reset-password', loadComponent: () => import('./pages/account-page.component').then(module => module.AccountPageComponent) },
