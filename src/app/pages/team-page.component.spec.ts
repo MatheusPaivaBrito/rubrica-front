@@ -1,10 +1,10 @@
 import { shouldLeaveTeamPage } from './team-page.component';
 import type { TenantTeam } from '../core/models';
 
-function team(memberLimit: number, requiresSelection: boolean): TenantTeam {
+function team(memberLimit: number | null, requiresSelection: boolean): TenantTeam {
   return {
     current_member_id: 'admin', member_limit: memberLimit,
-    active_count: requiresSelection ? memberLimit + 1 : memberLimit,
+    active_count: memberLimit === null ? 12 : requiresSelection ? memberLimit + 1 : memberLimit,
     requires_selection: requiresSelection, can_manage: true, members: [],
   };
 }
@@ -20,5 +20,9 @@ describe('shouldLeaveTeamPage', () => {
 
   it('keeps the team page available for multi-member plans', () => {
     expect(shouldLeaveTeamPage(team(3, false))).toBe(false);
+  });
+
+  it('keeps the team page available for unlimited lifetime tenants', () => {
+    expect(shouldLeaveTeamPage(team(null, false))).toBe(false);
   });
 });

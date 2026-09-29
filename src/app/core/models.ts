@@ -63,4 +63,4 @@ export interface SigningContext {
   issuer_snapshot?: OrganizationSnapshot | null;
 }
 
-export interface TenantTeam { members: TenantMember[]; member_limit: number; active_count: number; requires_selection: boolean; can_manage: boolean; current_member_id: string; }
+export interface TenantTeam { members: TenantMember[]; member_limit: number | null; active_count: number; requires_selection: boolean; can_manage: boolean; current_member_id: string; }

@@ -17,14 +17,14 @@ import { RubricaSelectComponent, RubricaSelectOption } from '../components/rubri
     <div class="workspace-layout"><app-workspace-sidebar [tenant]="tenant()" />
       <section class="container dashboard-container team-container">
         <header class="dashboard-header"><div><p class="eyebrow">{{ tenant()?.name }}</p><h1>{{ copy().team }}</h1><p class="muted">{{ copy().help }}</p></div>
-          @if (team()?.can_manage && team()!.active_count < team()!.member_limit) { <button class="button" (click)="inviteOpen.set(true)"><i class="bi bi-person-plus" aria-hidden="true"></i> {{ inviteLabel() }}</button> }
+          @if (team()?.can_manage && canAddMember(team()!)) { <button class="button" (click)="inviteOpen.set(true)"><i class="bi bi-person-plus" aria-hidden="true"></i> {{ inviteLabel() }}</button> }
         </header>
         @if (loading()) { <p class="notice">{{ i18n.text('loading') }}</p> }
         @else if (team(); as state) {
           @if (state.requires_selection) { <p class="notice warning" role="alert">{{ copy().overLimit }}</p> }
           @if (!state.can_manage) { <p class="notice">{{ copy().readonly }}</p> }
           <article class="card table-card">
-            <div class="section-heading"><div><h2>{{ copy().limit }}: {{ state.member_limit }}</h2><p class="muted">{{ copy().choose }}: {{ state.active_count }} · {{ selected().size }} {{ copy().selected }}</p></div></div>
+            <div class="section-heading"><div><h2>{{ copy().limit }}: {{ memberLimitLabel(state) }}</h2><p class="muted">{{ copy().choose }}: {{ state.active_count }} · {{ selected().size }} {{ copy().selected }}</p></div></div>
             <div class="table-wrap"><table class="data-table"><thead><tr><th>{{ i18n.text('email') }}</th><th>{{ i18n.text('profile') }}</th><th>{{ i18n.text('status') }}</th><th>{{ copy().choose }}</th></tr></thead><tbody>
               @for (member of state.members; track member.id) {
                 <tr><td>{{ member.auth_user_id }}</td><td [attr.data-label]="i18n.text('profile')">@if (member.role === 'admin') { {{ copy().admin }} } @else { <app-rubrica-select [ariaLabel]="i18n.text('profile') + ': ' + member.auth_user_id" [disabled]="saving()" [value]="member.role" [options]="roleOptions()" (valueChange)="changeRole(member, $event)" /> }</td><td [attr.data-label]="i18n.text('status')"><span class="badge" [class.complete]="member.status === 'active'">{{ member.status === 'active' ? copy().active : copy().suspended }}</span></td>
@@ -32,7 +32,7 @@ import { RubricaSelectComponent, RubricaSelectOption } from '../components/rubri
               }
             </tbody></table></div>
             <div class="team-footer"><p class="muted">{{ copy().preserved }}</p>
-              @if (state.can_manage) { <p class="muted">{{ copy().owner }}</p><button class="button" [disabled]="saving() || !dirty() || selected().size > state.member_limit" (click)="save()">{{ saving() ? i18n.text('loading') : copy().save }}</button> }
+              @if (state.can_manage) { <p class="muted">{{ copy().owner }}</p><button class="button" [disabled]="saving() || !dirty() || exceedsMemberLimit(state)" (click)="save()">{{ saving() ? i18n.text('loading') : copy().save }}</button> }
               @if (saved()) { <p role="status">{{ copy().saved }}</p> }
             </div>
           </article>
@@ -106,10 +106,13 @@ export class TeamPageComponent implements OnInit {
     this.team.set(team);
     this.selected.set(new Set(team.members.filter(m => m.status === 'active').map(m => m.id)));
   }
+  canAddMember(team: TenantTeam): boolean { return team.member_limit === null || team.active_count < team.member_limit; }
+  exceedsMemberLimit(team: TenantTeam): boolean { return team.member_limit !== null && this.selected().size > team.member_limit; }
+  memberLimitLabel(team: TenantTeam): string | number { return team.member_limit ?? this.i18n.text('unlimited'); }
   disabled(member: TenantMember): boolean {
     const team = this.team();
     return !team?.can_manage || this.saving() || member.id === team.current_member_id
-      || (!this.selected().has(member.id) && this.selected().size >= team.member_limit);
+      || (team.member_limit !== null && !this.selected().has(member.id) && this.selected().size >= team.member_limit);
   }
   toggle(id: string) {
     const selected = new Set(this.selected());
@@ -156,5 +159,5 @@ export class TeamPageComponent implements OnInit {
 }
 
 export function shouldLeaveTeamPage(team: TenantTeam): boolean {
-  return team.member_limit <= 1 && !team.requires_selection;
+  return team.member_limit !== null && team.member_limit <= 1 && !team.requires_selection;
 }
