@@ -24,6 +24,8 @@ export interface UserCreated { id: string; name: string; email: string; role: st
 export interface SignerOption { id: string; name: string; email: string; }
 export interface SignerContact { name: string; email: string; }
 export interface TenantItem { id: string; name: string; slug: string; role: string; currency: string; kind?: 'personal' | 'business'; legal_name?: string | null; registration_country?: string | null; registration_type?: string | null; registration_masked?: string | null; registration_verification_status?: string | null; }
+export interface SuspendedTenantAccess { tenant_id: string; tenant_name: string; tenant_kind: 'personal' | 'business'; role: 'admin' | 'member' | 'auditor'; default_locale: 'pt-BR' | 'en' | 'es' | 'ja-JP'; country_code: string | null; currency: string; }
+export interface TenantAccessState { active_tenant_count: number; suspended_tenants: SuspendedTenantAccess[]; can_create_personal_tenant: boolean; }
 export interface TenantMember { id: string; auth_user_id: string; role: 'admin' | 'member' | 'auditor'; status: string; joined_at?: string | null; }
 export interface BillingAccount {
   id: string;

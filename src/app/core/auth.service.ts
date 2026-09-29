@@ -28,6 +28,10 @@ export function tenantDashboardUrl(tenant: Pick<TenantItem, 'slug' | 'kind'>, ac
     : `/a/${account}/dashboard`;
 }
 
+export function accountLandingUrl(tenants: TenantItem[], accountPublicSlug: string): string {
+  return tenants.length ? tenantDashboardUrl(tenants[0], accountPublicSlug) : '/reactivate-account';
+}
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   readonly context = signal<AccessContext | null>(null);
@@ -82,7 +86,7 @@ export class AuthService {
     try {
       const tenants = await firstValueFrom(this.http.get<TenantItem[]>('/tenants'));
       const accountPublicSlug = this.context()?.account_public_slug;
-      return tenants.length && accountPublicSlug ? tenantDashboardUrl(tenants[0], accountPublicSlug) : '/dashboard';
+      return accountPublicSlug ? accountLandingUrl(tenants, accountPublicSlug) : '/dashboard';
     } catch {
       return '/dashboard';
     }
