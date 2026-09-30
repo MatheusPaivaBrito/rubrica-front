@@ -567,8 +567,8 @@ input:focus, select:focus { outline: 3px solid rgba(168, 32, 53, .16); border-co
 .workspace-layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); min-height: 100vh; }
 .workspace-layout > app-workspace-sidebar { position: relative; z-index: 10; min-width: 0; background: #8f172c; }
 .mobile-workspace-topbar, .mobile-sidebar-toggle, .mobile-sidebar-close, .workspace-sidebar-backdrop { display: none; }
-.workspace-sidebar { display: flex; flex-direction: column; justify-content: space-between; gap: 2rem; height: 100vh; padding: 1.5rem 1rem; position: sticky; top: 0; color: #fff; background: linear-gradient(180deg, #a91f38 0%, #7e1327 62%, #4b101c 100%); box-shadow: 8px 0 28px rgba(67, 13, 24, .12); }
-.sidebar-main { display: grid; align-content: start; gap: 1.35rem; }
+.workspace-sidebar { display: flex; flex-direction: column; gap: 1rem; height: 100dvh; max-height: 100dvh; overflow: hidden; box-sizing: border-box; padding: 1.5rem 1rem; position: sticky; top: 0; color: #fff; background: linear-gradient(180deg, #a91f38 0%, #7e1327 62%, #4b101c 100%); box-shadow: 8px 0 28px rgba(67, 13, 24, .12); }
+.sidebar-main { display: grid; align-content: start; gap: 1.35rem; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: .2rem; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .35) transparent; }
 .sidebar-brand { display: flex; align-items: center; min-height: 64px; padding: 0 .65rem; border-radius: 12px; }
 .sidebar-brand img { display: block; width: 178px; height: 58px; object-fit: cover; object-position: center; }
 .sidebar-account { display: grid; gap: .2rem; padding: 1rem; border: 1px solid rgba(255, 255, 255, .16); border-radius: 14px; background: rgba(55, 5, 16, .16); }
@@ -584,7 +584,7 @@ input:focus, select:focus { outline: 3px solid rgba(168, 32, 53, .16); border-co
 .sidebar-navigation i, .sidebar-action i { width: 1.2rem; font-size: 1.05rem; text-align: center; }
 .sidebar-navigation a:hover, .sidebar-action:hover { background: rgba(255, 255, 255, .11); }
 .sidebar-navigation a.selected { color: #8f172c; background: #fff; box-shadow: 0 8px 20px rgba(55, 5, 16, .16); }
-.sidebar-tools { display: grid; gap: .4rem; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, .16); }
+.sidebar-tools { display: grid; flex: 0 0 auto; gap: .4rem; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, .16); }
 .sidebar-tools app-language-picker, .sidebar-tools .language-picker, .sidebar-tools .language-picker summary { width: 100%; min-width: 0; }
 .sidebar-tools .language-picker summary { border-color: rgba(255, 255, 255, .16); color: #fff; background: rgba(255, 255, 255, .09); box-shadow: none; }
 .sidebar-tools .language-picker summary:hover { border-color: rgba(255, 255, 255, .3); background: rgba(255, 255, 255, .14); }
@@ -604,6 +604,7 @@ input:focus, select:focus { outline: 3px solid rgba(168, 32, 53, .16); border-co
   .mobile-sidebar-toggle i { display: block; font-size: 1.7rem; line-height: 1; }
   .workspace-sidebar-backdrop { display: block; width: 100%; height: 100%; padding: 0; position: fixed; inset: 0; z-index: 90; border: 0; background: rgba(13, 17, 24, .66); backdrop-filter: blur(2px); touch-action: none; cursor: default; }
   .workspace-sidebar { width: min(80vw, 340px); height: 100dvh; padding: max(1.25rem, env(safe-area-inset-top)) 1rem max(1.25rem, env(safe-area-inset-bottom)); position: fixed; inset: 0 auto 0 0; z-index: 100; overflow-y: auto; overscroll-behavior: contain; transform: translateX(-105%); transition: transform .22s ease; }
+  .sidebar-main { min-height: auto; overflow: visible; padding-right: 0; }
   .workspace-sidebar.mobile-open { transform: translateX(0); }
   .mobile-sidebar-close { display: grid; place-items: center; width: 42px; height: 42px; padding: 0; position: absolute; top: max(.8rem, env(safe-area-inset-top)); right: .75rem; z-index: 2; border: 1px solid rgba(255, 255, 255, .2); border-radius: 11px; color: #fff; background: rgba(55, 5, 16, .2); cursor: pointer; }
   .mobile-sidebar-close i { font-size: 1.15rem; }
