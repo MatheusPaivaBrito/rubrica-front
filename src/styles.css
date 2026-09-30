@@ -623,3 +623,8 @@ input:focus, select:focus { outline: 3px solid rgba(168, 32, 53, .16); border-co
 }
 
 .team-container .data-table td:first-child { overflow-wrap: anywhere; }
+
+.pdf-security-help { color: #344054; text-align: left; }
+.pdf-security-help h3 { margin: 1.25rem 0 .65rem; color: #1d2939; font-size: 1rem; }
+.pdf-security-help ol { display: grid; gap: .55rem; margin: 0; padding-left: 1.35rem; }
+.pdf-security-help p { line-height: 1.55; }

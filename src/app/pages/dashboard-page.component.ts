@@ -14,6 +14,7 @@ import { TenantTeam, BillingAccount, DocumentItem, SignatureEvidence, SignatureM
 import { dateTime } from '../core/date-time';
 import { evidenceDownloadLabel, evidenceReportHtml } from '../core/evidence-report';
 import { I18nService, Locale } from '../core/i18n.service';
+import { detectClientPlatform, pdfUploadHelp } from '../core/pdf-upload-help';
 import { LanguagePickerComponent } from '../components/language-picker.component';
 import { PdfStampViewerComponent } from '../components/pdf-stamp-viewer.component';
 import { DateFilterComponent } from '../components/date-filter.component';
@@ -294,7 +295,25 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  async upload(): Promise<void> { if (!this.file || !this.tenantSlug) return; await this.run(async () => { const file = this.file!; const content = await file.arrayBuffer(); await firstValueFrom(this.api.postFile<DocumentItem>('/documents', content, file.type || 'application/pdf', { organization_id: this.tenantSlug, title: this.title, filename: file.name, content_type: file.type || 'application/pdf' })); this.title = ''; this.file = null; this.closeUploadModal(); await this.reload(); await Swal.fire({ icon: 'success', title: this.i18n.text('documentSent'), timer: 1500, showConfirmButton: false }); }); }
+  async upload(): Promise<void> {
+    if (!this.file || !this.tenantSlug || this.submitting()) return;
+    this.submitting.set(true);
+    try {
+      const file = this.file;
+      const content = await file.arrayBuffer();
+      await firstValueFrom(this.api.postFile<DocumentItem>('/documents', content, file.type || 'application/pdf', { organization_id: this.tenantSlug, title: this.title, filename: file.name, content_type: file.type || 'application/pdf' }));
+      this.title = '';
+      this.file = null;
+      this.closeUploadModal();
+      await this.reload();
+      await Swal.fire({ icon: 'success', title: this.i18n.text('documentSent'), timer: 1500, showConfirmButton: false });
+    } catch (error) {
+      if (this.requiresPdfFlattening(error)) await this.showPdfUploadHelp();
+      else await this.feedback.error(error);
+    } finally {
+      this.submitting.set(false);
+    }
+  }
   async createRequest(): Promise<void> { const document = this.selectedDocument(); if (!document || !this.expiresAt) return; await this.run(async () => { const request = await firstValueFrom(this.api.post<SignatureRequest>('/signature-requests', { document_id: document.id, expires_at: dateTime.toUtcIso(this.expiresAt) })); this.requests.update((items) => [request, ...items]); this.closeRequestCreateModal(); await this.openRequestDetails(request); }); }
   async addSigner(): Promise<void> { const request = this.selectedRequest(); if (!request || !this.signerName.trim() || !this.signerEmail.trim()) return; const representedTenantId = this.signerParticipantRole === 'company_representative' ? this.tenantId : null; await this.run(async () => { await firstValueFrom(this.api.post<Signer>(`/signature-requests/${request.id}/signers`, { name: this.signerName.trim(), email: this.signerEmail.trim().toLowerCase(), preferred_locale: this.signerLocale, participant_role: this.signerParticipantRole, represented_tenant_id: representedTenantId })); this.signerName = ''; this.signerEmail = ''; this.signerLocale = this.i18n.locale(); this.signerParticipantRole = 'external_signer'; this.contactSearch.set(''); await Promise.all([this.loadSigners(request.id), this.loadSignerContacts()]); const refreshed = await firstValueFrom(this.api.get<SignatureRequest>(`/signature-requests/${request.id}`)); this.updateRequest(refreshed); }); }
   async openRequest(): Promise<void> {
@@ -408,5 +427,28 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     window.scrollTo(0, this.modalScrollY);
   }
   private async run(action: () => Promise<void>): Promise<void> { this.submitting.set(true); try { await action(); } catch (error) { await this.feedback.error(error); } finally { this.submitting.set(false); } }
+  private requiresPdfFlattening(error: unknown): boolean {
+    if (typeof error !== 'object' || error === null || !('error' in error)) return false;
+    const body = (error as { error?: unknown }).error;
+    return typeof body === 'object' && body !== null && 'code' in body
+      && (body as { code?: unknown }).code === 'pdf_requires_flattening';
+  }
+  private async showPdfUploadHelp(): Promise<void> {
+    const clientNavigator = navigator as Navigator & { userAgentData?: { platform?: string } };
+    const platform = detectClientPlatform(
+      clientNavigator.userAgent,
+      clientNavigator.userAgentData?.platform || clientNavigator.platform,
+      clientNavigator.maxTouchPoints,
+    );
+    const help = pdfUploadHelp(this.i18n.locale(), platform);
+    await Swal.fire({
+      icon: 'warning',
+      title: help.title,
+      html: help.html,
+      width: 680,
+      confirmButtonText: this.i18n.text('understood'),
+      confirmButtonColor: '#a82035',
+    });
+  }
   private setFile(file: File | null): void { if (!file) return; if ([...file.name].length > 120) { void this.feedback.warning(this.i18n.text('fileNameTooLong', { count: 120 }), this.i18n.text('invalidFile')); return; } if (file.size > 50 * 1024 * 1024) { void this.feedback.warning(this.i18n.text('tooLarge'), this.i18n.text('invalidFile')); return; } if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) { void this.feedback.warning(this.i18n.text('pdfOnly'), this.i18n.text('invalidFile')); return; } this.file = file; }
 }
