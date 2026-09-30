@@ -19,7 +19,7 @@ interface ReactivationCopy {
   imports: [FormsModule],
   template: `
     <main class="login-layout"><section class="card reactivation-card">
-      <img class="reactivation-logo" src="icons/rubrica-brand/lockup/384x384/rubrica-lockup-primary-384x384.png" alt="Rubrica Signature" />
+      <img class="reactivation-logo" src="icons/rubrica-brand/lockup/192x192/rubrica-lockup-primary-192x192.png" alt="Rubrica Signature" />
       @if (loading()) { <p class="notice">{{ text().loading }}</p> }
       @else {
         <p class="eyebrow">{{ text().eyebrow }}</p>

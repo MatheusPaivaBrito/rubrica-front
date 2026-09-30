@@ -16,7 +16,7 @@ import { TurnstileState, TurnstileWidgetComponent } from '../components/turnstil
   imports: [FormsModule, RouterLink, LanguagePickerComponent, OneTimeCodeComponent, PasswordFieldComponent, TurnstileWidgetComponent],
   template: `
     <main class="login-layout"><section class="card auth-card">
-      <a class="auth-logo-link" routerLink="/" [attr.aria-label]="i18n.text('backToHome')"><img class="auth-logo" src="icons/rubrica-brand/lockup/384x384/rubrica-lockup-primary-384x384.png" alt="Rubrica Signature" /></a>
+      <a class="auth-logo-link" routerLink="/" [attr.aria-label]="i18n.text('backToHome')"><img class="auth-logo" src="icons/rubrica-brand/lockup/192x192/rubrica-lockup-primary-192x192.png" alt="Rubrica Signature" /></a>
       <div class="auth-language"><app-language-picker /></div>
       <div class="auth-heading"><h1>{{ i18n.text('login') }}</h1>
       <p class="muted">{{ i18n.text('loginHelp') }}</p></div>
