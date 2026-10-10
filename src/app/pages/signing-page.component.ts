@@ -76,7 +76,7 @@ import { LanguagePickerComponent } from '../components/language-picker.component
           </section> }
 
           @if (!administrativeView()) { <p class="notice">{{ i18n.text('evidenceNotice') }}</p> }
-          @if (signatureMode() === 'serpro_timestamp') { <p class="notice">{{ timestampHelpLabel() }}</p> }
+          @if (signatureMode() === 'serpro_timestamp' || signatureMode() === 'serproid') { <p class="notice">{{ timestampHelpLabel() }}</p> }
           @if (signatureMode() === 'serproid') { <p class="notice">{{ certificateHelpLabel() }}</p> }
           @if (message()) { <p class="notice">{{ message() }}</p> }
 
@@ -257,7 +257,7 @@ export class SigningPageComponent implements OnInit {
   }
 
   certificateHelpLabel(): string {
-    return ({ 'pt-BR': 'Esta solicitação exige assinatura com certificado digital pelo Serpro ID.', en: 'This request requires a digital certificate signature through Serpro ID.', es: 'Esta solicitud exige una firma con certificado digital mediante Serpro ID.', 'ja-JP': 'この依頼には Serpro ID 経由のデジタル証明書署名が必要です。' } as Record<string, string>)[this.i18n.locale()] ?? 'This request requires a Serpro ID certificate signature.';
+    return ({ 'pt-BR': 'Esta solicitação exige assinatura com certificado digital pelo Serpro ID e recebe carimbo do tempo SERPRO.', en: 'This request requires a Serpro ID digital certificate signature and receives a SERPRO trusted timestamp.', es: 'Esta solicitud exige firma con certificado digital Serpro ID y recibe un sello de tiempo SERPRO.', 'ja-JP': 'この依頼には Serpro ID デジタル証明書署名と SERPRO タイムスタンプが必要です。' } as Record<string, string>)[this.i18n.locale()] ?? 'This request requires a Serpro ID certificate signature and a SERPRO timestamp.';
   }
 
   timestampHelpLabel(): string {

@@ -325,13 +325,17 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     ]);
     const timestampEnabled = timestampConfig.status === 'fulfilled' && timestampConfig.value.enabled;
     const serproidEnabled = serproidConfig.status === 'fulfilled' && serproidConfig.value.enabled;
+    if (!timestampEnabled) {
+      await Swal.fire({ icon: 'error', title: this.signatureModeTitle(), text: this.timestampRequiredHelp(), confirmButtonColor: '#a82035' });
+      return;
+    }
     const result = await Swal.fire({
       icon: 'question',
       title: this.signatureModeTitle(),
       text: this.signatureModeHelp(),
       input: 'radio',
       inputOptions: this.signatureModeOptions(timestampEnabled, serproidEnabled),
-      inputValue: timestampEnabled ? 'serpro_timestamp' : 'evidence',
+      inputValue: 'serpro_timestamp',
       inputValidator: value => value ? undefined : this.signatureModeRequired(),
       showCancelButton: true,
       confirmButtonText: this.i18n.text('openForSigning'),
@@ -350,16 +354,15 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
 
   private signatureModeOptions(timestampEnabled: boolean, serproidEnabled: boolean): Record<string, string> {
     const locale = this.i18n.locale();
-    const options: Record<string, string> = {
-      evidence: ({ 'pt-BR': 'Somente evidências Rubrica', en: 'Rubrica evidence only', es: 'Solo evidencias Rubrica', 'ja-JP': 'Rubrica の証拠情報のみ' } as Record<string, string>)[locale],
-    };
+    const options: Record<string, string> = {};
     if (timestampEnabled) options['serpro_timestamp'] = ({ 'pt-BR': 'Evidências + carimbo do tempo SERPRO', en: 'Evidence + SERPRO timestamp', es: 'Evidencias + sello de tiempo SERPRO', 'ja-JP': '証拠情報 + SERPRO タイムスタンプ' } as Record<string, string>)[locale];
-    if (serproidEnabled) options['serproid'] = ({ 'pt-BR': 'Certificado digital Serpro ID', en: 'Serpro ID digital certificate', es: 'Certificado digital Serpro ID', 'ja-JP': 'Serpro ID デジタル証明書' } as Record<string, string>)[locale];
+    if (timestampEnabled && serproidEnabled) options['serproid'] = ({ 'pt-BR': 'Evidências + Serpro ID + carimbo do tempo SERPRO', en: 'Evidence + Serpro ID + SERPRO timestamp', es: 'Evidencias + Serpro ID + sello de tiempo SERPRO', 'ja-JP': '証拠情報 + Serpro ID + SERPRO タイムスタンプ' } as Record<string, string>)[locale];
     return options;
   }
 
   private signatureModeTitle(): string { return ({ 'pt-BR': 'Escolha como o documento será assinado', en: 'Choose how the document will be signed', es: 'Elija cómo se firmará el documento', 'ja-JP': '署名方法を選択' } as Record<string, string>)[this.i18n.locale()]; }
   private signatureModeHelp(): string { return ({ 'pt-BR': 'A modalidade será fixada ao abrir a solicitação. Serpro ID aceita um único signatário.', en: 'The method is locked when the request opens. Serpro ID supports one signer.', es: 'La modalidad queda fijada al abrir la solicitud. Serpro ID admite un firmante.', 'ja-JP': '依頼を開始すると方式は固定されます。Serpro ID は署名者1名に対応します。' } as Record<string, string>)[this.i18n.locale()]; }
+  private timestampRequiredHelp(): string { return ({ 'pt-BR': 'O carimbo do tempo SERPRO é obrigatório para abrir novas solicitações.', en: 'A SERPRO trusted timestamp is required to open new requests.', es: 'El sello de tiempo SERPRO es obligatorio para abrir nuevas solicitudes.', 'ja-JP': '新しい依頼を開始するには SERPRO タイムスタンプが必要です。' } as Record<string, string>)[this.i18n.locale()]; }
   private signatureModeRequired(): string { return ({ 'pt-BR': 'Escolha uma modalidade.', en: 'Choose a method.', es: 'Elija una modalidad.', 'ja-JP': '方式を選択してください。' } as Record<string, string>)[this.i18n.locale()]; }
   signatureModeFieldLabel(): string { return ({ 'pt-BR': 'Modalidade', en: 'Method', es: 'Modalidad', 'ja-JP': '方式' } as Record<string, string>)[this.i18n.locale()]; }
   signatureModeLabel(mode: SignatureMode): string { return this.signatureModeOptions(true, true)[mode] ?? mode; }
