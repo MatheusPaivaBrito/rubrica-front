@@ -209,7 +209,7 @@ export class SigningPageComponent implements OnInit {
       screen_width: window.screen?.width || null,
       screen_height: window.screen?.height || null,
     };
-    const command = { consent: true, consent_version: 'rubrica-evidence-v1', stamp: { ...stamp, locale: this.i18n.locale(), timezone: dateTime.timezone() }, client, geolocation };
+    const command = { consent: true, consent_version: 'rubrica-evidence-v2', stamp: { ...stamp, locale: this.i18n.locale(), timezone: dateTime.timezone() }, client, geolocation };
     if (useCertificate) {
       this.signing.set(true);
       try {
