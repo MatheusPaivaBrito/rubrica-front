@@ -6,6 +6,14 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import Swal from 'sweetalert2';
 import QRCode from 'qrcode';
+import {
+  createPaginatedRowModel,
+  createSortedRowModel,
+  injectTable,
+  rowPaginationFeature,
+  rowSortingFeature,
+  tableFeatures,
+} from '@tanstack/angular-table';
 
 import { ApiService } from '../core/api.service';
 import { AuthService, tenantDashboardUrl } from '../core/auth.service';
@@ -19,6 +27,31 @@ import { LanguagePickerComponent } from '../components/language-picker.component
 import { PdfStampViewerComponent } from '../components/pdf-stamp-viewer.component';
 import { DateFilterComponent } from '../components/date-filter.component';
 import { RubricaSelectComponent, RubricaSelectOption } from '../components/rubrica-select.component';
+
+const dashboardTableFeatures = tableFeatures({
+  rowSortingFeature,
+  sortedRowModel: createSortedRowModel(),
+  rowPaginationFeature,
+  paginatedRowModel: createPaginatedRowModel(),
+});
+
+const requestTableColumns = [
+  { accessorKey: 'id' },
+  { accessorKey: 'document_title' },
+  { accessorKey: 'status' },
+  { accessorKey: 'signed_count' },
+  { accessorKey: 'expires_at' },
+  { accessorKey: 'created_at' },
+];
+
+const documentTableColumns = [
+  { accessorKey: 'title' },
+  { accessorKey: 'original_filename' },
+  { accessorKey: 'version' },
+  { accessorKey: 'status' },
+  { accessorKey: 'created_at' },
+  { accessorKey: 'id' },
+];
 
 @Component({
   standalone: true,
@@ -51,9 +84,10 @@ import { RubricaSelectComponent, RubricaSelectOption } from '../components/rubri
             </div>
             <div class="table-wrap">
               <table class="data-table">
-                <thead><tr><th>{{ i18n.text('request') }}</th><th>{{ i18n.text('document') }}</th><th>{{ i18n.text('status') }}</th><th>{{ i18n.text('signaturesLabel') }}</th><th>{{ i18n.text('deadline') }}</th><th class="actions-column">{{ i18n.text('actions') }}</th></tr></thead>
+                <thead><tr><th><button class="table-sort" (click)="toggleRequestSort('id')">{{ i18n.text('request') }} <i [class]="sortIcon(requestSortDirection('id'))"></i></button></th><th><button class="table-sort" (click)="toggleRequestSort('document_title')">{{ i18n.text('document') }} <i [class]="sortIcon(requestSortDirection('document_title'))"></i></button></th><th><button class="table-sort" (click)="toggleRequestSort('status')">{{ i18n.text('status') }} <i [class]="sortIcon(requestSortDirection('status'))"></i></button></th><th><button class="table-sort" (click)="toggleRequestSort('signed_count')">{{ i18n.text('signaturesLabel') }} <i [class]="sortIcon(requestSortDirection('signed_count'))"></i></button></th><th><button class="table-sort" (click)="toggleRequestSort('expires_at')">{{ i18n.text('deadline') }} <i [class]="sortIcon(requestSortDirection('expires_at'))"></i></button></th><th class="actions-column">{{ i18n.text('actions') }}</th></tr></thead>
                 <tbody>
-                  @for (request of visibleRequests(); track request.id) {
+                  @for (row of requestTable.getRowModel().rows; track row.id) {
+                    @let request = row.original;
                     <tr>
                       <td [attr.data-label]="i18n.text('request')"><strong>#{{ request.id }}</strong></td>
                       <td [attr.data-label]="i18n.text('document')"><div class="document-cell"><strong>{{ request.document_title }}</strong><small>{{ request.original_filename }} · {{ i18n.text('version') }} {{ request.document_version }}</small></div></td>
@@ -66,16 +100,17 @@ import { RubricaSelectComponent, RubricaSelectOption } from '../components/rubri
                 </tbody>
               </table>
             </div>
-            @if (matchingRequests().length > requestLimit) { <footer class="list-footer"><span>{{ i18n.text('showingCount', { current: visibleRequests().length, total: matchingRequests().length }) }}</span><button class="button secondary compact" (click)="requestLimit = requestLimit + 5">{{ i18n.text('loadMore') }}</button></footer> }
+            @if (matchingRequests().length) { <footer class="list-footer"><span>{{ pageSummary(requestTable.atoms.pagination.get().pageIndex, requestTable.atoms.pagination.get().pageSize, matchingRequests().length) }}</span><div class="pagination-actions"><button class="button secondary compact" (click)="requestTable.previousPage()" [disabled]="!requestTable.getCanPreviousPage()" [attr.aria-label]="previousPageLabel()"><i class="bi bi-chevron-left"></i></button><button class="button secondary compact" (click)="requestTable.nextPage()" [disabled]="!requestTable.getCanNextPage()" [attr.aria-label]="nextPageLabel()"><i class="bi bi-chevron-right"></i></button></div></footer> }
           </article>
 
           <article class="card table-card">
             <div class="section-heading"><div><p class="eyebrow">{{ i18n.text('collection') }}</p><h2>{{ i18n.text('documentsPlural') }}</h2><p class="muted">{{ i18n.text('documentsHelp') }}</p></div><div class="section-actions"><div class="list-toolbar"><label>{{ i18n.text('search') }}<input [(ngModel)]="documentSearch" (ngModelChange)="resetDocumentLimit()" [placeholder]="i18n.text('nameOrFile')" /></label><app-date-filter [label]="i18n.text('date')" [(value)]="documentDate" (valueChange)="resetDocumentLimit()" /></div>@if (canManage()) { <button class="button secondary" (click)="showUploadModal()">{{ i18n.text('uploadPdf') }}</button> }</div></div>
             <div class="table-wrap">
               <table class="data-table">
-                <thead><tr><th>{{ i18n.text('document') }}</th><th>{{ i18n.text('file') }}</th><th>{{ i18n.text('version') }}</th><th>{{ i18n.text('status') }}</th><th class="actions-column">{{ i18n.text('actions') }}</th></tr></thead>
+                <thead><tr><th><button class="table-sort" (click)="toggleDocumentSort('title')">{{ i18n.text('document') }} <i [class]="sortIcon(documentSortDirection('title'))"></i></button></th><th><button class="table-sort" (click)="toggleDocumentSort('original_filename')">{{ i18n.text('file') }} <i [class]="sortIcon(documentSortDirection('original_filename'))"></i></button></th><th><button class="table-sort" (click)="toggleDocumentSort('version')">{{ i18n.text('version') }} <i [class]="sortIcon(documentSortDirection('version'))"></i></button></th><th><button class="table-sort" (click)="toggleDocumentSort('status')">{{ i18n.text('status') }} <i [class]="sortIcon(documentSortDirection('status'))"></i></button></th><th class="actions-column">{{ i18n.text('actions') }}</th></tr></thead>
                 <tbody>
-                  @for (document of visibleDocuments(); track document.id) {
+                  @for (row of documentTable.getRowModel().rows; track row.id) {
+                    @let document = row.original;
                     <tr>
                       <td><div class="document-cell"><strong>{{ document.title }}</strong><small>{{ i18n.text('signedCount', { count: document.completed_signature_count }) }}</small></div></td>
                       <td [attr.data-label]="i18n.text('file')"><div class="file-cell"><span class="file-name" [title]="document.original_filename"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i><span>{{ document.original_filename }}</span></span><small>{{ fileSize(document.size_bytes) }}</small></div></td>
@@ -87,7 +122,7 @@ import { RubricaSelectComponent, RubricaSelectOption } from '../components/rubri
                 </tbody>
               </table>
             </div>
-            @if (matchingDocuments().length > documentLimit) { <footer class="list-footer"><span>{{ i18n.text('showingCount', { current: visibleDocuments().length, total: matchingDocuments().length }) }}</span><button class="button secondary compact" (click)="documentLimit = documentLimit + 5">{{ i18n.text('loadMore') }}</button></footer> }
+            @if (matchingDocuments().length) { <footer class="list-footer"><span>{{ pageSummary(documentTable.atoms.pagination.get().pageIndex, documentTable.atoms.pagination.get().pageSize, matchingDocuments().length) }}</span><div class="pagination-actions"><button class="button secondary compact" (click)="documentTable.previousPage()" [disabled]="!documentTable.getCanPreviousPage()" [attr.aria-label]="previousPageLabel()"><i class="bi bi-chevron-left"></i></button><button class="button secondary compact" (click)="documentTable.nextPage()" [disabled]="!documentTable.getCanNextPage()" [attr.aria-label]="nextPageLabel()"><i class="bi bi-chevron-right"></i></button></div></footer> }
           </article>
         }
       </section>
@@ -160,13 +195,34 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   readonly requestCreateModalOpen = signal(false);
   readonly requestModalOpen = signal(false);
 
-  requestFilter = 'all';
-  requestSearch = '';
-  requestDate = '';
-  requestLimit = 5;
-  documentSearch = '';
-  documentDate = '';
-  documentLimit = 5;
+  private readonly requestFilterValue = signal('all');
+  private readonly requestSearchValue = signal('');
+  private readonly requestDateValue = signal('');
+  private readonly documentSearchValue = signal('');
+  private readonly documentDateValue = signal('');
+  get requestFilter(): string { return this.requestFilterValue(); }
+  set requestFilter(value: string) { this.requestFilterValue.set(value); }
+  get requestSearch(): string { return this.requestSearchValue(); }
+  set requestSearch(value: string) { this.requestSearchValue.set(value); }
+  get requestDate(): string { return this.requestDateValue(); }
+  set requestDate(value: string) { this.requestDateValue.set(value); }
+  get documentSearch(): string { return this.documentSearchValue(); }
+  set documentSearch(value: string) { this.documentSearchValue.set(value); }
+  get documentDate(): string { return this.documentDateValue(); }
+  set documentDate(value: string) { this.documentDateValue.set(value); }
+
+  readonly requestTable = injectTable(() => ({
+    features: dashboardTableFeatures,
+    columns: requestTableColumns,
+    data: this.matchingRequests(),
+    initialState: { sorting: [{ id: 'created_at', desc: true }, { id: 'id', desc: true }], pagination: { pageIndex: 0, pageSize: 5 } },
+  }));
+  readonly documentTable = injectTable(() => ({
+    features: dashboardTableFeatures,
+    columns: documentTableColumns,
+    data: this.matchingDocuments(),
+    initialState: { sorting: [{ id: 'created_at', desc: true }, { id: 'id', desc: true }], pagination: { pageIndex: 0, pageSize: 5 } },
+  }));
   signerName = '';
   signerEmail = '';
   signerLocale: 'pt-BR' | 'en' | 'es' | 'ja-JP' = 'en';
@@ -198,11 +254,17 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   completedRequestsCount(): number { return this.requests().filter((item) => item.status === 'completed').length; }
   totalSignaturesCount(): number { return this.requests().reduce((total, item) => total + item.signed_count, 0); }
   matchingRequests(): SignatureRequest[] { const query = this.requestSearch.trim().toLowerCase(); return this.requests().filter((item) => (this.requestFilter === 'all' || item.status === this.requestFilter) && (!this.requestDate || item.created_at.slice(0, 10) === this.requestDate) && (!query || item.document_title.toLowerCase().includes(query) || item.original_filename.toLowerCase().includes(query) || item.id.toLowerCase().includes(query))); }
-  visibleRequests(): SignatureRequest[] { return this.matchingRequests().slice(0, this.requestLimit); }
   matchingDocuments(): DocumentItem[] { const query = this.documentSearch.trim().toLowerCase(); return this.documents().filter((item) => (!this.documentDate || item.created_at.slice(0, 10) === this.documentDate) && (!query || item.title.toLowerCase().includes(query) || item.original_filename.toLowerCase().includes(query) || item.created_by.toLowerCase().includes(query))); }
-  visibleDocuments(): DocumentItem[] { return this.matchingDocuments().slice(0, this.documentLimit); }
-  resetRequestLimit(): void { this.requestLimit = 5; }
-  resetDocumentLimit(): void { this.documentLimit = 5; }
+  resetRequestLimit(): void { this.requestTable.setPageIndex(0); }
+  resetDocumentLimit(): void { this.documentTable.setPageIndex(0); }
+  toggleRequestSort(column: string): void { this.requestTable.getColumn(column)?.toggleSorting(); }
+  toggleDocumentSort(column: string): void { this.documentTable.getColumn(column)?.toggleSorting(); }
+  requestSortDirection(column: string): false | 'asc' | 'desc' { return this.requestTable.getColumn(column)?.getIsSorted() ?? false; }
+  documentSortDirection(column: string): false | 'asc' | 'desc' { return this.documentTable.getColumn(column)?.getIsSorted() ?? false; }
+  sortIcon(direction: false | 'asc' | 'desc'): string { return direction === 'asc' ? 'bi bi-sort-up' : direction === 'desc' ? 'bi bi-sort-down' : 'bi bi-arrow-down-up'; }
+  pageSummary(pageIndex: number, pageSize: number, total: number): string { const first = pageIndex * pageSize + 1; const last = Math.min(first + pageSize - 1, total); return this.localized({ 'pt-BR': `${first}–${last} de ${total}`, en: `${first}–${last} of ${total}`, es: `${first}–${last} de ${total}`, 'ja-JP': `${total}件中 ${first}–${last}件` }); }
+  previousPageLabel(): string { return this.localized({ 'pt-BR': 'Página anterior', en: 'Previous page', es: 'Página anterior', 'ja-JP': '前のページ' }); }
+  nextPageLabel(): string { return this.localized({ 'pt-BR': 'Próxima página', en: 'Next page', es: 'Página siguiente', 'ja-JP': '次のページ' }); }
   requestFilterOptions(): { value: string; label: 'all' | 'open' | 'drafts' | 'completedPlural' }[] { return [{ value: 'all', label: 'all' }, { value: 'open', label: 'open' }, { value: 'draft', label: 'drafts' }, { value: 'completed', label: 'completedPlural' }]; }
   requestFilterLabel(): string { const option = this.requestFilterOptions().find(item => item.value === this.requestFilter); return this.i18n.text(option?.label ?? 'all'); }
   selectRequestFilter(value: string, menu: HTMLDetailsElement): void { this.requestFilter = value; this.resetRequestLimit(); menu.removeAttribute('open'); }

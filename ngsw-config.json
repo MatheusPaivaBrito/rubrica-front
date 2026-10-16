@@ -1,6 +1,33 @@
 {
   "$schema": "./node_modules/@angular/service-worker/config/schema.json",
   "index": "/index.csr.html",
+  "appData": {
+    "schema_version": 1,
+    "release_id": "2026.10.16.1",
+    "released_at": "2026-10-16T03:28:29Z",
+    "highlights": {
+      "pt-BR": [
+        "Documentos e solicitações agora aparecem do mais recente para o mais antigo.",
+        "As duas listas ganharam ordenação por coluna e paginação.",
+        "As próximas atualizações mostram um resumo curto das novidades."
+      ],
+      "en": [
+        "Documents and signature requests now show newest items first.",
+        "Both lists now include column sorting and pagination.",
+        "Future updates will show a short summary of what changed."
+      ],
+      "es": [
+        "Los documentos y las solicitudes ahora muestran primero los elementos más recientes.",
+        "Ambas listas ahora incluyen ordenación por columna y paginación.",
+        "Las próximas actualizaciones mostrarán un breve resumen de las novedades."
+      ],
+      "ja-JP": [
+        "文書と署名依頼が新しい順に表示されるようになりました。",
+        "両方の一覧で列の並べ替えとページングを利用できます。",
+        "今後の更新では変更内容の短い概要が表示されます。"
+      ]
+    }
+  },
   "assetGroups": [
     {
       "name": "app",
