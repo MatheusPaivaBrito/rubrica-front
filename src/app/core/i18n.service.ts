@@ -99,7 +99,8 @@ export class I18nService {
     });
   }
 
-  text(key: MessageKey, values: Record<string, string | number> = {}): string {
+  text(key: MessageKey | 'save', values: Record<string, string | number> = {}): string {
+    if (key === 'save') return ({ 'pt-BR': 'Salvar', en: 'Save', es: 'Guardar', 'ja-JP': '保存' } as const)[this.locale()];
     return Object.entries(values).reduce((text, [name, value]) => text.replaceAll(`{${name}}`, String(value)), messages[this.locale()][key]);
   }
 

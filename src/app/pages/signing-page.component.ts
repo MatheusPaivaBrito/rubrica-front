@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import Swal from 'sweetalert2';
@@ -35,7 +35,8 @@ import { LanguagePickerComponent } from '../components/language-picker.component
             [signerCountry]="context()!.signer.identity_document_country || context()!.account_country || ''"
             [stampDate]="context()!.signer.signed_at || stampPreviewDate"
             [placement]="placement()"
-            [readonly]="completed()"
+            [placements]="context()!.stamp_positions || []"
+            [readonly]="completed() || (context()!.stamp_positions?.length || 0) > 0"
             (placementChange)="placement.set($event)"
           />
         </section>
@@ -76,6 +77,7 @@ import { LanguagePickerComponent } from '../components/language-picker.component
           </section> }
 
           @if (!administrativeView()) { <p class="notice">{{ i18n.text('evidenceNotice') }}</p> }
+          @if (!administrativeView() && context()!.stamp_customization?.require_drawn_signature) { <section class="signing-summary"><strong>{{ drawnSignatureLabel() }}</strong><canvas #signatureCanvas width="420" height="140" style="width:100%;height:140px;border:1px solid #ccd5e2;border-radius:8px;touch-action:none" (pointerdown)="startDrawing($event)" (pointermove)="draw($event)" (pointerup)="stopDrawing()" (pointercancel)="stopDrawing()"></canvas><button class="button secondary compact" (click)="clearDrawing()">{{ clearDrawingLabel() }}</button></section> }
           @if (signatureMode() === 'serpro_timestamp' || signatureMode() === 'serproid') { <p class="notice">{{ timestampHelpLabel() }}</p> }
           @if (signatureMode() === 'serproid') { <p class="notice">{{ certificateHelpLabel() }}</p> }
           @if (message()) { <p class="notice">{{ message() }}</p> }
@@ -98,6 +100,7 @@ import { LanguagePickerComponent } from '../components/language-picker.component
   `,
 })
 export class SigningPageComponent implements OnInit {
+  @ViewChild('signatureCanvas') signatureCanvas?: ElementRef<HTMLCanvasElement>;
   readonly context = signal<SigningContext | null>(null);
   readonly placement = signal<StampPosition | null>(null);
   readonly loading = signal(true);
@@ -108,6 +111,8 @@ export class SigningPageComponent implements OnInit {
   readonly error = signal('');
   readonly stampPreviewDate = new Date();
   token = '';
+  private drawing = false;
+  private hasDrawing = false;
 
   constructor(
     readonly auth: AuthService,
@@ -209,7 +214,8 @@ export class SigningPageComponent implements OnInit {
       screen_width: window.screen?.width || null,
       screen_height: window.screen?.height || null,
     };
-    const command = { consent: true, consent_version: 'rubrica-evidence-v2', stamp: { ...stamp, locale: this.i18n.locale(), timezone: dateTime.timezone() }, client, geolocation };
+    if (this.context()?.stamp_customization?.require_drawn_signature && !this.hasDrawing) { await this.feedback.warning(this.drawnSignatureLabel()); return; }
+    const command = { consent: true, consent_version: 'rubrica-evidence-v2', stamp: { ...stamp, locale: this.i18n.locale(), timezone: dateTime.timezone() }, drawn_signature_png_data_url: this.hasDrawing ? this.signatureCanvas?.nativeElement.toDataURL('image/png') : null, client, geolocation };
     if (useCertificate) {
       this.signing.set(true);
       try {
@@ -245,6 +251,12 @@ export class SigningPageComponent implements OnInit {
   organizationLabel(snapshot: NonNullable<Signer['representation_snapshot']>): string { return [snapshot.legal_name || snapshot.name, snapshot.registration_masked].filter(Boolean).join(' · '); }
   representativeLabel(): string { return ({ 'pt-BR':'Representando', en:'Representing', es:'En representación de', 'ja-JP':'代表する会社' } as Record<string, string>)[this.i18n.locale()]; }
   issuerLabel(): string { return ({ 'pt-BR':'Empresa emissora', en:'Issuing company', es:'Empresa emisora', 'ja-JP':'発行会社' } as Record<string, string>)[this.i18n.locale()]; }
+  drawnSignatureLabel(): string { return ({ 'pt-BR':'Desenhe sua assinatura', en:'Draw your signature', es:'Dibuje su firma', 'ja-JP':'署名を描いてください' } as Record<string, string>)[this.i18n.locale()]; }
+  clearDrawingLabel(): string { return ({ 'pt-BR':'Limpar', en:'Clear', es:'Limpiar', 'ja-JP':'消去' } as Record<string, string>)[this.i18n.locale()]; }
+  startDrawing(event: PointerEvent): void { this.drawing = true; const canvas = this.signatureCanvas?.nativeElement; canvas?.setPointerCapture(event.pointerId); this.draw(event); }
+  draw(event: PointerEvent): void { const canvas = this.signatureCanvas?.nativeElement; if (!this.drawing || !canvas) return; const rect = canvas.getBoundingClientRect(); const context = canvas.getContext('2d'); if (!context) return; const x = (event.clientX - rect.left) * canvas.width / rect.width; const y = (event.clientY - rect.top) * canvas.height / rect.height; context.fillStyle = '#172033'; context.beginPath(); context.arc(x, y, 2.5, 0, Math.PI * 2); context.fill(); this.hasDrawing = true; }
+  stopDrawing(): void { this.drawing = false; }
+  clearDrawing(): void { const canvas = this.signatureCanvas?.nativeElement; canvas?.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height); this.hasDrawing = false; }
 
   private alpha3Country(country: string | null | undefined): string { return ({ BR: 'BRA', JP: 'JPN', PT: 'PRT', US: 'USA' } as Record<string, string>)[(country ?? '').toUpperCase()] ?? (country ?? '').toUpperCase(); }
 
@@ -327,7 +339,7 @@ export class SigningPageComponent implements OnInit {
   private applyContext(context: SigningContext): void {
     this.context.set(context);
     const stampAlreadyRendered = context.request.signed_count > 0 && context.signer.status === 'signed';
-    this.placement.set(stampAlreadyRendered ? null : context.stamp);
+    this.placement.set(stampAlreadyRendered ? null : (context.stamp_positions?.[0] || context.stamp));
     this.completed.set(context.viewer_mode === 'administrator' || ['signed', 'declined'].includes(context.signer.status));
   }
 }

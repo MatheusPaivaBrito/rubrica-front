@@ -30,12 +30,13 @@ interface PdfPageView {
           (pointerdown)="placeStamp($event, page.number)"
         >
           <canvas #pageCanvas [attr.aria-label]="i18n.text('page') + ' ' + page.number"></canvas>
-          @if (placement?.page === page.number) {
+          @for (visiblePlacement of visiblePlacements(page.number); track placementKey(visiblePlacement, $index)) {
             <div
               class="signature-stamp"
-              [class.movable]="!readonly"
-              [style.left.%]="placement!.x * 100"
-              [style.top.%]="placement!.y * 100"
+              [class.movable]="!readonly && !placements.length"
+              [style.left.%]="visiblePlacement.x * 100"
+              [style.top.%]="visiblePlacement.y * 100"
+              [style.width.%]="(visiblePlacement.width || 0.4) * 100"
               (pointerdown)="startDrag($event)"
               (pointermove)="dragStamp($event, page.number)"
               (pointerup)="finishDrag($event)"
@@ -62,8 +63,10 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
   @Input() signerCountry = '';
   @Input() stampDate: string | Date = new Date();
   @Input() placement: StampPosition | null = null;
+  @Input() placements: StampPosition[] = [];
   @Input() readonly = false;
   @Output() readonly placementChange = new EventEmitter<StampPosition>();
+  @Output() readonly pageCountChange = new EventEmitter<number>();
   @ViewChildren('pageCanvas') private readonly canvases!: QueryList<ElementRef<HTMLCanvasElement>>;
 
   readonly pages = signal<PdfPageView[]>([]);
@@ -101,7 +104,7 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
   }
 
   startDrag(event: PointerEvent): void {
-    if (this.readonly) return;
+    if (this.readonly || this.placements.length) return;
     event.stopPropagation();
     this.dragging = true;
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
@@ -119,6 +122,8 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
   }
 
   signerFlag(): string { return countryFlag(this.signerCountry); }
+  visiblePlacements(page: number): StampPosition[] { return (this.placements.length ? this.placements : this.placement ? [this.placement] : []).filter(item => item.page === page); }
+  placementKey(item: StampPosition, index: number): string { return `${item.signer_id || 'current'}:${item.page}:${item.order ?? index}`; }
 
   private async loadDocument(): Promise<void> {
     if (!this.sourceData && !this.token) return;
@@ -139,6 +144,7 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
         pageViews.push({ number, width: viewport.width, height: viewport.height });
       }
       this.pages.set(pageViews);
+      this.pageCountChange.emit(pageViews.length);
       queueMicrotask(() => void this.renderPages());
     } catch (error) {
       const message = this.i18n.text('pdfRenderFailed');

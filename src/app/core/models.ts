@@ -2,7 +2,7 @@ export interface DocumentItem { id: string; title: string; original_filename: st
 export type SignatureMode = 'evidence' | 'serpro_timestamp' | 'serproid';
 export interface OrganizationSnapshot { tenant_id: string; legal_name?: string; name?: string; registration_country?: string; registration_type?: string; registration_masked?: string; }
 export type ParticipantRole = 'personal_signer' | 'external_signer' | 'company_representative' | 'corporate_seal';
-export interface SignatureRequest { id: string; document_id: string; document_version: number; document_title: string; original_filename: string; status: string; expires_at: string; created_at: string; created_by: string; completed_at: string | null; signer_count: number; signed_count: number; signature_mode: SignatureMode; issuer_snapshot?: OrganizationSnapshot | null; }
+export interface SignatureRequest { id: string; document_id: string; document_version: number; document_title: string; original_filename: string; status: string; expires_at: string; created_at: string; created_by: string; completed_at: string | null; signer_count: number; signed_count: number; signature_mode: SignatureMode; issuer_snapshot?: OrganizationSnapshot | null; has_custom_stamp_placement?: boolean; has_custom_stamp_branding?: boolean; }
 export interface SigningLink { signing_url: string; }
 export interface SignatureEvidence {
   signature_id: string;
@@ -40,6 +40,8 @@ export interface BillingAccount {
   files_remaining?: number | null;
   unlimited_files?: boolean;
   email_invitations_enabled?: boolean;
+  custom_stamp_placement?: boolean;
+  custom_stamp_branding?: boolean;
   usage_period_starts_at?: string | null;
   complimentary_lifetime: boolean;
   current_product_code?: string | null;
@@ -51,7 +53,9 @@ export interface BillingAccount {
 }
 export interface BillingCheckout { checkout_url: string; }
 export interface BillingPortal { portal_url: string; }
-export interface StampPosition { page: number; x: number; y: number; locale?: 'pt-BR' | 'en' | 'es' | 'ja-JP'; timezone?: string; }
+export interface StampPosition { page: number; x: number; y: number; signer_id?: string | null; width?: number; height?: number; order?: number; locale?: 'pt-BR' | 'en' | 'es' | 'ja-JP'; timezone?: string; }
+export interface StampCustomization { template: 'standard' | 'business' | 'representative'; primary_color: string; show_logo: boolean; logo_png_data_url?: string | null; require_drawn_signature: boolean; }
+export interface StampConfiguration { placements: StampPosition[]; customization: StampCustomization | null; }
 export interface SigningContext {
   request: SignatureRequest;
   signer: Signer;
@@ -59,6 +63,8 @@ export interface SigningContext {
   original_filename: string;
   account_country?: string | null;
   stamp: StampPosition | null;
+  stamp_positions?: StampPosition[];
+  stamp_customization?: StampCustomization | null;
   viewer_mode: 'signer' | 'administrator';
   issuer_snapshot?: OrganizationSnapshot | null;
 }
