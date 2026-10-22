@@ -2,7 +2,7 @@ export interface DocumentItem { id: string; title: string; original_filename: st
 export type SignatureMode = 'evidence' | 'serpro_timestamp' | 'serproid';
 export interface OrganizationSnapshot { tenant_id: string; legal_name?: string; name?: string; registration_country?: string; registration_type?: string; registration_masked?: string; }
 export type ParticipantRole = 'personal_signer' | 'external_signer' | 'company_representative' | 'corporate_seal';
-export interface SignatureRequest { id: string; document_id: string; document_version: number; document_title: string; original_filename: string; status: string; expires_at: string; created_at: string; created_by: string; completed_at: string | null; signer_count: number; signed_count: number; signature_mode: SignatureMode; issuer_snapshot?: OrganizationSnapshot | null; has_custom_stamp_placement?: boolean; has_custom_stamp_branding?: boolean; }
+export interface SignatureRequest { id: string; document_id: string; document_version: number; document_title: string; original_filename: string; status: string; expires_at: string; created_at: string; created_by: string; completed_at: string | null; signer_count: number; signed_count: number; signature_mode: SignatureMode; issuer_snapshot?: OrganizationSnapshot | null; has_custom_stamp_placement?: boolean; has_custom_stamp_branding?: boolean; parent_request_id?: string | null; round_number?: number; reopened_reason?: string | null; reopened_by?: string | null; reopened_at?: string | null; preserved_signature_count?: number; child_request_id?: string | null; }
 export interface SigningLink { signing_url: string; }
 export interface SignatureEvidence {
   signature_id: string;
