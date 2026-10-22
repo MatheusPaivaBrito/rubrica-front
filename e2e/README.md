@@ -1,4 +1,6 @@
-# Testes do visualizador PDF
+# Testes visuais e do visualizador PDF
+
+`dashboard-tables.spec.ts` cobre as tabelas de solicitações e documentos com respostas deliberadamente fora de ordem. O cenário verifica a ordenação inicial por `created_at` e `id`, paginação, busca, ordenação por teclado, contenção no viewport e snapshots visuais nos cinco perfis configurados.
 
 `pdf-mobile.spec.ts` cria PDFs válidos em memória para cinco perfis: iPhone antigo e novo, Android antigo e novo, e PC. Os perfis móveis usam viewport, toque e mecanismo WebKit ou Chromium do Playwright. Nos perfis antigos, o teste remove `Promise.withResolvers` e `AbortSignal.any` antes da aplicação carregar. Cada cenário verifica o preview no painel, a pintura da última página, a visualização na assinatura, o posicionamento do carimbo e a ausência de `iframe`.
 

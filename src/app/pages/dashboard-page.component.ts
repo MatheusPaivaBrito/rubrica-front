@@ -77,7 +77,7 @@ const documentTableColumns = [
             }
           </section>
 
-          <article class="card table-card">
+          <article class="card table-card" data-testid="signature-requests-table">
             <div class="section-heading">
               <div><p class="eyebrow">{{ i18n.text('monitoring') }}</p><h2>{{ i18n.text('requests') }}</h2><p class="muted">{{ i18n.text('requestsHelp') }}</p></div>
               <div class="list-toolbar"><label>{{ i18n.text('search') }}<input [(ngModel)]="requestSearch" (ngModelChange)="resetRequestLimit()" [placeholder]="i18n.text('nameOrFile')" /></label><app-date-filter [label]="i18n.text('date')" [(value)]="requestDate" (valueChange)="resetRequestLimit()" /><div class="toolbar-field"><span>{{ i18n.text('show') }}</span><details class="toolbar-picker status-filter" #requestStatusMenu (toggle)="toolbarPickerToggled($event)"><summary><span>{{ requestFilterLabel() }}</span><i class="bi bi-chevron-down picker-chevron" aria-hidden="true"></i></summary><div class="toolbar-options" role="listbox">@for (option of requestFilterOptions(); track option.value) { <button type="button" role="option" [class.active]="requestFilter === option.value" [attr.aria-selected]="requestFilter === option.value" (click)="selectRequestFilter(option.value, requestStatusMenu)"><span>{{ i18n.text(option.label) }}</span>@if (requestFilter === option.value) { <i class="bi bi-check2"></i> }</button> }</div></details></div></div>
@@ -103,7 +103,7 @@ const documentTableColumns = [
             @if (matchingRequests().length) { <footer class="list-footer"><span>{{ pageSummary(requestTable.atoms.pagination.get().pageIndex, requestTable.atoms.pagination.get().pageSize, matchingRequests().length) }}</span><div class="pagination-actions"><button class="button secondary compact" (click)="requestTable.previousPage()" [disabled]="!requestTable.getCanPreviousPage()" [attr.aria-label]="previousPageLabel()"><i class="bi bi-chevron-left"></i></button><button class="button secondary compact" (click)="requestTable.nextPage()" [disabled]="!requestTable.getCanNextPage()" [attr.aria-label]="nextPageLabel()"><i class="bi bi-chevron-right"></i></button></div></footer> }
           </article>
 
-          <article class="card table-card">
+          <article class="card table-card" data-testid="documents-table">
             <div class="section-heading"><div><p class="eyebrow">{{ i18n.text('collection') }}</p><h2>{{ i18n.text('documentsPlural') }}</h2><p class="muted">{{ i18n.text('documentsHelp') }}</p></div><div class="section-actions"><div class="list-toolbar"><label>{{ i18n.text('search') }}<input [(ngModel)]="documentSearch" (ngModelChange)="resetDocumentLimit()" [placeholder]="i18n.text('nameOrFile')" /></label><app-date-filter [label]="i18n.text('date')" [(value)]="documentDate" (valueChange)="resetDocumentLimit()" /></div>@if (canManage()) { <button class="button secondary" (click)="showUploadModal()">{{ i18n.text('uploadPdf') }}</button> }</div></div>
             <div class="table-wrap">
               <table class="data-table">
