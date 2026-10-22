@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: '.',
-  testMatch: ['pdf-mobile.spec.ts', 'dashboard-tables.spec.ts'],
+  testMatch: ['pdf-mobile.spec.ts', 'dashboard-tables.spec.ts', 'stamp-customization.spec.ts'],
   timeout: 30_000,
   expect: { timeout: 10_000 },
   reporter: 'list',
