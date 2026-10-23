@@ -12,6 +12,10 @@ import {
   injectTable,
   rowPaginationFeature,
   rowSortingFeature,
+  sortFn_alphanumeric,
+  sortFn_basic,
+  sortFn_datetime,
+  sortFn_text,
   tableFeatures,
 } from '@tanstack/angular-table';
 
@@ -31,6 +35,7 @@ import { RubricaSelectComponent, RubricaSelectOption } from '../components/rubri
 const dashboardTableFeatures = tableFeatures({
   rowSortingFeature,
   sortedRowModel: createSortedRowModel(),
+  sortFns: { alphanumeric: sortFn_alphanumeric, basic: sortFn_basic, datetime: sortFn_datetime, text: sortFn_text },
   rowPaginationFeature,
   paginatedRowModel: createPaginatedRowModel(),
 });
@@ -83,22 +88,42 @@ const documentTableColumns = [
               <div class="list-toolbar"><label>{{ i18n.text('search') }}<input [(ngModel)]="requestSearch" (ngModelChange)="resetRequestLimit()" [placeholder]="i18n.text('nameOrFile')" /></label><app-date-filter [label]="i18n.text('date')" [(value)]="requestDate" (valueChange)="resetRequestLimit()" /><div class="toolbar-field"><span>{{ i18n.text('show') }}</span><details class="toolbar-picker status-filter" #requestStatusMenu (toggle)="toolbarPickerToggled($event)"><summary><span>{{ requestFilterLabel() }}</span><i class="bi bi-chevron-down picker-chevron" aria-hidden="true"></i></summary><div class="toolbar-options" role="listbox">@for (option of requestFilterOptions(); track option.value) { <button type="button" role="option" [class.active]="requestFilter === option.value" [attr.aria-selected]="requestFilter === option.value" (click)="selectRequestFilter(option.value, requestStatusMenu)"><span>{{ i18n.text(option.label) }}</span>@if (requestFilter === option.value) { <i class="bi bi-check2"></i> }</button> }</div></details></div></div>
             </div>
             <div class="table-wrap">
-              <table class="data-table">
+              <table class="data-table request-data-table">
                 <thead><tr><th><button class="table-sort" (click)="toggleRequestSort('id')">{{ i18n.text('request') }} <i [class]="sortIcon(requestSortDirection('id'))"></i></button></th><th><button class="table-sort" (click)="toggleRequestSort('document_title')">{{ i18n.text('document') }} <i [class]="sortIcon(requestSortDirection('document_title'))"></i></button></th><th><button class="table-sort" (click)="toggleRequestSort('status')">{{ i18n.text('status') }} <i [class]="sortIcon(requestSortDirection('status'))"></i></button></th><th><button class="table-sort" (click)="toggleRequestSort('signed_count')">{{ i18n.text('signaturesLabel') }} <i [class]="sortIcon(requestSortDirection('signed_count'))"></i></button></th><th><button class="table-sort" (click)="toggleRequestSort('expires_at')">{{ i18n.text('deadline') }} <i [class]="sortIcon(requestSortDirection('expires_at'))"></i></button></th><th class="actions-column">{{ i18n.text('actions') }}</th></tr></thead>
                 <tbody>
                   @for (row of requestTable.getRowModel().rows; track row.id) {
                     @let request = row.original;
-                    <tr>
-                      <td [attr.data-label]="i18n.text('request')"><strong>#{{ request.id }}</strong></td>
+                    <tr class="request-mobile-row" [class.mobile-expanded]="mobileRequestExpanded(request.id)">
+                      <td [attr.data-label]="i18n.text('request')"><strong class="desktop-request-id">#{{ request.id }}</strong><button type="button" class="request-mobile-toggle" (click)="toggleMobileRequest(request.id)" [attr.aria-expanded]="mobileRequestExpanded(request.id)"><span><strong>{{ request.document_title }}</strong><small><span class="badge" [class.pending]="request.status === 'draft'" [class.complete]="request.status === 'completed'">{{ requestStatusLabel(request.status) }}</span> · {{ i18n.text('of', { current: request.signed_count, total: request.signer_count }) }}</small></span><i class="bi bi-chevron-down" aria-hidden="true"></i></button></td>
                       <td [attr.data-label]="i18n.text('document')"><div class="document-cell"><strong>{{ request.document_title }}</strong><small>{{ request.original_filename }} · {{ i18n.text('version') }} {{ request.document_version }}</small></div></td>
                       <td data-label="Status"><span class="badge" [class.pending]="request.status === 'draft'" [class.complete]="request.status === 'completed'">{{ requestStatusLabel(request.status) }}</span></td>
-                      <td><div class="progress-cell"><strong>{{ i18n.text('of', { current: request.signed_count, total: request.signer_count }) }}</strong><span class="progress-track"><i [style.width.%]="signatureProgress(request)"></i></span></div></td>
-                      <td>{{ i18n.formatDate(request.expires_at) }}</td>
-                      <td><div class="table-actions"><button class="button secondary compact" (click)="openRequestDetails(request)">{{ i18n.text('details') }}</button></div></td>
+                      <td [attr.data-label]="i18n.text('signaturesLabel')"><div class="progress-cell"><strong>{{ i18n.text('of', { current: request.signed_count, total: request.signer_count }) }}</strong><span class="progress-track"><i [style.width.%]="signatureProgress(request)"></i></span></div></td>
+                      <td [attr.data-label]="i18n.text('deadline')">{{ i18n.formatDate(request.expires_at) }}</td>
+                      <td [attr.data-label]="i18n.text('actions')"><div class="table-actions"><button class="button secondary compact" (click)="openRequestDetails(request)">{{ i18n.text('details') }}</button></div></td>
                     </tr>
                   } @empty { <tr><td colspan="6"><div class="empty-state"><strong>{{ i18n.text('noRequests') }}</strong><span>{{ i18n.text('filterHelp') }}</span></div></td></tr> }
                 </tbody>
               </table>
+              <div class="request-mobile-list">
+                @for (row of requestTable.getRowModel().rows; track row.id) {
+                  @let request = row.original;
+                  <article class="request-mobile-item" [class.expanded]="mobileRequestExpanded(request.id)">
+                    <button type="button" class="request-mobile-summary" (click)="toggleMobileRequest(request.id)" [attr.aria-expanded]="mobileRequestExpanded(request.id)">
+                      <span><strong>{{ request.document_title }}</strong><small><span class="badge" [class.pending]="request.status === 'draft'" [class.complete]="request.status === 'completed'">{{ requestStatusLabel(request.status) }}</span><span>{{ i18n.text('of', { current: request.signed_count, total: request.signer_count }) }}</span></small></span>
+                      <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                    </button>
+                    @if (mobileRequestExpanded(request.id)) {
+                      <div class="request-mobile-details">
+                        <div><span>{{ i18n.text('request') }}</span><strong>#{{ request.id }}</strong></div>
+                        <div><span>{{ i18n.text('document') }}</span><strong>{{ request.original_filename }}</strong><small>{{ i18n.text('version') }} {{ request.document_version }}</small></div>
+                        <div><span>{{ i18n.text('signaturesLabel') }}</span><strong>{{ i18n.text('of', { current: request.signed_count, total: request.signer_count }) }}</strong><span class="progress-track"><i [style.width.%]="signatureProgress(request)"></i></span></div>
+                        <div><span>{{ i18n.text('deadline') }}</span><strong>{{ i18n.formatDate(request.expires_at) }}</strong></div>
+                        <button class="button secondary compact" (click)="openRequestDetails(request)">{{ i18n.text('details') }}</button>
+                      </div>
+                    }
+                  </article>
+                } @empty { <div class="empty-state"><strong>{{ i18n.text('noRequests') }}</strong><span>{{ i18n.text('filterHelp') }}</span></div> }
+              </div>
             </div>
             @if (matchingRequests().length) { <footer class="list-footer"><span>{{ pageSummary(requestTable.atoms.pagination.get().pageIndex, requestTable.atoms.pagination.get().pageSize, matchingRequests().length) }}</span><div class="pagination-actions"><button class="button secondary compact" (click)="requestTable.previousPage()" [disabled]="!requestTable.getCanPreviousPage()" [attr.aria-label]="previousPageLabel()"><i class="bi bi-chevron-left"></i></button><button class="button secondary compact" (click)="requestTable.nextPage()" [disabled]="!requestTable.getCanNextPage()" [attr.aria-label]="nextPageLabel()"><i class="bi bi-chevron-right"></i></button></div></footer> }
           </article>
@@ -142,7 +167,7 @@ const documentTableColumns = [
       }
 
       @if (requestModalOpen() && selectedRequest()) {
-        <div class="modal-backdrop" (click)="closeRequestModal()"><section class="app-modal wide" (click)="$event.stopPropagation()">
+        <div class="modal-backdrop request-details-backdrop" (click)="closeRequestModal()"><section class="app-modal wide request-details-modal" (click)="$event.stopPropagation()">
           <header class="modal-header"><div><p class="eyebrow">{{ i18n.text('request') }} #{{ selectedRequest()!.id }}</p><h2>{{ selectedRequest()!.document_title }}</h2><span class="badge" [class.pending]="selectedRequest()!.status === 'draft'" [class.complete]="selectedRequest()!.status === 'completed'">{{ requestStatusLabel(selectedRequest()!.status) }}</span></div><button class="modal-close" (click)="closeRequestModal()" [attr.aria-label]="i18n.text('close')">×</button></header>
           <div class="modal-body">
             @if (selectedRequest()!.status === 'expired' && canManage()) { <button class="button secondary" (click)="startReopenRequest()">{{ reopenRequestLabel() }}</button> }
@@ -172,7 +197,7 @@ const documentTableColumns = [
       @if (reopenModalOpen() && selectedRequest()) { <div class="modal-backdrop" (click)="closeReopenModal()"><section class="app-modal" (click)="$event.stopPropagation()"><header class="modal-header"><div><p class="eyebrow">{{ reopenRequestLabel() }}</p><h2>{{ selectedRequest()!.document_title }}</h2></div><button class="modal-close" (click)="closeReopenModal()" [attr.aria-label]="i18n.text('close')">×</button></header><div class="modal-body form"><p class="notice">{{ reopenImmutabilityHelp() }}</p><label>{{ i18n.text('signingDeadline') }}<input type="datetime-local" [(ngModel)]="reopenExpiresAt" /></label><label>{{ reopenReasonLabel() }}<textarea [(ngModel)]="reopenReason" maxlength="500" rows="3"></textarea></label><fieldset><legend>{{ pendingSignersLabel() }}</legend>@for (signer of reopenCandidates(); track signer.id) { <label><input type="checkbox" [checked]="reopenSignerIds.has(signer.id)" (change)="toggleReopenSigner(signer.id, $event)" /> {{ signer.name }} · {{ signer.email }}</label> } @empty { <p class="muted">{{ noPendingSignersLabel() }}</p> }</fieldset><p class="muted">{{ addSignersAfterReopenHelp() }}</p></div><footer class="modal-footer"><button class="button secondary" (click)="closeReopenModal()">{{ i18n.text('cancel') }}</button><button class="button" [disabled]="submitting() || !reopenExpiresAt || reopenReason.trim().length < 5" (click)="reopenRequest()">{{ reopenRequestLabel() }}</button></footer></section></div> }
 
       @if (previewDocument()) { <div class="modal-backdrop pdf-backdrop" (click)="closePreview()"><section class="pdf-modal" (click)="$event.stopPropagation()"><header><div><strong>{{ previewHeading() }} · {{ previewDocument()!.title }}</strong><small>{{ previewDocument()!.original_filename }}</small></div><div class="pdf-modal-actions"><button class="button secondary compact" (click)="downloadPreview()"><i class="bi bi-download"></i> {{ i18n.text('downloadPdf') }}</button><button class="modal-close" (click)="closePreview()" [attr.aria-label]="i18n.text('close')">×</button></div></header><div class="pdf-modal-content"><app-pdf-stamp-viewer [sourceData]="previewData()" [readonly]="true" /></div></section></div> }
-      @if (stampEditorOpen()) { <div class="modal-backdrop pdf-backdrop" (click)="closeStampEditor()"><section class="pdf-modal" (click)="$event.stopPropagation()"><header><div><strong>{{ stampEditorLabel() }}</strong><small>{{ selectedRequest()?.document_title }}</small></div><button class="modal-close" (click)="closeStampEditor()" [attr.aria-label]="i18n.text('close')">×</button></header><div class="pdf-modal-content"><div class="form"><label>{{ signerForStampLabel() }}<select [(ngModel)]="stampSignerId">@for (signer of signers(); track signer.id) { <option [value]="signer.id">{{ signer.name }}</option> }</select></label>@if (customStampBrandingEnabled()) { <label>Template<select [(ngModel)]="stampCustomization.template"><option value="standard">Standard</option><option value="business">CNPJ</option><option value="representative">{{ representativeLabel() }}</option></select></label><label>{{ stampColorLabel() }}<input type="color" [(ngModel)]="stampCustomization.primary_color" /></label><label>Logo PNG<input type="file" accept="image/png" (change)="selectStampLogo($event)" /></label><label><input type="checkbox" [(ngModel)]="stampCustomization.require_drawn_signature" /> {{ drawnSignatureLabel() }}</label> }</div><app-pdf-stamp-viewer [sourceData]="stampEditorPdf()" [placements]="stampPlacements()" [signerName]="stampSignerName()" (placementChange)="addStampPlacement($event)" (pageCountChange)="stampPageCount = $event" /></div><footer class="modal-footer"><button class="button secondary" (click)="replicateStampOnEveryPage()">{{ everyPageLabel() }}</button>@if (customStampBrandingEnabled()) { <button class="button secondary" (click)="saveTenantStampDefault()">{{ tenantStampDefaultLabel() }}</button> }<button class="button" (click)="saveStampConfiguration()">{{ i18n.text('save') }}</button></footer></section></div> }
+      @if (stampEditorOpen()) { <div class="modal-backdrop pdf-backdrop" (click)="closeStampEditor()"><section class="pdf-modal stamp-editor-modal" (click)="$event.stopPropagation()"><header><div><strong>{{ stampEditorLabel() }}</strong><small>{{ selectedRequest()?.document_title }}</small></div><div class="stamp-editor-header-actions"><button type="button" class="button secondary compact stamp-mobile-controls-trigger" (click)="toggleStampMobileControls()"><i class="bi bi-list"></i><span>Opções</span></button><img class="stamp-topbar-logo" src="/icons/rubrica-brand/source/rubrica-lockup-inverse.png" alt="Rúbrica" /><button type="button" class="stamp-fit-toggle" (click)="toggleStampPdfFitMode()" [attr.aria-label]="stampPdfFitMode() === 'page' ? 'Ajustar à largura' : 'Mostrar página inteira'" [attr.title]="stampPdfFitMode() === 'page' ? 'Ajustar à largura' : 'Mostrar página inteira'"><i class="bi" [class.bi-arrows-angle-expand]="stampPdfFitMode() === 'page'" [class.bi-arrows-angle-contract]="stampPdfFitMode() === 'width'"></i></button><button class="modal-close" (click)="closeStampEditor()" [attr.aria-label]="i18n.text('close')">×</button></div></header><div class="pdf-modal-content stamp-editor-layout" [class.drawer-open]="stampMobileControlsOpen()"><button type="button" class="stamp-drawer-scrim" [attr.aria-label]="i18n.text('close')" (click)="stampMobileControlsOpen.set(false)"></button><aside class="stamp-editor-controls" [class.open]="stampMobileControlsOpen()"><div class="stamp-mobile-drawer-header"><strong>Personalizar assinatura</strong><button type="button" class="modal-close" (click)="stampMobileControlsOpen.set(false)" [attr.aria-label]="i18n.text('close')">×</button></div><div class="form-field"><span class="field-label">{{ signerForStampLabel() }}</span><app-rubrica-select [ariaLabel]="signerForStampLabel()" [value]="stampSignerId" [options]="stampSignerOptions()" (valueChange)="stampSignerId = $event" /></div><div class="form-field"><span class="field-label">Método de assinatura</span><app-rubrica-select ariaLabel="Método de assinatura" [value]="stampSignerMode()" [options]="stampSignatureModeOptions()" (valueChange)="selectStampSignerMode($event)" /></div><div class="stamp-variant-picker"><span class="field-label">Versão exibida no PDF</span><button type="button" [class.active]="stampCustomization.display_variant === 'full'" (click)="selectStampVariant('full')"><strong>Completo</strong><small>CPF, CNPJ, data e evidência</small></button><button type="button" [class.active]="stampCustomization.display_variant === 'minimal'" (click)="selectStampVariant('minimal')"><strong>Mínimo</strong><small>Somente nome e confirmação</small></button></div>@if (customStampBrandingEnabled()) { <div class="form-field"><span class="field-label">Modelo</span><app-rubrica-select ariaLabel="Modelo" [value]="stampCustomization.template" [options]="stampTemplateOptions()" (valueChange)="selectStampTemplate($event)" /></div><label class="stamp-color-field"><span class="field-label">{{ stampColorLabel() }}</span><span class="stamp-color-control"><input type="color" [ngModel]="stampCustomization.primary_color" (ngModelChange)="selectStampColor($event)" [attr.aria-label]="stampColorLabel()" /><strong>{{ stampCustomization.primary_color }}</strong><small>Toque na amostra para alterar</small></span></label><div class="stamp-logo-field"><span class="field-label">Logo PNG</span><input #stampLogoPicker class="sr-only" type="file" accept="image/png,.png" (change)="selectStampLogo($event)" /><button type="button" class="stamp-logo-button" (click)="stampLogoPicker.click()"><i class="bi bi-upload"></i><span><strong>{{ stampLogoName || 'Selecionar logo' }}</strong><small>PNG · máximo 256 KB · 2048 × 2048 px</small></span></button></div><label class="stamp-drawing-option"><input type="checkbox" [(ngModel)]="stampCustomization.require_drawn_signature" /> {{ drawnSignatureLabel() }}</label> }<div class="stamp-sidebar-actions"><button class="button secondary" (click)="replicateStampOnEveryPage()">{{ everyPageLabel() }}</button> @if (customStampBrandingEnabled()) { <button class="button secondary" (click)="saveTenantStampDefault()">{{ tenantStampDefaultLabel() }}</button> }<button class="button" (click)="saveStampConfiguration()">{{ i18n.text('save') }}</button></div></aside><div class="stamp-editor-document"><app-pdf-stamp-viewer [sourceData]="stampEditorPdf()" [placements]="stampPlacements()" [activeSignerId]="stampSignerId" [fitMode]="stampPdfFitMode()" [customization]="stampCustomization" [signerName]="stampSignerName()" [signerIdentity]="stampSignerIdentity()" [signerRepresentation]="stampSignerRepresentation()" (placementChange)="addStampPlacement($event)" (pageCountChange)="stampPageCount = $event" /></div></div></section></div> }
     </div></main>
   `,
 })
@@ -200,12 +225,17 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   readonly requestCreateModalOpen = signal(false);
   readonly requestModalOpen = signal(false);
   readonly stampEditorOpen = signal(false);
+  readonly stampMobileControlsOpen = signal(false);
+  readonly stampPdfFitMode = signal<'page' | 'width'>('page');
+  readonly expandedMobileRequests = signal<Set<string>>(new Set());
   readonly reopenModalOpen = signal(false);
   readonly stampEditorPdf = signal<ArrayBuffer | null>(null);
   readonly stampPlacements = signal<StampPosition[]>([]);
   stampSignerId = '';
+  stampSignerModes: Record<string, 'serpro_timestamp' | 'serproid'> = {};
+  stampLogoName = '';
   stampPageCount = 0;
-  stampCustomization: StampCustomization = { template: 'standard', primary_color: '#187A66', show_logo: false, logo_png_data_url: null, require_drawn_signature: false };
+  stampCustomization: StampCustomization = { template: 'standard', display_variant: 'full', primary_color: '#187A66', show_logo: false, logo_png_data_url: null, require_drawn_signature: false };
   reopenExpiresAt = '';
   reopenReason = '';
   reopenSignerIds = new Set<string>();
@@ -230,13 +260,13 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     features: dashboardTableFeatures,
     columns: requestTableColumns,
     data: this.matchingRequests(),
-    initialState: { sorting: [{ id: 'created_at', desc: true }, { id: 'id', desc: true }], pagination: { pageIndex: 0, pageSize: 5 } },
+    initialState: { sorting: [{ id: 'document_title', desc: true }], pagination: { pageIndex: 0, pageSize: 5 } },
   }));
   readonly documentTable = injectTable(() => ({
     features: dashboardTableFeatures,
     columns: documentTableColumns,
     data: this.matchingDocuments(),
-    initialState: { sorting: [{ id: 'created_at', desc: true }, { id: 'id', desc: true }], pagination: { pageIndex: 0, pageSize: 5 } },
+    initialState: { sorting: [{ id: 'title', desc: true }], pagination: { pageIndex: 0, pageSize: 5 } },
   }));
   signerName = '';
   signerEmail = '';
@@ -272,11 +302,11 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   matchingDocuments(): DocumentItem[] { const query = this.documentSearch.trim().toLowerCase(); return this.documents().filter((item) => (!this.documentDate || item.created_at.slice(0, 10) === this.documentDate) && (!query || item.title.toLowerCase().includes(query) || item.original_filename.toLowerCase().includes(query) || item.created_by.toLowerCase().includes(query))); }
   resetRequestLimit(): void { this.requestTable.setPageIndex(0); }
   resetDocumentLimit(): void { this.documentTable.setPageIndex(0); }
-  toggleRequestSort(column: string): void { this.requestTable.getColumn(column)?.toggleSorting(); }
-  toggleDocumentSort(column: string): void { this.documentTable.getColumn(column)?.toggleSorting(); }
+  toggleRequestSort(column: string): void { const target = this.requestTable.getColumn(column); target?.toggleSorting(target.getIsSorted() === 'asc'); }
+  toggleDocumentSort(column: string): void { const target = this.documentTable.getColumn(column); target?.toggleSorting(target.getIsSorted() === 'asc'); }
   requestSortDirection(column: string): false | 'asc' | 'desc' { return this.requestTable.getColumn(column)?.getIsSorted() ?? false; }
   documentSortDirection(column: string): false | 'asc' | 'desc' { return this.documentTable.getColumn(column)?.getIsSorted() ?? false; }
-  sortIcon(direction: false | 'asc' | 'desc'): string { return direction === 'asc' ? 'bi bi-sort-up' : direction === 'desc' ? 'bi bi-sort-down' : 'bi bi-arrow-down-up'; }
+  sortIcon(direction: false | 'asc' | 'desc'): string { return direction === 'asc' ? 'bi bi-arrow-up table-sort-active' : direction === 'desc' ? 'bi bi-arrow-down table-sort-active' : 'bi bi-arrow-down-up'; }
   pageSummary(pageIndex: number, pageSize: number, total: number): string { const first = pageIndex * pageSize + 1; const last = Math.min(first + pageSize - 1, total); return this.localized({ 'pt-BR': `${first}–${last} de ${total}`, en: `${first}–${last} of ${total}`, es: `${first}–${last} de ${total}`, 'ja-JP': `${total}件中 ${first}–${last}件` }); }
   previousPageLabel(): string { return this.localized({ 'pt-BR': 'Página anterior', en: 'Previous page', es: 'Página anterior', 'ja-JP': '前のページ' }); }
   nextPageLabel(): string { return this.localized({ 'pt-BR': 'Próxima página', en: 'Next page', es: 'Página siguiente', 'ja-JP': '次のページ' }); }
@@ -409,15 +439,48 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   async addSigner(): Promise<void> { const request = this.selectedRequest(); if (!request || !this.signerName.trim() || !this.signerEmail.trim()) return; const representedTenantId = this.signerParticipantRole === 'company_representative' ? this.tenantId : null; await this.run(async () => { await firstValueFrom(this.api.post<Signer>(`/signature-requests/${request.id}/signers`, { name: this.signerName.trim(), email: this.signerEmail.trim().toLowerCase(), preferred_locale: this.signerLocale, participant_role: this.signerParticipantRole, represented_tenant_id: representedTenantId })); this.signerName = ''; this.signerEmail = ''; this.signerLocale = this.i18n.locale(); this.signerParticipantRole = 'external_signer'; this.contactSearch.set(''); await Promise.all([this.loadSigners(request.id), this.loadSignerContacts()]); const refreshed = await firstValueFrom(this.api.get<SignatureRequest>(`/signature-requests/${request.id}`)); this.updateRequest(refreshed); }); }
   customStampPlacementEnabled(): boolean { return Boolean(this.billingAccounts()[this.tenantId]?.custom_stamp_placement); }
   customStampBrandingEnabled(): boolean { return Boolean(this.billingAccounts()[this.tenantId]?.custom_stamp_branding); }
-  async openStampEditor(): Promise<void> { const request = this.selectedRequest(); if (!request || !this.customStampPlacementEnabled()) return; await this.run(async () => { const [configuration, pdf, tenantDefault] = await Promise.all([firstValueFrom(this.api.get<StampConfiguration>(`/signature-requests/${request.id}/stamp-configuration`)), firstValueFrom(this.api.getArrayBuffer(`/documents/${request.document_id}/preview`)), this.customStampBrandingEnabled() ? firstValueFrom(this.api.get<StampCustomization | null>(`/tenants/${this.tenantId}/stamp-customization`)).catch(() => null) : Promise.resolve(null)]); this.stampPlacements.set(configuration.placements); this.stampCustomization = configuration.customization || tenantDefault || { template: 'standard', primary_color: '#187A66', show_logo: false, logo_png_data_url: null, require_drawn_signature: false }; this.stampSignerId = this.signers()[0]?.id || ''; this.stampEditorPdf.set(pdf); this.stampEditorOpen.set(true); this.syncModalLock(); }); }
-  closeStampEditor(): void { this.stampEditorOpen.set(false); this.stampEditorPdf.set(null); this.syncModalLock(); }
-  addStampPlacement(position: StampPosition): void { if (!this.stampSignerId) return; const next = { ...position, signer_id: this.stampSignerId, width: 0.4, height: 0.12, order: this.stampPlacements().length }; this.stampPlacements.update(items => [...items.filter(item => !(item.signer_id === next.signer_id && item.page === next.page)), next]); }
+  async openStampEditor(): Promise<void> { const request = this.selectedRequest(); if (!request || !this.customStampPlacementEnabled()) return; await this.run(async () => { const [configuration, pdf, tenantDefault] = await Promise.all([firstValueFrom(this.api.get<StampConfiguration>(`/signature-requests/${request.id}/stamp-configuration`)), firstValueFrom(this.api.getArrayBuffer(`/documents/${request.document_id}/preview`)), this.customStampBrandingEnabled() ? firstValueFrom(this.api.get<StampCustomization | null>(`/tenants/${this.tenantId}/stamp-customization`)).catch(() => null) : Promise.resolve(null)]); this.stampPlacements.set(configuration.placements); const customization = configuration.customization || tenantDefault; this.stampCustomization = { template: customization?.template || 'standard', display_variant: customization?.display_variant || 'full', primary_color: customization?.primary_color || '#187A66', show_logo: customization?.show_logo || false, logo_png_data_url: customization?.logo_png_data_url || null, require_drawn_signature: customization?.require_drawn_signature || false }; this.stampSignerModes = Object.fromEntries(this.signers().map(signer => [signer.id, configuration.signer_signature_modes?.[signer.id] || signer.signature_mode || 'serpro_timestamp'])); this.stampSignerId = this.signers()[0]?.id || ''; this.stampEditorPdf.set(pdf); this.stampEditorOpen.set(true); this.syncModalLock(); }); }
+  closeStampEditor(): void { this.stampEditorOpen.set(false); this.stampMobileControlsOpen.set(false); this.stampEditorPdf.set(null); this.syncModalLock(); }
+  toggleStampMobileControls(): void { this.stampMobileControlsOpen.update(open => !open); }
+  toggleStampPdfFitMode(): void { this.stampPdfFitMode.update(mode => mode === 'page' ? 'width' : 'page'); }
+  mobileRequestExpanded(id: string): boolean { return this.expandedMobileRequests().has(id); }
+  toggleMobileRequest(id: string): void { this.expandedMobileRequests.update(current => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; }); }
+  addStampPlacement(position: StampPosition): void { if (!this.stampSignerId) return; const next = { ...position, signer_id: this.stampSignerId, width: position.width ?? 0.4, height: position.height ?? 0.12, order: position.order ?? this.stampPlacements().length }; this.stampPlacements.update(items => [...items.filter(item => !(item.signer_id === next.signer_id && item.page === next.page)), next]); }
   replicateStampOnEveryPage(): void { const source = [...this.stampPlacements()].reverse().find(item => item.signer_id === this.stampSignerId); if (!source || !this.stampPageCount) return; this.stampPlacements.update(items => [...items.filter(item => item.signer_id !== this.stampSignerId), ...Array.from({ length: this.stampPageCount }, (_, index) => ({ ...source, page: index + 1, order: items.length + index }))]); }
-  async saveStampConfiguration(): Promise<void> { const request = this.selectedRequest(); if (!request) return; const payload: StampConfiguration = { placements: this.stampPlacements(), customization: this.customStampBrandingEnabled() ? this.stampCustomization : null }; await this.run(async () => { await firstValueFrom(this.api.put<StampConfiguration>(`/signature-requests/${request.id}/stamp-configuration`, payload)); this.closeStampEditor(); }); }
+  async saveStampConfiguration(): Promise<void> { const request = this.selectedRequest(); if (!request) return; const payload: StampConfiguration = { placements: this.stampPlacements(), customization: this.customStampBrandingEnabled() ? this.stampCustomization : null, signer_signature_modes: this.stampSignerModes }; await this.run(async () => { await firstValueFrom(this.api.put<StampConfiguration>(`/signature-requests/${request.id}/stamp-configuration`, payload)); this.closeStampEditor(); }); }
   async saveTenantStampDefault(): Promise<void> { if (!this.customStampBrandingEnabled()) return; await this.run(async () => { this.stampCustomization = await firstValueFrom(this.api.put<StampCustomization>(`/tenants/${this.tenantId}/stamp-customization`, this.stampCustomization)); await Swal.fire({ icon: 'success', title: this.tenantStampDefaultSavedLabel(), timer: 1400, showConfirmButton: false }); }); }
-  async selectStampLogo(event: Event): Promise<void> { const file = (event.target as HTMLInputElement).files?.[0]; if (!file || file.type !== 'image/png' || file.size > 256_000) { await this.feedback.warning('PNG de até 256 KB'); return; } const reader = new FileReader(); const dataUrl = await new Promise<string>((resolve, reject) => { reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(reader.error); reader.readAsDataURL(file); }); this.stampCustomization.logo_png_data_url = dataUrl; this.stampCustomization.show_logo = true; }
+  async selectStampLogo(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file || file.type !== 'image/png' || file.size > 256_000) { input.value = ''; await this.feedback.warning('Selecione um PNG válido de até 256 KB.'); return; }
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const pngHeader = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+    const pngEnd = [0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82];
+    const validHeader = bytes.length >= 20 && pngHeader.every((value, index) => bytes[index] === value);
+    const validEnd = bytes.length >= pngEnd.length && pngEnd.every((value, index) => bytes[bytes.length - pngEnd.length + index] === value);
+    if (!validHeader || !validEnd) { input.value = ''; await this.feedback.warning('O arquivo não contém uma imagem PNG segura.'); return; }
+    try {
+      const bitmap = await createImageBitmap(file);
+      const validDimensions = bitmap.width <= 2048 && bitmap.height <= 2048 && bitmap.width * bitmap.height <= 4_000_000;
+      bitmap.close();
+      if (!validDimensions) throw new Error('invalid dimensions');
+    } catch { input.value = ''; await this.feedback.warning('PNG inválido ou maior que 2048 × 2048 pixels.'); return; }
+    const dataUrl = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(reader.error); reader.readAsDataURL(file); });
+    this.stampLogoName = file.name;
+    this.stampCustomization = { ...this.stampCustomization, logo_png_data_url: dataUrl, show_logo: true };
+  }
   stampSignerName(): string { return this.signers().find(item => item.id === this.stampSignerId)?.name || ''; }
-  stampEditorLabel(): string { return this.i18n.locale() === 'pt-BR' ? 'Posicionar carimbos' : 'Position stamps'; }
+  stampSignerOptions(): RubricaSelectOption[] { return this.signers().map(signer => ({ value: signer.id, label: signer.name })); }
+  stampSignerMode(): 'serpro_timestamp' | 'serproid' { return this.stampSignerModes[this.stampSignerId] || 'serpro_timestamp'; }
+  stampSignatureModeOptions(): RubricaSelectOption[] { return [{ value: 'serpro_timestamp', label: 'Evidências Rúbrica + Carimbo do Tempo' }, { value: 'serproid', label: 'Evidências Rúbrica + Serpro ID' }]; }
+  selectStampSignerMode(value: string): void { if (this.stampSignerId && (value === 'serpro_timestamp' || value === 'serproid')) this.stampSignerModes = { ...this.stampSignerModes, [this.stampSignerId]: value }; }
+  selectStampVariant(value: 'full' | 'minimal'): void { this.stampCustomization = { ...this.stampCustomization, display_variant: value }; }
+  stampTemplateOptions(): RubricaSelectOption[] { return [{ value: 'standard', label: 'Padrão' }, { value: 'business', label: 'CNPJ' }, { value: 'representative', label: this.representativeLabel() }]; }
+  selectStampTemplate(value: string): void { if (value === 'standard' || value === 'business' || value === 'representative') this.stampCustomization = { ...this.stampCustomization, template: value }; }
+  selectStampColor(value: string): void { this.stampCustomization = { ...this.stampCustomization, primary_color: value }; }
+  stampSignerIdentity(): string { const signer = this.signers().find(item => item.id === this.stampSignerId); return signer?.identity_document_masked ? `${(signer.identity_document_type || '').replace('BR_', '')}: ${signer.identity_document_masked}` : 'CPF/CNPJ confirmado no momento da assinatura'; }
+  stampSignerRepresentation(): string { const signer = this.signers().find(item => item.id === this.stampSignerId); const representation = signer?.representation_snapshot; return representation ? [representation.legal_name || representation.name, representation.registration_masked].filter(Boolean).join(' · CNPJ: ') : ''; }
+  stampEditorLabel(): string { return this.customStampBrandingEnabled() ? (this.i18n.locale() === 'pt-BR' ? 'Posicionar e personalizar carimbos' : 'Position and customize stamps') : (this.i18n.locale() === 'pt-BR' ? 'Posicionar carimbos' : 'Position stamps'); }
   signerForStampLabel(): string { return this.i18n.locale() === 'pt-BR' ? 'Signatário' : 'Signer'; }
   stampColorLabel(): string { return this.i18n.locale() === 'pt-BR' ? 'Cor do carimbo' : 'Stamp color'; }
   drawnSignatureLabel(): string { return this.i18n.locale() === 'pt-BR' ? 'Exigir assinatura desenhada' : 'Require drawn signature'; }
@@ -428,44 +491,23 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   async openRequest(): Promise<void> {
     const request = this.selectedRequest();
     if (!request) return;
-    const [timestampConfig, serproidConfig] = await Promise.allSettled([
-      firstValueFrom(this.api.get<{ enabled: boolean }>('/signing/timestamp/config')),
-      firstValueFrom(this.api.get<{ enabled: boolean }>('/signing/serproid/config')),
-    ]);
-    const timestampEnabled = timestampConfig.status === 'fulfilled' && timestampConfig.value.enabled;
-    const serproidEnabled = serproidConfig.status === 'fulfilled' && serproidConfig.value.enabled;
-    if (!timestampEnabled) {
-      await Swal.fire({ icon: 'error', title: this.signatureModeTitle(), text: this.timestampRequiredHelp(), confirmButtonColor: '#a82035' });
-      return;
-    }
-    const result = await Swal.fire({
-      icon: 'question',
-      title: this.signatureModeTitle(),
-      text: this.signatureModeHelp(),
-      input: 'radio',
-      inputOptions: this.signatureModeOptions(timestampEnabled, serproidEnabled),
-      inputValue: 'serpro_timestamp',
-      inputValidator: value => value ? undefined : this.signatureModeRequired(),
-      showCancelButton: true,
-      confirmButtonText: this.i18n.text('openForSigning'),
-      cancelButtonText: this.i18n.text('back'),
-      confirmButtonColor: '#a82035',
-    });
+    const result = await Swal.fire({ icon: 'question', title: this.i18n.text('openForSigning'), text: 'Os métodos definidos para cada signatário serão usados.', showCancelButton: true, confirmButtonText: this.i18n.text('openForSigning'), cancelButtonText: this.i18n.text('back'), confirmButtonColor: '#a82035' });
     if (!result.isConfirmed) return;
-    const signatureMode = result.value as SignatureMode;
     await this.run(async () => {
-      const opened = await firstValueFrom(this.api.post<SignatureRequest>(`/signature-requests/${request.id}/open`, { signature_mode: signatureMode }));
+      const opened = await firstValueFrom(this.api.post<SignatureRequest>(`/signature-requests/${request.id}/open`, { signature_mode: 'serpro_timestamp' }));
       this.updateRequest(opened);
       const link = await firstValueFrom(this.api.post<SigningLink>(`/signature-requests/${request.id}/signing-link`, {}));
       await this.storeSigningLink(request.id, link.signing_url);
     });
   }
 
-  private signatureModeOptions(timestampEnabled: boolean, serproidEnabled: boolean): Record<string, string> {
+  private signatureModeOptions(timestampEnabled: boolean, serproidEnabled: boolean, serproidSimulated = false): Record<string, string> {
     const locale = this.i18n.locale();
     const options: Record<string, string> = {};
+    if (!timestampEnabled) options['evidence'] = ({ 'pt-BR': 'Somente evidências do Rúbrica (sem carimbo do tempo)', en: 'Rubrica evidence only (without trusted timestamp)', es: 'Solo evidencias de Rubrica (sin sello de tiempo)', 'ja-JP': 'Rubrica 証拠情報のみ（タイムスタンプなし）' } as Record<string, string>)[locale];
     if (timestampEnabled) options['serpro_timestamp'] = ({ 'pt-BR': 'Evidências + carimbo do tempo SERPRO', en: 'Evidence + SERPRO timestamp', es: 'Evidencias + sello de tiempo SERPRO', 'ja-JP': '証拠情報 + SERPRO タイムスタンプ' } as Record<string, string>)[locale];
     if (timestampEnabled && serproidEnabled) options['serproid'] = ({ 'pt-BR': 'Evidências + Serpro ID + carimbo do tempo SERPRO', en: 'Evidence + Serpro ID + SERPRO timestamp', es: 'Evidencias + Serpro ID + sello de tiempo SERPRO', 'ja-JP': '証拠情報 + Serpro ID + SERPRO タイムスタンプ' } as Record<string, string>)[locale];
+    if (serproidSimulated) options['serproid'] = ({ 'pt-BR': 'Serpro ID simulado (somente teste, sem certificado ICP-Brasil)', en: 'Simulated Serpro ID (test only, no ICP-Brasil certificate)', es: 'Serpro ID simulado (solo prueba, sin certificado ICP-Brasil)', 'ja-JP': 'Serpro ID シミュレーション（テスト専用・ICP-Brasil証明書なし）' } as Record<string, string>)[locale];
     return options;
   }
 

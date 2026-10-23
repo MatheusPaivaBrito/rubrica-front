@@ -3,7 +3,7 @@ import { firstValueFrom, Subscription } from 'rxjs';
 import { GlobalWorkerOptions, getDocument, PDFDocumentLoadingTask, PDFDocumentProxy } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 import { ApiService } from '../core/api.service';
-import { StampPosition } from '../core/models';
+import { StampCustomization, StampPosition } from '../core/models';
 import { countryFlag } from '../core/countries';
 import { I18nService } from '../core/i18n.service';
 
@@ -19,34 +19,44 @@ interface PdfPageView {
   selector: 'app-pdf-stamp-viewer',
   standalone: true,
   template: `
-    <div class="pdf-canvas-viewer" [class.readonly]="readonly">
+    <div class="pdf-canvas-viewer" [class.readonly]="readonly" [class.fit-page]="fitMode === 'page'" [class.fit-width]="fitMode === 'width'">
       @if (loading()) { <p class="pdf-loading">{{ i18n.text('preparingPdf') }}</p> }
       @if (error()) { <p class="error">{{ error() }}</p> }
       @for (page of pages(); track page.number) {
         <div
           class="pdf-page"
           [style.width.px]="page.width"
+          [style.--pdf-page-ratio]="page.width / page.height"
           [style.aspect-ratio]="page.width + ' / ' + page.height"
-          (pointerdown)="placeStamp($event, page.number)"
+          (pointerdown)="startPageInteraction($event, page.number)"
+          (pointermove)="trackPageInteraction($event)"
+          (pointerup)="finishPageInteraction($event, page.number)"
+          (pointercancel)="cancelPageInteraction()"
         >
           <canvas #pageCanvas [attr.aria-label]="i18n.text('page') + ' ' + page.number"></canvas>
           @for (visiblePlacement of visiblePlacements(page.number); track placementKey(visiblePlacement, $index)) {
             <div
               class="signature-stamp"
-              [class.movable]="!readonly && !placements.length"
+              [class.minimal]="customization?.display_variant === 'minimal'"
+              [class.movable]="!readonly"
               [style.left.%]="visiblePlacement.x * 100"
               [style.top.%]="visiblePlacement.y * 100"
-              [style.width.%]="(visiblePlacement.width || 0.4) * 100"
-              (pointerdown)="startDrag($event)"
+              [style.width.%]="stampWidthPercent(page, visiblePlacement)"
+              [style.border-color]="customization?.primary_color"
+              (pointerdown)="startDrag($event, visiblePlacement)"
               (pointermove)="dragStamp($event, page.number)"
               (pointerup)="finishDrag($event)"
               (pointercancel)="finishDrag($event)"
+              (click)="$event.stopPropagation()"
             >
               @if (signerFlag()) { <span class="stamp-country" [attr.aria-label]="signerCountry">{{ signerFlag() }}</span> }
               <span>{{ i18n.text('signedBy') }}</span>
               <strong>{{ signerName }}</strong>
-              @if (signerIdentity) { <small class="stamp-identity">{{ signerIdentity }}</small> }
-              <small>{{ i18n.formatDate(stampDate) }}</small>
+              @if (signerIdentity && customization?.display_variant !== 'minimal') { <small class="stamp-identity">{{ signerIdentity }}</small> }
+              @if (signerRepresentation && customization?.display_variant !== 'minimal') { <small class="stamp-representation">{{ signerRepresentation }}</small> }
+              @if (customization?.display_variant !== 'minimal') { <small>{{ i18n.formatDate(stampDate) }}</small> }
+              @if (customization?.display_variant !== 'minimal') { <small class="stamp-evidence">Evidência: SHA-256 registrada ao assinar</small> }
+              @if (customization?.show_logo && customization?.logo_png_data_url) { <img class="stamp-logo-preview" [src]="customization!.logo_png_data_url" alt="" /> }
             </div>
           }
         </div>
@@ -60,10 +70,14 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
   @Input() documentEndpoint = 'document';
   @Input() signerName = '';
   @Input() signerIdentity = '';
+  @Input() signerRepresentation = '';
   @Input() signerCountry = '';
   @Input() stampDate: string | Date = new Date();
   @Input() placement: StampPosition | null = null;
   @Input() placements: StampPosition[] = [];
+  @Input() activeSignerId = '';
+  @Input() customization: StampCustomization | null = null;
+  @Input() fitMode: 'page' | 'width' = 'width';
   @Input() readonly = false;
   @Output() readonly placementChange = new EventEmitter<StampPosition>();
   @Output() readonly pageCountChange = new EventEmitter<number>();
@@ -77,6 +91,8 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
   private canvasesSubscription?: Subscription;
   private renderingDocument: PDFDocumentProxy | null = null;
   private dragging = false;
+  private draggingPlacement: StampPosition | null = null;
+  private pagePointerStart: { id: number; x: number; y: number; moved: boolean } | null = null;
 
   constructor(private readonly api: ApiService, readonly i18n: I18nService) {}
 
@@ -98,15 +114,31 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
     void this.loadingTask?.destroy();
   }
 
-  placeStamp(event: PointerEvent, page: number): void {
+  startPageInteraction(event: PointerEvent, _page: number): void {
     if (this.readonly || this.dragging) return;
+    this.pagePointerStart = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
+  }
+
+  trackPageInteraction(event: PointerEvent): void {
+    const start = this.pagePointerStart;
+    if (!start || start.id !== event.pointerId) return;
+    if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > 6) start.moved = true;
+  }
+
+  finishPageInteraction(event: PointerEvent, page: number): void {
+    const start = this.pagePointerStart;
+    this.pagePointerStart = null;
+    if (!start || start.id !== event.pointerId || start.moved || this.readonly || this.dragging) return;
     this.updatePlacement(event, page);
   }
 
-  startDrag(event: PointerEvent): void {
-    if (this.readonly || this.placements.length) return;
+  cancelPageInteraction(): void { this.pagePointerStart = null; }
+
+  startDrag(event: PointerEvent, placement: StampPosition): void {
+    if (this.readonly) return;
     event.stopPropagation();
     this.dragging = true;
+    this.draggingPlacement = placement;
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   }
 
@@ -119,10 +151,16 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
   finishDrag(event: PointerEvent): void {
     event.stopPropagation();
     this.dragging = false;
+    this.draggingPlacement = null;
   }
 
   signerFlag(): string { return countryFlag(this.signerCountry); }
-  visiblePlacements(page: number): StampPosition[] { return (this.placements.length ? this.placements : this.placement ? [this.placement] : []).filter(item => item.page === page); }
+  stampWidthPercent(page: PdfPageView, placement: StampPosition): number {
+    const requested = placement.width ?? 0.4;
+    const maximumPdfWidth = this.customization?.display_variant === 'minimal' ? 210 : 320;
+    return Math.min(requested, (maximumPdfWidth * 1.5) / page.width) * 100;
+  }
+  visiblePlacements(page: number): StampPosition[] { return (this.placements.length ? this.placements : this.placement ? [this.placement] : []).filter(item => item.page === page && (!this.activeSignerId || item.signer_id === this.activeSignerId)); }
   placementKey(item: StampPosition, index: number): string { return `${item.signer_id || 'current'}:${item.page}:${item.order ?? index}`; }
 
   private async loadDocument(): Promise<void> {
@@ -191,12 +229,12 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
     }
   }
 
-  private updatePlacement(event: PointerEvent, page: number): void {
+  private updatePlacement(event: MouseEvent, page: number): void {
     const pageElement = (event.currentTarget as HTMLElement).closest('.pdf-page') as HTMLElement | null;
     if (!pageElement) return;
     const bounds = pageElement.getBoundingClientRect();
     const x = Math.min(0.84, Math.max(0.16, (event.clientX - bounds.left) / bounds.width));
     const y = Math.min(0.94, Math.max(0.06, (event.clientY - bounds.top) / bounds.height));
-    this.placementChange.emit({ page, x, y });
+    this.placementChange.emit({ ...(this.draggingPlacement || {}), page, x, y });
   }
 }

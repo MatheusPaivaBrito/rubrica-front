@@ -19,7 +19,7 @@ export interface SignatureEvidence {
   artifact_sha256: string;
   evidence: Record<string, unknown>;
 }
-export interface Signer { id: string; name: string; email: string; preferred_locale: 'pt-BR' | 'en' | 'es' | 'ja-JP'; status: string; signed_at: string | null; identity_document_type?: string | null; identity_document_country?: string | null; identity_document_masked?: string | null; participant_role?: ParticipantRole; represented_tenant_id?: string | null; representation_snapshot?: OrganizationSnapshot | null; }
+export interface Signer { id: string; name: string; email: string; preferred_locale: 'pt-BR' | 'en' | 'es' | 'ja-JP'; status: string; signed_at: string | null; signature_mode?: 'serpro_timestamp' | 'serproid'; identity_document_type?: string | null; identity_document_country?: string | null; identity_document_masked?: string | null; participant_role?: ParticipantRole; represented_tenant_id?: string | null; representation_snapshot?: OrganizationSnapshot | null; }
 export interface UserCreated { id: string; name: string; email: string; role: string; is_active: boolean; }
 export interface SignerOption { id: string; name: string; email: string; }
 export interface SignerContact { name: string; email: string; }
@@ -54,8 +54,8 @@ export interface BillingAccount {
 export interface BillingCheckout { checkout_url: string; }
 export interface BillingPortal { portal_url: string; }
 export interface StampPosition { page: number; x: number; y: number; signer_id?: string | null; width?: number; height?: number; order?: number; locale?: 'pt-BR' | 'en' | 'es' | 'ja-JP'; timezone?: string; }
-export interface StampCustomization { template: 'standard' | 'business' | 'representative'; primary_color: string; show_logo: boolean; logo_png_data_url?: string | null; require_drawn_signature: boolean; }
-export interface StampConfiguration { placements: StampPosition[]; customization: StampCustomization | null; }
+export interface StampCustomization { template: 'standard' | 'business' | 'representative'; display_variant: 'full' | 'minimal'; primary_color: string; show_logo: boolean; logo_png_data_url?: string | null; require_drawn_signature: boolean; }
+export interface StampConfiguration { placements: StampPosition[]; customization: StampCustomization | null; signer_signature_modes: Record<string, 'serpro_timestamp' | 'serproid'>; }
 export interface SigningContext {
   request: SignatureRequest;
   signer: Signer;

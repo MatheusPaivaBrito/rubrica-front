@@ -106,6 +106,7 @@ export class SigningPageComponent implements OnInit {
   readonly loading = signal(true);
   readonly signing = signal(false);
   readonly serproidEnabled = signal(false);
+  readonly serproidSimulated = signal(false);
   readonly completed = signal(false);
   readonly message = signal('');
   readonly error = signal('');
@@ -133,9 +134,10 @@ export class SigningPageComponent implements OnInit {
       if (certificateOutcome === 'success') this.message.set(this.i18n.text('signedSuccess'));
       if (certificateOutcome === 'denied') this.message.set(this.certificateDeniedLabel());
       try {
-        const serproid = await firstValueFrom(this.api.get<{ enabled: boolean }>('/signing/serproid/config'));
+        const serproid = await firstValueFrom(this.api.get<{ enabled: boolean; simulated?: boolean }>('/signing/serproid/config'));
         this.serproidEnabled.set(serproid.enabled);
-      } catch { this.serproidEnabled.set(false); }
+        this.serproidSimulated.set(serproid.simulated === true);
+      } catch { this.serproidEnabled.set(false); this.serproidSimulated.set(false); }
       if (context.viewer_mode === 'signer' && context.signer.status === 'pending') {
         const signer = await firstValueFrom(this.api.post<Signer>(`/signing/links/${this.token}/view`, {}));
         this.context.update(current => current ? { ...current, signer: {
@@ -216,7 +218,7 @@ export class SigningPageComponent implements OnInit {
     };
     if (this.context()?.stamp_customization?.require_drawn_signature && !this.hasDrawing) { await this.feedback.warning(this.drawnSignatureLabel()); return; }
     const command = { consent: true, consent_version: 'rubrica-evidence-v2', stamp: { ...stamp, locale: this.i18n.locale(), timezone: dateTime.timezone() }, drawn_signature_png_data_url: this.hasDrawing ? this.signatureCanvas?.nativeElement.toDataURL('image/png') : null, client, geolocation };
-    if (useCertificate) {
+    if (useCertificate && !this.serproidSimulated()) {
       this.signing.set(true);
       try {
         const result = await firstValueFrom(this.api.post<{ authorization_url: string }>(`/signing/links/${this.token}/serproid/start`, command));
@@ -281,12 +283,11 @@ export class SigningPageComponent implements OnInit {
   }
 
   administrativeView(): boolean { return this.context()?.viewer_mode === 'administrator'; }
-  signatureMode(): 'evidence' | 'serpro_timestamp' | 'serproid' { return this.context()?.request.signature_mode ?? 'evidence'; }
+  signatureMode(): 'evidence' | 'serpro_timestamp' | 'serproid' { return this.context()?.signer.signature_mode ?? this.context()?.request.signature_mode ?? 'evidence'; }
   serproidEligible(): boolean {
     const context = this.context();
-    if (!context || context.request.signature_mode !== 'serproid' || !this.serproidEnabled() || this.administrativeView() || this.completed()) return false;
-    const lastPendingSigner = context.request.signer_count - context.request.signed_count === 1;
-    return lastPendingSigner && ['BR_CPF', 'BR_CNPJ'].includes(context.signer.identity_document_type ?? '');
+    if (!context || this.signatureMode() !== 'serproid' || (!this.serproidEnabled() && !this.serproidSimulated()) || this.administrativeView() || this.completed()) return false;
+    return ['BR_CPF', 'BR_CNPJ'].includes(context.signer.identity_document_type ?? '');
   }
   documentEndpoint(): string { return (this.context()?.request.signed_count ?? 0) > 0 ? 'signed-document' : 'document'; }
   pageHint(): string {

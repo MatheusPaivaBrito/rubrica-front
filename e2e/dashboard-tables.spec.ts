@@ -86,8 +86,8 @@ test('mantém as duas DataTables legíveis, ordenadas e navegáveis', async ({ p
 
   await expect(requestRows).toHaveCount(5);
   await expect(documentRows).toHaveCount(5);
-  await expect(requestRows.first()).toContainText('#request-4');
-  await expect(documentRows.first()).toContainText('Contrato recém-enviado');
+  await expect(requestRows.first()).toContainText('#request-7');
+  await expect(documentRows.first()).toContainText('Documento 7');
 
   await expect(requestCard).toHaveScreenshot(`requests-${testInfo.project.name}.png`, {
     animations: 'disabled',
@@ -111,9 +111,13 @@ test('mantém as duas DataTables legíveis, ordenadas e navegáveis', async ({ p
 
   const documentSort = documentCard.getByRole('button', { name: /^documento/i });
   await documentSearch.clear();
+  await expect(documentSort.locator('i')).toHaveClass(/bi-arrow-down/);
   await documentSort.focus();
   await page.keyboard.press('Enter');
+  await expect(documentSort.locator('i')).toHaveClass(/bi-arrow-up/);
   await expect(documentRows.first()).toContainText('Contrato recém-enviado');
+  await documentSort.click();
+  await expect(documentSort.locator('i')).toHaveClass(/bi-arrow-down/);
 
   const viewport = page.viewportSize();
   const requestBox = await requestCard.boundingBox();
