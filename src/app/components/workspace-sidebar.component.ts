@@ -30,7 +30,6 @@ import { LanguagePickerComponent } from './language-picker.component';
           <span>{{ i18n.text('account') }}</span>
           <strong>{{ tenant.name }}</strong>
           <small>{{ auth.context()?.subject }}</small>
-          @if (billingAccount(); as account) { <small class="sidebar-plan">Rubrica — {{ accountPlanName(account) }}</small> }
           @if (tenant.kind === 'business') {
             <div class="sidebar-company">
               <span>{{ companyLabel() }}</span>
@@ -42,12 +41,21 @@ import { LanguagePickerComponent } from './language-picker.component';
         <nav class="sidebar-navigation" [attr.aria-label]="copy().nav">
           <a [routerLink]="url('dashboard')" routerLinkActive="selected" ariaCurrentWhenActive="page" (click)="closeMobile()"><i class="bi bi-grid-1x2" aria-hidden="true"></i><span>{{ copy().dashboard }}</span></a>
           @if (showTeam()) { <a [routerLink]="url('team')" routerLinkActive="selected" ariaCurrentWhenActive="page" (click)="closeMobile()"><i class="bi bi-people" aria-hidden="true"></i><span>{{ copy().team }}</span></a> }
-          @if (tenant.role === 'admin') { <a [routerLink]="url('plan')" routerLinkActive="selected" ariaCurrentWhenActive="page" (click)="closeMobile()"><i class="bi bi-credit-card" aria-hidden="true"></i><span>{{ i18n.text('billing') }}</span></a> }
+          <div class="sidebar-settings" [class.open]="settingsOpen() || settingsActive()">
+            <button type="button" class="sidebar-action sidebar-settings-toggle" [class.selected]="settingsActive()" [attr.aria-expanded]="settingsOpen() || settingsActive()" (click)="toggleSettings()">
+              <i class="bi bi-gear" aria-hidden="true"></i><span>{{ settingsLabel() }}</span><i class="bi bi-chevron-down sidebar-settings-chevron" aria-hidden="true"></i>
+            </button>
+            @if (settingsOpen() || settingsActive()) {
+              <div class="sidebar-settings-menu">
+                @if (tenant.role === 'admin') { <a [routerLink]="url('plan')" routerLinkActive="selected" ariaCurrentWhenActive="page" (click)="closeMobile()"><i class="bi bi-credit-card" aria-hidden="true"></i><span>{{ i18n.text('billing') }}</span></a> }
+                <button type="button" class="sidebar-action" [class.selected]="securityActive()" (click)="security()"><i class="bi bi-shield-lock" aria-hidden="true"></i><span>{{ i18n.text('dashboardSecurity') }}</span></button>
+                <div class="sidebar-settings-language"><app-language-picker /></div>
+              </div>
+            }
+          </div>
         </nav>
       </div>
       <div class="sidebar-tools">
-        <app-language-picker />
-        <button type="button" class="sidebar-action" (click)="security()"><i class="bi bi-shield-lock" aria-hidden="true"></i><span>{{ i18n.text('dashboardSecurity') }}</span></button>
         <button type="button" class="sidebar-action" (click)="logout()"><i class="bi bi-box-arrow-right" aria-hidden="true"></i><span>{{ i18n.text('logout') }}</span></button>
       </div>
     </aside>
@@ -62,6 +70,7 @@ export class WorkspaceSidebarComponent implements OnChanges {
   readonly showTeam = signal(false);
   readonly billingAccount = signal<BillingAccount | null>(null);
   readonly mobileOpen = signal(false);
+  readonly settingsOpen = signal(false);
   async ngOnChanges() {
     this.showTeam.set(false);
     this.billingAccount.set(null);
@@ -76,20 +85,17 @@ export class WorkspaceSidebarComponent implements OnChanges {
   copy() { return teamCopy[this.i18n.locale()]; }
   openMobile() { this.mobileOpen.set(true); }
   closeMobile() { this.mobileOpen.set(false); }
+  toggleSettings() { this.settingsOpen.update((open) => !open); }
   @HostListener('document:keydown.escape') onEscape() { this.closeMobile(); }
   url(page: 'dashboard' | 'team' | 'plan'): string {
     const slug = this.auth.context()?.account_public_slug;
     return this.tenant && slug ? tenantDashboardUrl(this.tenant, slug).replace(/dashboard$/, page) : `/${page}`;
   }
   security() { this.closeMobile(); return this.router.navigate(['/security']); }
+  settingsActive() { return this.router.url.includes('/plan') || this.securityActive(); }
+  securityActive() { return this.router.url.startsWith('/security'); }
+  settingsLabel(): string { return ({ 'pt-BR':'Configurações', en:'Settings', es:'Configuración', 'ja-JP':'設定' })[this.i18n.locale()]; }
   async logout() { this.closeMobile(); await this.auth.logout(); await this.router.navigate(['/login']); }
-  accountPlanName(account: BillingAccount): string {
-    if (account.complimentary_lifetime) return this.i18n.text('lifetimePlan').replace(/^Rubrica\s+/i, '');
-    if (account.current_product_code === 'rubrica_team' && ['active', 'past_due'].includes(account.status)) return ({ 'pt-BR':'Equipe', en:'Team', es:'Equipo', 'ja-JP':'チーム' })[this.i18n.locale()];
-    if (account.current_product_code === 'rubrica_intermediate' && ['active', 'past_due'].includes(account.status)) return this.i18n.text('intermediatePlan');
-    if (account.current_product_code === 'rubrica_base' && ['active', 'past_due'].includes(account.status)) return this.i18n.text('basePlan');
-    return this.i18n.text('free');
-  }
   companyLabel(): string { return ({ 'pt-BR':'Empresa', en:'Company', es:'Empresa', 'ja-JP':'法人' })[this.i18n.locale()]; }
   legalNameLabel(): string { return ({ 'pt-BR':'Razão social', en:'Legal name', es:'Razón social', 'ja-JP':'法人名' })[this.i18n.locale()]; }
 }

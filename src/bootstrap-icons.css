@@ -24,6 +24,7 @@
 .bi-arrow-left-right::before { content: "\f12b"; }
 .bi-arrow-down-up::before { content: "\f127"; }
 .bi-arrow-down::before { content: "\f128"; }
+.bi-arrow-clockwise::before { content: "\f116"; }
 .bi-arrow-right::before { content: "\f138"; }
 .bi-arrow-up::before { content: "\f148"; }
 .bi-box-arrow-up-right::before { content: "\f1c5"; }
@@ -48,6 +49,7 @@
 .bi-file-earmark-person::before { content: "\f379"; }
 .bi-fingerprint::before { content: "\f671"; }
 .bi-grid-1x2::before { content: "\f3f4"; }
+.bi-gear::before { content: "\f3e5"; }
 .bi-house::before { content: "\f425"; }
 .bi-house-check::before { content: "\f889"; }
 .bi-info-circle::before { content: "\f431"; }
