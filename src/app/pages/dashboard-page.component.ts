@@ -2268,12 +2268,15 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
       ]);
       this.stampPlacements.set(configuration.placements);
       const customization = configuration.customization || tenantDefault;
+      const normalizedLogo = await this.normalizeStampLogoDataUrl(
+        customization?.logo_png_data_url || null,
+      );
       this.stampCustomization = {
         template: customization?.template || 'standard',
         display_variant: customization?.display_variant || 'full',
         primary_color: customization?.primary_color || '#187A66',
         show_logo: customization?.show_logo || false,
-        logo_png_data_url: customization?.logo_png_data_url || null,
+        logo_png_data_url: normalizedLogo,
         require_drawn_signature: customization?.require_drawn_signature || false,
       };
       this.stampSignerModes = Object.fromEntries(
@@ -2478,6 +2481,18 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
       .getContext('2d')
       ?.drawImage(source, left, top, output.width, output.height, 0, 0, output.width, output.height);
     return output.toDataURL('image/png');
+  }
+  private async normalizeStampLogoDataUrl(dataUrl: string | null): Promise<string | null> {
+    if (!dataUrl) return null;
+    try {
+      const response = await fetch(dataUrl);
+      const bitmap = await createImageBitmap(await response.blob());
+      const normalized = await this.trimTransparentPng(bitmap);
+      bitmap.close();
+      return normalized;
+    } catch {
+      return dataUrl;
+    }
   }
   stampSignerName(): string {
     return this.signers().find((item) => item.id === this.stampSignerId)?.name || '';
