@@ -28,7 +28,7 @@ interface PdfPageView {
           [style.width.px]="page.width"
           [style.--pdf-page-ratio]="page.width / page.height"
           [style.aspect-ratio]="page.width + ' / ' + page.height"
-          (pointerdown)="startPageInteraction($event, page.number)"
+          (pointerdown)="startPageInteraction($event)"
           (pointermove)="trackPageInteraction($event)"
           (pointerup)="finishPageInteraction($event, page.number)"
           (pointercancel)="cancelPageInteraction()"
@@ -37,11 +37,13 @@ interface PdfPageView {
           @for (visiblePlacement of visiblePlacements(page.number); track placementKey(visiblePlacement, $index)) {
             <div
               class="signature-stamp"
-              [class.minimal]="customization?.display_variant === 'minimal'"
+              [class.minimal]="stampVariant(visiblePlacement) === 'minimal'"
+              [class.drawn]="stampVariant(visiblePlacement) === 'drawn'"
               [class.movable]="!readonly"
               [style.left.%]="visiblePlacement.x * 100"
               [style.top.%]="visiblePlacement.y * 100"
               [style.width.%]="stampWidthPercent(page, visiblePlacement)"
+              [style.height.%]="stampHeightPercent(page, visiblePlacement)"
               [style.border-color]="customization?.primary_color"
               (pointerdown)="startDrag($event, visiblePlacement)"
               (pointermove)="dragStamp($event, page.number)"
@@ -49,14 +51,18 @@ interface PdfPageView {
               (pointercancel)="finishDrag($event)"
               (click)="$event.stopPropagation()"
             >
-              @if (signerFlag()) { <span class="stamp-country" [attr.aria-label]="signerCountry">{{ signerFlag() }}</span> }
-              <span>{{ i18n.text('signedBy') }}</span>
-              <strong>{{ signerName }}</strong>
-              @if (signerIdentity && customization?.display_variant !== 'minimal') { <small class="stamp-identity">{{ signerIdentity }}</small> }
-              @if (signerRepresentation && customization?.display_variant !== 'minimal') { <small class="stamp-representation">{{ signerRepresentation }}</small> }
-              @if (customization?.display_variant !== 'minimal') { <small>{{ i18n.formatDate(stampDate) }}</small> }
-              @if (customization?.display_variant !== 'minimal') { <small class="stamp-evidence">Evidência: SHA-256 registrada ao assinar</small> }
-              @if (customization?.show_logo && customization?.logo_png_data_url) { <img class="stamp-logo-preview" [src]="customization!.logo_png_data_url" alt="" /> }
+              @if (stampVariant(visiblePlacement) === 'drawn') {
+                <span class="stamp-drawn-preview">Sua assinatura</span>
+              } @else {
+                @if (signerFlag()) { <span class="stamp-country" [attr.aria-label]="signerCountry">{{ signerFlag() }}</span> }
+                <span>{{ stampSignedByLabel() }}</span>
+                <strong>{{ signerName }}</strong>
+                @if (signerIdentity && stampVariant(visiblePlacement) === 'full') { <small class="stamp-identity">{{ signerIdentity }}</small> }
+                @if (signerRepresentation && stampVariant(visiblePlacement) === 'full') { <small class="stamp-representation">{{ signerRepresentation }}</small> }
+                @if (stampVariant(visiblePlacement) === 'full') { <small>{{ i18n.formatDate(stampDate) }}</small> }
+                @if (stampVariant(visiblePlacement) === 'full') { <small class="stamp-evidence">Evidência: SHA-256 registrada ao assinar</small> }
+                @if (customization?.show_logo && customization?.logo_png_data_url) { <img class="stamp-logo-preview" [src]="customization!.logo_png_data_url" alt="" /> }
+              }
             </div>
           }
         </div>
@@ -114,7 +120,7 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
     void this.loadingTask?.destroy();
   }
 
-  startPageInteraction(event: PointerEvent, _page: number): void {
+  startPageInteraction(event: PointerEvent): void {
     if (this.readonly || this.dragging) return;
     this.pagePointerStart = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
   }
@@ -154,11 +160,26 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
     this.draggingPlacement = null;
   }
 
-  signerFlag(): string { return countryFlag(this.signerCountry); }
+  signerFlag(): string { return countryFlag(this.effectiveSignerCountry()); }
+  stampSignedByLabel(): string {
+    return ({ BR: 'ASSINADO ELETRONICAMENTE POR', PT: 'ASSINADO ELETRONICAMENTE POR', ES: 'FIRMADO ELECTRÓNICAMENTE POR', JP: '電子署名者', US: 'ELECTRONICALLY SIGNED BY' } as Record<string, string>)[this.effectiveSignerCountry()] || this.i18n.text('signedBy');
+  }
+  private effectiveSignerCountry(): string {
+    if (this.signerCountry) return this.signerCountry.toUpperCase();
+    return /\b(?:CPF|CNPJ)\b/i.test(this.signerIdentity) ? 'BR' : '';
+  }
+  stampVariant(placement: StampPosition): 'full' | 'minimal' | 'drawn' { return placement.display_variant || this.customization?.display_variant || 'full'; }
   stampWidthPercent(page: PdfPageView, placement: StampPosition): number {
     const requested = placement.width ?? 0.4;
-    const maximumPdfWidth = this.customization?.display_variant === 'minimal' ? 210 : 320;
+    const maximumPdfWidth = this.stampVariant(placement) === 'minimal' ? 210 : 320;
     return Math.min(requested, (maximumPdfWidth * 1.5) / page.width) * 100;
+  }
+  stampHeightPercent(page: PdfPageView, placement: StampPosition): number {
+    const requested = placement.height ?? 0.12;
+    const variant = this.stampVariant(placement);
+    if (variant === 'minimal') return (42 * 1.5 / page.height) * 100;
+    const minimumPdfHeight = variant === 'drawn' ? 58 : this.signerRepresentation ? 96 : 54;
+    return Math.max(requested, (minimumPdfHeight * 1.5) / page.height) * 100;
   }
   visiblePlacements(page: number): StampPosition[] { return (this.placements.length ? this.placements : this.placement ? [this.placement] : []).filter(item => item.page === page && (!this.activeSignerId || item.signer_id === this.activeSignerId)); }
   placementKey(item: StampPosition, index: number): string { return `${item.signer_id || 'current'}:${item.page}:${item.order ?? index}`; }

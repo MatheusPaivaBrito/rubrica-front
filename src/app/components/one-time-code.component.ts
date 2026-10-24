@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, ElementRef, EventEmitter, Input, Output, QueryList, ViewChildren } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, EventEmitter, Input, OnDestroy, Output, QueryList, ViewChildren } from '@angular/core';
 
 @Component({
   selector: 'app-one-time-code',
@@ -24,13 +24,14 @@ import { AfterViewInit, Component, ElementRef, EventEmitter, Input, Output, Quer
     </div>
   `,
   styles: [`
+    :host{display:block;scroll-margin-block:22dvh}
     .otp-group{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:.55rem;width:100%}
     .otp-digit{width:100%;min-width:0;aspect-ratio:1/1;min-height:52px;padding:0;border:1px solid #cfd8e6;border-radius:11px;background:#fff;color:#18212f;text-align:center;font-size:1.45rem;font-weight:750;caret-color:#a82035}
     .otp-digit:focus{outline:3px solid rgba(168,32,53,.16);border-color:#a82035}
     @media(max-width:420px){.otp-group{gap:.35rem}.otp-digit{min-height:46px;font-size:1.25rem}}
   `],
 })
-export class OneTimeCodeComponent implements AfterViewInit {
+export class OneTimeCodeComponent implements AfterViewInit, OnDestroy {
   @Input() label = 'Authentication code';
   @Input() set value(value: string) { this.setDigits(value); }
   @Output() readonly valueChange = new EventEmitter<string>();
@@ -39,8 +40,15 @@ export class OneTimeCodeComponent implements AfterViewInit {
 
   digits = ['', '', '', '', '', ''];
   private lastCompleted = '';
+  private focusedInput?: HTMLInputElement;
+  private readonly keepFocusedInputVisible = (): void => this.scrollInputIntoView(this.focusedInput);
 
-  ngAfterViewInit(): void { queueMicrotask(() => this.focus(0)); }
+  ngAfterViewInit(): void {
+    window.visualViewport?.addEventListener('resize', this.keepFocusedInputVisible);
+    queueMicrotask(() => this.focus(0));
+  }
+
+  ngOnDestroy(): void { window.visualViewport?.removeEventListener('resize', this.keepFocusedInputVisible); }
 
   onInput(index: number, event: Event): void {
     const input = event.target as HTMLInputElement;
@@ -74,7 +82,12 @@ export class OneTimeCodeComponent implements AfterViewInit {
     this.focus(Math.min(digits.length, 6) - 1);
   }
 
-  selectInput(event: FocusEvent): void { (event.target as HTMLInputElement).select(); }
+  selectInput(event: FocusEvent): void {
+    const input = event.target as HTMLInputElement;
+    this.focusedInput = input;
+    input.select();
+    this.scrollInputIntoView(input);
+  }
 
   private applyDigits(start: number, value: string): void {
     for (const [offset, digit] of [...value].entries()) {
@@ -102,5 +115,10 @@ export class OneTimeCodeComponent implements AfterViewInit {
     }
   }
 
-  private focus(index: number): void { this.inputs?.get(index)?.nativeElement.focus(); }
+  private focus(index: number): void { this.inputs?.get(index)?.nativeElement.focus({ preventScroll: true }); }
+
+  private scrollInputIntoView(input?: HTMLInputElement): void {
+    if (!input) return;
+    window.setTimeout(() => input.scrollIntoView?.({ block: 'center', inline: 'nearest', behavior: 'smooth' }), 120);
+  }
 }

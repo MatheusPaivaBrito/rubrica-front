@@ -21,7 +21,9 @@ import { LanguagePickerComponent } from '../components/language-picker.component
     } @else if (error() && !context()) {
       <main class="signing-state"><section class="card"><h1>{{ i18n.text('inviteFailed') }}</h1><p class="error">{{ error() }}</p><button class="button" (click)="login()">{{ i18n.text('enter') }}</button></section></main>
     } @else if (context()) {
-      <main class="signing-workspace">
+      <main class="signing-workspace" [class.signing-drawer-open]="signingMobileControlsOpen()">
+        <header class="signing-mobile-topbar"><button type="button" class="signing-mobile-menu" (click)="toggleSigningMobileControls()" [attr.aria-expanded]="signingMobileControlsOpen()" aria-controls="signing-actions"><i class="bi bi-list" aria-hidden="true"></i><span>Assinar</span></button><div class="signing-mobile-view-actions"><button type="button" class="signing-fit-toggle" (click)="toggleSigningPdfFitMode()" [attr.aria-label]="signingPdfFitMode() === 'page' ? 'Ajustar à largura' : 'Mostrar página inteira'" [attr.title]="signingPdfFitMode() === 'page' ? 'Ajustar à largura' : 'Mostrar página inteira'"><i class="bi" [class.bi-arrows-angle-expand]="signingPdfFitMode() === 'page'" [class.bi-arrows-angle-contract]="signingPdfFitMode() === 'width'"></i></button><img class="signing-mobile-logo" src="/icons/rubrica-brand/source/rubrica-lockup-inverse.png" alt="Rúbrica Signature" /></div></header>
+        <button type="button" class="signing-drawer-scrim" [attr.aria-label]="i18n.text('close')" (click)="closeSigningMobileControls()"></button>
         <section class="signing-document-pane" [attr.aria-label]="i18n.text('documentForSigning')">
           <header class="signing-document-header">
             <div><p class="eyebrow">{{ i18n.text('documentForSigning') }}</p><h1>{{ context()!.document_title }}</h1><p>{{ context()!.original_filename }}</p></div>
@@ -36,14 +38,18 @@ import { LanguagePickerComponent } from '../components/language-picker.component
             [stampDate]="context()!.signer.signed_at || stampPreviewDate"
             [placement]="placement()"
             [placements]="context()!.stamp_positions || []"
+            [customization]="context()!.stamp_customization || null"
+            [fitMode]="signingPdfFitMode()"
             [readonly]="completed() || (context()!.stamp_positions?.length || 0) > 0"
             (placementChange)="placement.set($event)"
           />
         </section>
 
-        <aside class="signing-actions-pane">
+        <aside id="signing-actions" class="signing-actions-pane" [class.open]="signingMobileControlsOpen()">
+          <div class="signing-mobile-drawer-header"><strong>{{ signingOptionsLabel() }}</strong><button type="button" class="modal-close" (click)="closeSigningMobileControls()" [attr.aria-label]="i18n.text('close')">×</button></div>
+          <div class="signing-actions-scroll">
           <div>
-            <div class="signing-language"><p class="eyebrow">{{ i18n.text('secureSigning') }}</p><app-language-picker /></div>
+            <div class="signing-language"><p class="eyebrow signing-desktop-eyebrow">{{ i18n.text('secureSigning') }}</p><app-language-picker /></div>
             <h2>{{ administrativeView() ? i18n.text('adminView') : i18n.text('hello', { name: context()!.signer.name }) }}</h2>
             <p class="muted">{{ administrativeView() ? i18n.text('notSigner') : i18n.text('chooseStamp') }}</p>
           </div>
@@ -77,7 +83,7 @@ import { LanguagePickerComponent } from '../components/language-picker.component
           </section> }
 
           @if (!administrativeView()) { <p class="notice">{{ i18n.text('evidenceNotice') }}</p> }
-          @if (!administrativeView() && context()!.stamp_customization?.require_drawn_signature) { <section class="signing-summary"><strong>{{ drawnSignatureLabel() }}</strong><canvas #signatureCanvas width="420" height="140" style="width:100%;height:140px;border:1px solid #ccd5e2;border-radius:8px;touch-action:none" (pointerdown)="startDrawing($event)" (pointermove)="draw($event)" (pointerup)="stopDrawing()" (pointercancel)="stopDrawing()"></canvas><button class="button secondary compact" (click)="clearDrawing()">{{ clearDrawingLabel() }}</button></section> }
+          @if (!administrativeView() && requiresDrawnSignature()) { <section class="signing-summary"><strong>{{ drawnSignatureLabel() }}</strong><canvas #signatureCanvas width="420" height="140" style="width:100%;height:140px;border:1px solid #ccd5e2;border-radius:8px;touch-action:none" (pointerdown)="startDrawing($event)" (pointermove)="draw($event)" (pointerup)="stopDrawing()" (pointercancel)="stopDrawing()"></canvas><button class="button secondary compact" (click)="clearDrawing()">{{ clearDrawingLabel() }}</button></section> }
           @if (signatureMode() === 'serpro_timestamp' || signatureMode() === 'serproid') { <p class="notice">{{ timestampHelpLabel() }}</p> }
           @if (signatureMode() === 'serproid') { <p class="notice">{{ certificateHelpLabel() }}</p> }
           @if (message()) { <p class="notice">{{ message() }}</p> }
@@ -94,6 +100,7 @@ import { LanguagePickerComponent } from '../components/language-picker.component
             @if (!administrativeView()) { <button class="button subtle" [disabled]="signing() || completed()" (click)="decline()">{{ i18n.text('decline') }}</button> }
             @if (administrativeView()) { <button class="button" (click)="switchAccount()">{{ i18n.text('signInAsSigner') }}</button><button class="button subtle" (click)="goToDashboard()">{{ i18n.text('backDashboard') }}</button> }
           </div>
+          </div>
         </aside>
       </main>
     }
@@ -108,12 +115,18 @@ export class SigningPageComponent implements OnInit {
   readonly serproidEnabled = signal(false);
   readonly serproidSimulated = signal(false);
   readonly completed = signal(false);
+  readonly signingMobileControlsOpen = signal(false);
+  readonly signingPdfFitMode = signal<'page' | 'width'>('page');
   readonly message = signal('');
   readonly error = signal('');
   readonly stampPreviewDate = new Date();
   token = '';
   private drawing = false;
   private hasDrawing = false;
+
+  toggleSigningMobileControls(): void { this.signingMobileControlsOpen.update(open => !open); }
+  closeSigningMobileControls(): void { this.signingMobileControlsOpen.set(false); }
+  toggleSigningPdfFitMode(): void { this.signingPdfFitMode.update(mode => mode === 'page' ? 'width' : 'page'); }
 
   constructor(
     readonly auth: AuthService,
@@ -216,7 +229,7 @@ export class SigningPageComponent implements OnInit {
       screen_width: window.screen?.width || null,
       screen_height: window.screen?.height || null,
     };
-    if (this.context()?.stamp_customization?.require_drawn_signature && !this.hasDrawing) { await this.feedback.warning(this.drawnSignatureLabel()); return; }
+    if (this.requiresDrawnSignature() && !this.hasDrawing) { await this.feedback.warning(this.drawnSignatureLabel()); return; }
     const command = { consent: true, consent_version: 'rubrica-evidence-v2', stamp: { ...stamp, locale: this.i18n.locale(), timezone: dateTime.timezone() }, drawn_signature_png_data_url: this.hasDrawing ? this.signatureCanvas?.nativeElement.toDataURL('image/png') : null, client, geolocation };
     if (useCertificate && !this.serproidSimulated()) {
       this.signing.set(true);
@@ -254,6 +267,8 @@ export class SigningPageComponent implements OnInit {
   representativeLabel(): string { return ({ 'pt-BR':'Representando', en:'Representing', es:'En representación de', 'ja-JP':'代表する会社' } as Record<string, string>)[this.i18n.locale()]; }
   issuerLabel(): string { return ({ 'pt-BR':'Empresa emissora', en:'Issuing company', es:'Empresa emisora', 'ja-JP':'発行会社' } as Record<string, string>)[this.i18n.locale()]; }
   drawnSignatureLabel(): string { return ({ 'pt-BR':'Desenhe sua assinatura', en:'Draw your signature', es:'Dibuje su firma', 'ja-JP':'署名を描いてください' } as Record<string, string>)[this.i18n.locale()]; }
+  signingOptionsLabel(): string { return ({ 'pt-BR':'Opções de assinatura', en:'Signing options', es:'Opciones de firma', 'ja-JP':'署名オプション' } as Record<string, string>)[this.i18n.locale()]; }
+  requiresDrawnSignature(): boolean { return Boolean(this.context()?.stamp_positions?.some(item => item.display_variant === 'drawn') || this.context()?.stamp_customization?.require_drawn_signature); }
   clearDrawingLabel(): string { return ({ 'pt-BR':'Limpar', en:'Clear', es:'Limpiar', 'ja-JP':'消去' } as Record<string, string>)[this.i18n.locale()]; }
   startDrawing(event: PointerEvent): void { this.drawing = true; const canvas = this.signatureCanvas?.nativeElement; canvas?.setPointerCapture(event.pointerId); this.draw(event); }
   draw(event: PointerEvent): void { const canvas = this.signatureCanvas?.nativeElement; if (!this.drawing || !canvas) return; const rect = canvas.getBoundingClientRect(); const context = canvas.getContext('2d'); if (!context) return; const x = (event.clientX - rect.left) * canvas.width / rect.width; const y = (event.clientY - rect.top) * canvas.height / rect.height; context.fillStyle = '#172033'; context.beginPath(); context.arc(x, y, 2.5, 0, Math.PI * 2); context.fill(); this.hasDrawing = true; }
