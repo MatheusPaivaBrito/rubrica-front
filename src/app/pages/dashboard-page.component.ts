@@ -2509,9 +2509,32 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
       { value: 'serproid', label: 'Evidências Rúbrica + Serpro ID' },
     ];
   }
-  selectStampSignerMode(value: string): void {
-    if (this.stampSignerId && (value === 'serpro_timestamp' || value === 'serproid'))
-      this.stampSignerModes = { ...this.stampSignerModes, [this.stampSignerId]: value };
+  async selectStampSignerMode(value: string): Promise<void> {
+    if (!this.stampSignerId || (value !== 'serpro_timestamp' && value !== 'serproid')) return;
+    const signer = this.signers().find((item) => item.id === this.stampSignerId);
+    if (value === 'serproid' && signer && !['BR_CPF', 'BR_CNPJ'].includes(signer.identity_document_type || '')) {
+      const result = await Swal.fire({
+        icon: 'info',
+        title: 'Conta necessária para usar Serpro ID',
+        text: `${signer.name} ainda não possui uma conta Rubrica com CPF ou CNPJ cadastrado. Deseja enviar um e-mail para ${signer.email} criar a conta e informar o CPF e a senha?`,
+        showCancelButton: true,
+        confirmButtonText: 'Enviar convite',
+        cancelButtonText: this.i18n.text('cancel'),
+        confirmButtonColor: '#a82035',
+      });
+      if (!result.isConfirmed) return;
+      const request = this.selectedRequest();
+      if (!request) return;
+      try {
+        await firstValueFrom(this.api.post(`/signature-requests/${request.id}/signers/${signer.id}/account-invitation`, {}));
+        this.stampSignerModes = { ...this.stampSignerModes, [this.stampSignerId]: value };
+        await this.feedback.success(`Convite enviado para ${signer.email}. Abra a solicitação depois que o signatário ativar a conta e cadastrar o CPF.`);
+      } catch (error) {
+        await this.feedback.error(error);
+      }
+      return;
+    }
+    this.stampSignerModes = { ...this.stampSignerModes, [this.stampSignerId]: value };
   }
   stampVariant(): 'full' | 'minimal' | 'drawn' {
     return this.stampVariants[this.stampSignerId] || 'full';

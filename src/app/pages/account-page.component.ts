@@ -85,11 +85,15 @@ interface IdentityOption { value: string; label: MessageKey }
       } @else {
         <form class="form" (ngSubmit)="activateAccount()">
           <p class="muted">{{ i18n.text('activationHelp') }}</p>
+          @if (activationIdentityRequired) {
+            <label>{{ i18n.text('cpf') }} <input name="activationCpf" [ngModel]="documentValue" (ngModelChange)="documentValueChanged($event)" placeholder="000.000.000-00" maxlength="14" inputmode="numeric" required autocomplete="off" /></label>
+            <p class="field-help">O CPF será usado para validar assinaturas feitas com Serpro ID.</p>
+          }
           <app-password-field name="password" [(ngModel)]="password" [label]="i18n.text('newPassword')" autocomplete="new-password" [minlength]="8" [maxlength]="128" [pattern]="passwordPattern" required />
           <ng-container [ngTemplateOutlet]="passwordRules" />
           <app-password-field name="passwordConfirmation" [(ngModel)]="passwordConfirmation" [label]="i18n.text('confirmPassword')" autocomplete="new-password" [minlength]="8" [maxlength]="128" required />
           <p class="password-match" [class.met]="passwordsMatch()"><i class="bi" [class.bi-check-circle-fill]="passwordsMatch()" [class.bi-circle]="!passwordsMatch()"></i>{{ i18n.text('passwordsMustMatch') }}</p>
-          <button class="button" [disabled]="!passwordMeetsPolicy() || !passwordsMatch()">{{ i18n.text('activateAccount') }}</button>
+          <button class="button" [disabled]="!passwordMeetsPolicy() || !passwordsMatch() || (activationIdentityRequired && documentValue.replaceAll('.', '').replace('-', '').length !== 11)">{{ i18n.text('activateAccount') }}</button>
         </form>
       }
       <ng-template #passwordRules>
@@ -123,6 +127,7 @@ export class AccountPageComponent implements OnInit {
   readonly verificationError = signal(false);
   readonly passwordPattern = '(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9\\s]).{8,128}';
   returnUrl: string | null = null;
+  activationIdentityRequired = false;
   private token = '';
 
   constructor(private readonly route: ActivatedRoute, private readonly router: Router, private readonly api: ApiService, private readonly feedback: FeedbackService, readonly i18n: I18nService) {}
@@ -132,6 +137,8 @@ export class AccountPageComponent implements OnInit {
     this.token = this.route.snapshot.queryParamMap.get('token') ?? '';
     const candidate = this.route.snapshot.queryParamMap.get('returnUrl');
     this.returnUrl = candidate?.startsWith('/signing/') ? candidate : null;
+    this.activationIdentityRequired = this.route.snapshot.queryParamMap.get('identity') === 'required';
+    if (this.activationIdentityRequired) { this.country = 'BR'; this.documentType = 'BR_CPF'; }
     const titleKeys: Record<string, MessageKey> = { register: 'createAccount', 'forgot-password': 'recovery', 'reset-password': 'newPassword', 'verify-email': 'verifyEmail' };
     this.titleKey = titleKeys[this.mode] ?? 'account';
   }
@@ -220,7 +227,13 @@ export class AccountPageComponent implements OnInit {
   }
   async activateAccount(): Promise<void> {
     if (!this.token || !this.passwordMeetsPolicy() || this.password !== this.passwordConfirmation) { await this.feedback.error(this.i18n.text('reviewData')); return; }
-    const activated = await this.action('/auth/verify-email', { token: this.token, new_password: this.password }, this.i18n.text('emailVerified'));
+    const activated = await this.action('/auth/verify-email', {
+      token: this.token,
+      new_password: this.password,
+      identity_document_type: this.activationIdentityRequired ? 'BR_CPF' : null,
+      identity_document_country: this.activationIdentityRequired ? 'BR' : null,
+      identity_document_value: this.activationIdentityRequired ? this.documentValue : null,
+    }, this.i18n.text('emailVerified'));
     if (activated) await this.router.navigate(['/login'], { queryParams: this.returnUrl ? { returnUrl: this.returnUrl } : undefined });
   }
   async requestReset(): Promise<boolean> {
