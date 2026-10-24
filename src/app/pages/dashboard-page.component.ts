@@ -2429,29 +2429,55 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
       await this.feedback.warning('O arquivo não contém uma imagem PNG segura.');
       return;
     }
+    let bitmap: ImageBitmap;
     try {
-      const bitmap = await createImageBitmap(file);
+      bitmap = await createImageBitmap(file);
       const validDimensions =
         bitmap.width <= 2048 && bitmap.height <= 2048 && bitmap.width * bitmap.height <= 4_000_000;
-      bitmap.close();
       if (!validDimensions) throw new Error('invalid dimensions');
     } catch {
       input.value = '';
       await this.feedback.warning('PNG inválido ou maior que 2048 × 2048 pixels.');
       return;
     }
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
-    });
+    const dataUrl = await this.trimTransparentPng(bitmap);
+    bitmap.close();
     this.stampLogoName = file.name;
     this.stampCustomization = {
       ...this.stampCustomization,
       logo_png_data_url: dataUrl,
       show_logo: true,
     };
+  }
+  private async trimTransparentPng(bitmap: ImageBitmap): Promise<string> {
+    const source = document.createElement('canvas');
+    source.width = bitmap.width;
+    source.height = bitmap.height;
+    const context = source.getContext('2d', { willReadFrequently: true });
+    if (!context) throw new Error('canvas unavailable');
+    context.drawImage(bitmap, 0, 0);
+    const pixels = context.getImageData(0, 0, source.width, source.height).data;
+    let left = source.width;
+    let top = source.height;
+    let right = -1;
+    let bottom = -1;
+    for (let y = 0; y < source.height; y += 1) {
+      for (let x = 0; x < source.width; x += 1) {
+        if (pixels[(y * source.width + x) * 4 + 3] === 0) continue;
+        left = Math.min(left, x);
+        top = Math.min(top, y);
+        right = Math.max(right, x);
+        bottom = Math.max(bottom, y);
+      }
+    }
+    if (right < left || bottom < top) throw new Error('empty image');
+    const output = document.createElement('canvas');
+    output.width = right - left + 1;
+    output.height = bottom - top + 1;
+    output
+      .getContext('2d')
+      ?.drawImage(source, left, top, output.width, output.height, 0, 0, output.width, output.height);
+    return output.toDataURL('image/png');
   }
   stampSignerName(): string {
     return this.signers().find((item) => item.id === this.stampSignerId)?.name || '';

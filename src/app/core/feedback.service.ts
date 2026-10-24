@@ -134,6 +134,52 @@ export class FeedbackService {
       'email already registered': 'conflict',
       'cpf already registered': 'conflict',
     };
+    const workflowMessages: Record<string, Record<'pt-BR' | 'en' | 'es' | 'ja-JP', string>> = {
+      'signature round base artifact is incomplete': {
+        'pt-BR': 'O arquivo-base desta rodada de assinatura está incompleto. Crie uma nova solicitação para este documento.',
+        en: 'The base file for this signing round is incomplete. Create a new request for this document.',
+        es: 'El archivo base de esta ronda está incompleto. Crea una nueva solicitud para este documento.',
+        'ja-JP': 'この署名ラウンドの元ファイルが不完全です。この文書から新しい依頼を作成してください。',
+      },
+      'only a draft request can be opened': {
+        'pt-BR': 'Somente uma solicitação em rascunho pode ser aberta para assinatura.',
+        en: 'Only a draft request can be opened for signing.',
+        es: 'Solo una solicitud en borrador puede abrirse para firma.',
+        'ja-JP': '下書きの依頼のみ署名受付を開始できます。',
+      },
+      'at least one signer is required': {
+        'pt-BR': 'Adicione pelo menos um signatário antes de abrir para assinatura.',
+        en: 'Add at least one signer before opening for signing.',
+        es: 'Añade al menos un firmante antes de abrir para firma.',
+        'ja-JP': '署名受付を開始する前に署名者を1名以上追加してください。',
+      },
+      'serpro timestamp is not configured': {
+        'pt-BR': 'O carimbo do tempo SERPRO não está configurado neste ambiente.',
+        en: 'The SERPRO timestamp is not configured in this environment.',
+        es: 'El sello de tiempo SERPRO no está configurado en este entorno.',
+        'ja-JP': 'この環境では SERPRO タイムスタンプが設定されていません。',
+      },
+      'serpro id is not configured': {
+        'pt-BR': 'O Serpro ID não está configurado neste ambiente.',
+        en: 'Serpro ID is not configured in this environment.',
+        es: 'Serpro ID no está configurado en este entorno.',
+        'ja-JP': 'この環境では Serpro ID が設定されていません。',
+      },
+      'every serpro id signer must have a brazilian cpf or cnpj': {
+        'pt-BR': 'Todo signatário que usar Serpro ID precisa ter um CPF ou CNPJ brasileiro cadastrado.',
+        en: 'Every signer using Serpro ID must have a Brazilian CPF or CNPJ registered.',
+        es: 'Todo firmante que use Serpro ID debe tener un CPF o CNPJ brasileño registrado.',
+        'ja-JP': 'Serpro ID を使用する署名者にはブラジルの CPF または CNPJ の登録が必要です。',
+      },
+      'document changed after request creation': {
+        'pt-BR': 'O documento mudou depois que esta solicitação foi criada. Crie uma nova solicitação para a versão atual.',
+        en: 'The document changed after this request was created. Create a new request for the current version.',
+        es: 'El documento cambió después de crear esta solicitud. Crea una nueva para la versión actual.',
+        'ja-JP': '依頼作成後に文書が変更されました。現在の版から新しい依頼を作成してください。',
+      },
+    };
+    const workflowMessage = workflowMessages[message.trim().toLowerCase()];
+    if (workflowMessage) return workflowMessage[this.i18n.locale()];
     const translated = translations[message.trim().toLowerCase()];
     return translated ? this.i18n.text(translated) : (status ? this.statusMessage(status) : '') || message;
   }
