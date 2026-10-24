@@ -1365,6 +1365,7 @@ const documentTableColumns = [
                   <app-pdf-stamp-viewer
                     [sourceData]="stampEditorPdf()"
                     [placements]="stampPlacements()"
+                    [signers]="signers()"
                     [activeSignerId]="stampSignerId"
                     [fitMode]="stampPdfFitMode()"
                     [customization]="stampCustomization"

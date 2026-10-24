@@ -3,7 +3,7 @@ import { firstValueFrom, Subscription } from 'rxjs';
 import { GlobalWorkerOptions, getDocument, PDFDocumentLoadingTask, PDFDocumentProxy } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 import { ApiService } from '../core/api.service';
-import { StampCustomization, StampPosition } from '../core/models';
+import { Signer, StampCustomization, StampPosition } from '../core/models';
 import { countryFlag } from '../core/countries';
 import { I18nService } from '../core/i18n.service';
 
@@ -37,9 +37,11 @@ interface PdfPageView {
           @for (visiblePlacement of visiblePlacements(page.number); track placementKey(visiblePlacement, $index)) {
             <div
               class="signature-stamp"
+              [class.active-signer]="isActivePlacement(visiblePlacement)"
+              [class.inactive-signer]="!isActivePlacement(visiblePlacement)"
               [class.minimal]="stampVariant(visiblePlacement) === 'minimal'"
               [class.drawn]="stampVariant(visiblePlacement) === 'drawn'"
-              [class.movable]="!readonly"
+              [class.movable]="!readonly && isActivePlacement(visiblePlacement)"
               [style.left.%]="visiblePlacement.x * 100"
               [style.top.%]="visiblePlacement.y * 100"
               [style.width.%]="stampWidthPercent(page, visiblePlacement)"
@@ -54,11 +56,11 @@ interface PdfPageView {
               @if (stampVariant(visiblePlacement) === 'drawn') {
                 <span class="stamp-drawn-preview">Sua assinatura</span>
               } @else {
-                @if (signerFlag()) { <span class="stamp-country" [attr.aria-label]="signerCountry">{{ signerFlag() }}</span> }
-                <span>{{ stampSignedByLabel() }}</span>
-                <strong>{{ signerName }}</strong>
-                @if (signerIdentity && stampVariant(visiblePlacement) === 'full') { <small class="stamp-identity">{{ signerIdentity }}</small> }
-                @if (signerRepresentation && stampVariant(visiblePlacement) === 'full') { <small class="stamp-representation">{{ signerRepresentation }}</small> }
+                @if (placementSignerFlag(visiblePlacement)) { <span class="stamp-country">{{ placementSignerFlag(visiblePlacement) }}</span> }
+                <span>{{ placementSignedByLabel(visiblePlacement) }}</span>
+                <strong>{{ placementSignerName(visiblePlacement) }}</strong>
+                @if (placementSignerIdentity(visiblePlacement) && stampVariant(visiblePlacement) === 'full') { <small class="stamp-identity">{{ placementSignerIdentity(visiblePlacement) }}</small> }
+                @if (placementSignerRepresentation(visiblePlacement) && stampVariant(visiblePlacement) === 'full') { <small class="stamp-representation">{{ placementSignerRepresentation(visiblePlacement) }}</small> }
                 @if (stampVariant(visiblePlacement) === 'full') { <small>{{ i18n.formatDate(stampDate) }}</small> }
                 @if (stampVariant(visiblePlacement) === 'full') { <small class="stamp-evidence">Evidência: SHA-256 registrada ao assinar</small> }
                 @if (customization?.show_logo && customization?.logo_png_data_url) { <img class="stamp-logo-preview" [src]="customization!.logo_png_data_url" alt="" /> }
@@ -81,6 +83,7 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
   @Input() stampDate: string | Date = new Date();
   @Input() placement: StampPosition | null = null;
   @Input() placements: StampPosition[] = [];
+  @Input() signers: Signer[] = [];
   @Input() activeSignerId = '';
   @Input() customization: StampCustomization | null = null;
   @Input() fitMode: 'page' | 'width' = 'width';
@@ -141,7 +144,7 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
   cancelPageInteraction(): void { this.pagePointerStart = null; }
 
   startDrag(event: PointerEvent, placement: StampPosition): void {
-    if (this.readonly) return;
+    if (this.readonly || !this.isActivePlacement(placement)) return;
     event.stopPropagation();
     this.dragging = true;
     this.draggingPlacement = placement;
@@ -169,6 +172,25 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
     return /\b(?:CPF|CNPJ)\b/i.test(this.signerIdentity) ? 'BR' : '';
   }
   stampVariant(placement: StampPosition): 'full' | 'minimal' | 'drawn' { return placement.display_variant || this.customization?.display_variant || 'full'; }
+  isActivePlacement(placement: StampPosition): boolean { return !this.activeSignerId || placement.signer_id === this.activeSignerId; }
+  placementSignerName(placement: StampPosition): string { return this.placementSigner(placement)?.name || this.signerName; }
+  placementSignerIdentity(placement: StampPosition): string {
+    const signer = this.placementSigner(placement);
+    return signer?.identity_document_masked
+      ? `${(signer.identity_document_type || '').replace('BR_', '')}: ${signer.identity_document_masked}`
+      : placement.signer_id === this.activeSignerId ? this.signerIdentity : 'CPF/CNPJ confirmado no momento da assinatura';
+  }
+  placementSignerRepresentation(placement: StampPosition): string {
+    const signer = this.placementSigner(placement);
+    const organization = signer?.representation_snapshot;
+    return organization
+      ? [organization.legal_name || organization.name, organization.registration_masked].filter(Boolean).join(' · CNPJ: ')
+      : placement.signer_id === this.activeSignerId ? this.signerRepresentation : '';
+  }
+  placementSignerFlag(placement: StampPosition): string { return countryFlag(this.placementSignerCountry(placement)); }
+  placementSignedByLabel(placement: StampPosition): string {
+    return ({ BR: 'ASSINADO ELETRONICAMENTE POR', PT: 'ASSINADO ELETRONICAMENTE POR', ES: 'FIRMADO ELECTRÓNICAMENTE POR', JP: '電子署名者', US: 'ELECTRONICALLY SIGNED BY' } as Record<string, string>)[this.placementSignerCountry(placement)] || this.i18n.text('signedBy');
+  }
   stampWidthPercent(page: PdfPageView, placement: StampPosition): number {
     const requested = placement.width ?? 0.4;
     const maximumPdfWidth = this.stampVariant(placement) === 'minimal' ? 210 : 320;
@@ -181,8 +203,16 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
     const minimumPdfHeight = variant === 'drawn' ? 58 : this.signerRepresentation ? 96 : 54;
     return Math.max(requested, (minimumPdfHeight * 1.5) / page.height) * 100;
   }
-  visiblePlacements(page: number): StampPosition[] { return (this.placements.length ? this.placements : this.placement ? [this.placement] : []).filter(item => item.page === page && (!this.activeSignerId || item.signer_id === this.activeSignerId)); }
+  visiblePlacements(page: number): StampPosition[] { return (this.placements.length ? this.placements : this.placement ? [this.placement] : []).filter(item => item.page === page); }
   placementKey(item: StampPosition, index: number): string { return `${item.signer_id || 'current'}:${item.page}:${item.order ?? index}`; }
+
+  private placementSigner(placement: StampPosition): Signer | undefined { return this.signers.find((item) => item.id === placement.signer_id); }
+  private placementSignerCountry(placement: StampPosition): string {
+    const signer = this.placementSigner(placement);
+    if (signer?.identity_document_country) return signer.identity_document_country.toUpperCase();
+    if (/^BR_/.test(signer?.identity_document_type || '')) return 'BR';
+    return placement.signer_id === this.activeSignerId ? this.effectiveSignerCountry() : '';
+  }
 
   private async loadDocument(): Promise<void> {
     if (!this.sourceData && !this.token) return;

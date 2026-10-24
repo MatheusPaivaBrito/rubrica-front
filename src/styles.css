@@ -346,15 +346,17 @@ input:focus, select:focus { outline: 3px solid rgba(168, 32, 53, .16); border-co
 .pdf-page { position: relative; max-width: 100%; overflow: hidden; container-type: inline-size; background: #fff; box-shadow: 0 4px 18px rgba(0, 0, 0, .32); cursor: crosshair; touch-action: pan-y; }
 .pdf-page canvas { display: block; width: 100%; height: 100%; }
 .signature-stamp { position: absolute; z-index: 2; transform: translate(-50%, -50%); user-select: none; }
+.signature-stamp.active-signer { z-index: 3; }
+.signature-stamp.inactive-signer { opacity: .58; pointer-events: none; filter: saturate(.65); }
 .signature-stamp.movable { cursor: grab; touch-action: none; }
 .signature-stamp.movable:active { cursor: grabbing; box-shadow: 0 5px 18px rgba(86, 27, 36, .34); }
-.signature-stamp .stamp-logo-preview { position: absolute; right: .45rem; bottom: .4rem; width: min(36px, 35%); height: 24px; object-fit: contain; pointer-events: none; }
+.signature-stamp .stamp-logo-preview { position: absolute; right: .45rem; bottom: .4rem; width: min(72px, 28%); height: min(36px, 46%); object-fit: contain; object-position: right bottom; pointer-events: none; }
 .pdf-page .signature-stamp { gap: .22cqw; min-width: 0; padding: .98cqw 1.25cqw; border-width: max(1px, .22cqw); border-radius: .67cqw; }
 .pdf-page .signature-stamp > span { font-size: 1.04cqw; }
 .pdf-page .signature-stamp > strong { font-size: 1.43cqw; }
 .pdf-page .signature-stamp > small { font-size: 1.15cqw; }
 .pdf-page .signature-stamp .stamp-country { top: .8cqw; right: .98cqw; font-size: 2.05cqw; }
-.pdf-page .signature-stamp .stamp-logo-preview { right: .8cqw; bottom: .7cqw; width: 4.05cqw; height: 2.7cqw; }
+.pdf-page .signature-stamp .stamp-logo-preview { right: .8cqw; bottom: .7cqw; width: min(9cqw, 28%); height: min(4.5cqw, 46%); }
 .pdf-page .signature-stamp.minimal { min-width: 0; min-height: 7cqw; padding: .72cqw .98cqw; }
 .pdf-page .signature-stamp.minimal > span:first-of-type { font-size: .98cqw; }
 .autocomplete { position: relative; }
