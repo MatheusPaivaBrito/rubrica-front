@@ -28,6 +28,14 @@
       ]
     }
   },
+  "navigationUrls": [
+    "/**",
+    "!/**/*.*",
+    "!/**/*__*",
+    "!/**/*__*/**",
+    "!/test-accounts",
+    "!/test-accounts/**"
+  ],
   "assetGroups": [
     {
       "name": "app",
