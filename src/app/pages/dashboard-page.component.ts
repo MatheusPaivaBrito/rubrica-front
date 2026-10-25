@@ -873,11 +873,24 @@ const documentTableColumns = [
                       <div class="signer-list">
                         @for (signer of signers(); track signer.id) {
                           <div class="signer-row">
-                            <div>
-                              <strong>{{ signer.name }}</strong
-                              ><small>{{ signer.email }}</small
-                              ><small>{{ signatureModeLabel(signer.signature_mode || 'serpro_timestamp') }}</small
-                              ><small>{{ participantRoleLabel(signer.participant_role) }}</small>
+                            <div class="signer-summary">
+                              <div class="signer-heading">
+                                <strong>{{ signer.name }}</strong>
+                                <span
+                                  class="badge"
+                                  [class.pending]="signer.status === 'pending' || signer.status === 'viewed'"
+                                  [class.complete]="signer.status === 'signed'"
+                                  >{{ signerStatusLabel(signer.status) }}</span
+                                >
+                              </div>
+                              <small class="signer-email">{{ signer.email }}</small>
+                              <div class="signer-attributes">
+                                <span class="signer-mode"
+                                  ><i class="bi bi-shield-check"></i>
+                                  {{ signatureModeLabel(signer.signature_mode || 'serpro_timestamp') }}</span
+                                >
+                                <span class="signer-role">{{ participantRoleLabel(signer.participant_role) }}</span>
+                              </div>
                               @if (signer.representation_snapshot) {
                                 <small class="signer-identity"
                                   ><i class="bi bi-building"></i>
@@ -896,14 +909,6 @@ const documentTableColumns = [
                                 }}</small>
                               }
                             </div>
-                            <span
-                              class="badge"
-                              [class.pending]="
-                                signer.status === 'pending' || signer.status === 'viewed'
-                              "
-                              [class.complete]="signer.status === 'signed'"
-                              >{{ signerStatusLabel(signer.status) }}</span
-                            >
                           </div>
                         } @empty {
                           <div class="empty-state compact-empty">

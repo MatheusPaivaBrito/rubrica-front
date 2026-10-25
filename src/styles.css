@@ -228,9 +228,17 @@ input:focus, select:focus { outline: 3px solid rgba(168, 32, 53, .16); border-co
 .request-row strong, .request-row small { display: block; }
 .request-progress { text-align: center; }
 .signer-list { display: grid; gap: .6rem; max-height: 300px; overflow: auto; }
-.signer-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .7rem 0; border-bottom: 1px solid #edf0f5; }
+.signer-row { padding: .8rem 0; border-bottom: 1px solid #edf0f5; }
 .signer-row:last-child { border-bottom: 0; }
 .signer-row strong, .signer-row small { display: block; }
+.signer-summary { min-width: 0; }
+.signer-heading { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.signer-heading strong { min-width: 0; }
+.signer-email { margin-top: .12rem; color: #667085; overflow-wrap: anywhere; }
+.signer-attributes { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .55rem; }
+.signer-mode, .signer-role { display: inline-flex; align-items: center; gap: .3rem; width: fit-content; padding: .28rem .52rem; border-radius: 999px; font-size: .76rem; font-weight: 700; line-height: 1.2; }
+.signer-mode { color: #7f1428; background: #fff0f2; border: 1px solid #f3c7cf; }
+.signer-role { color: #475467; background: #f2f4f7; border: 1px solid #e4e7ec; }
 .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: .24rem .55rem; color: #0f5d4c; background: #def7ee; font-size: .75rem; font-weight: 800; }
 .badge.pending { color: #8a5d00; background: #fff0c2; }
 .badge.complete { color: #175cd3; background: #dff0ff; }
