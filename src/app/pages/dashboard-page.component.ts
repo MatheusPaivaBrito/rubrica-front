@@ -884,25 +884,23 @@ const documentTableColumns = [
                                 >
                               </div>
                               <small class="signer-email">{{ signer.email }}</small>
-                              <div class="signer-attributes">
-                                <span class="signer-mode"
-                                  ><i class="bi bi-shield-check"></i>
-                                  {{ signatureModeLabel(signer.signature_mode || 'serpro_timestamp') }}</span
-                                >
-                                <span class="signer-role">{{ participantRoleLabel(signer.participant_role) }}</span>
-                              </div>
+                              <small class="signer-role-line">{{ participantRoleLabel(signer.participant_role) }}</small>
                               @if (signer.representation_snapshot) {
                                 <small class="signer-identity"
                                   ><i class="bi bi-building"></i>
                                   {{ organizationLabel(signer.representation_snapshot) }}</small
                                 >
                               }
-                              @if (signer.identity_document_masked) {
-                                <small class="signer-identity"
-                                  ><i class="bi bi-person-vcard"></i>
-                                  {{ identityLabel(signer) }}</small
-                                >
-                              }
+                              <div class="signer-details">
+                                <div>
+                                  <small>Modalidade</small>
+                                  <strong><i class="bi bi-shield-check"></i> {{ signatureModeLabel(signer.signature_mode || 'serpro_timestamp') }}</strong>
+                                </div>
+                                <div>
+                                  <small>Identidade</small>
+                                  <strong>@if (signer.identity_document_masked) { {{ identityLabel(signer) }} } @else { A confirmar }</strong>
+                                </div>
+                              </div>
                               @if (signer.signed_at) {
                                 <small>{{
                                   i18n.text('signedAt', { date: i18n.formatDate(signer.signed_at) })
