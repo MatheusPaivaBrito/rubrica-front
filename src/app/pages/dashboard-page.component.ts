@@ -1413,6 +1413,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   readonly reopenModalOpen = signal(false);
   readonly stampEditorPdf = signal<ArrayBuffer | null>(null);
   readonly stampPlacements = signal<StampPosition[]>([]);
+  private previewCache: { key: string; data: ArrayBuffer } | null = null;
   stampSignerId = '';
   stampSignerModes: Record<string, 'serpro_timestamp' | 'serproid'> = {};
   stampSignerCustomizations: Record<string, StampCustomization> = {};
@@ -1991,10 +1992,14 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
 
   async preview(document: DocumentItem): Promise<void> {
     await this.run(async () => {
-      const data = await firstValueFrom(
-        this.api.getArrayBuffer(`/documents/${document.id}/preview?version=${document.version}`),
-      );
+      const cacheKey = `document:${document.id}:${document.version}`;
+      const data = this.previewCache?.key === cacheKey
+        ? this.previewCache.data
+        : await firstValueFrom(
+            this.api.getArrayBuffer(`/documents/${document.id}/preview?version=${document.version}`),
+          );
       if (!data.byteLength) throw new Error('Document preview is empty');
+      this.previewCache = { key: cacheKey, data };
       this.previewHeading.set(this.i18n.text('originalDocument'));
       this.previewDocument.set(document);
       this.previewData.set(data);
@@ -2006,10 +2011,14 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     const document = this.documents().find((item) => item.id === request?.document_id);
     if (!request || !document) return;
     await this.run(async () => {
-      const data = await firstValueFrom(
-        this.api.getArrayBuffer(`/signature-requests/${request.id}/signed-document`),
-      );
+      const cacheKey = `signed:${request.id}:${request.signed_count}`;
+      const data = this.previewCache?.key === cacheKey
+        ? this.previewCache.data
+        : await firstValueFrom(
+            this.api.getArrayBuffer(`/signature-requests/${request.id}/signed-document`),
+          );
       if (!data.byteLength) throw new Error('Signed document preview is empty');
+      this.previewCache = { key: cacheKey, data };
       this.previewHeading.set(this.i18n.text('stampedPdf'));
       this.previewDocument.set(document);
       this.previewData.set(data);
