@@ -1345,6 +1345,11 @@ const documentTableColumns = [
                           ><small>PNG · máximo 256 KB · 2048 × 2048 px</small></span
                         >
                       </button>
+                      @if (stampCustomization.show_logo) {
+                        <button type="button" class="button secondary compact" (click)="removeStampLogo()">
+                          <i class="bi bi-x-circle"></i><span>Assinar sem logo</span>
+                        </button>
+                      }
                     </div>
                   }
                   <div class="stamp-sidebar-actions">
@@ -1417,6 +1422,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   readonly stampPlacements = signal<StampPosition[]>([]);
   stampSignerId = '';
   stampSignerModes: Record<string, 'serpro_timestamp' | 'serproid'> = {};
+  stampSignerCustomizations: Record<string, StampCustomization> = {};
   stampVariants: Record<string, 'full' | 'minimal' | 'drawn'> = {};
   stampLogoName = '';
   stampPageCount = 0;
@@ -2267,18 +2273,20 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
           : Promise.resolve(null),
       ]);
       this.stampPlacements.set(configuration.placements);
-      const customization = configuration.customization || tenantDefault;
-      const normalizedLogo = await this.normalizeStampLogoDataUrl(
-        customization?.logo_png_data_url || null,
-      );
-      this.stampCustomization = {
-        template: customization?.template || 'standard',
-        display_variant: customization?.display_variant || 'full',
-        primary_color: customization?.primary_color || '#187A66',
-        show_logo: customization?.show_logo || false,
-        logo_png_data_url: normalizedLogo,
-        require_drawn_signature: customization?.require_drawn_signature || false,
-      };
+      const legacyCustomization = configuration.customization;
+      const signerCustomizations = await Promise.all(this.signers().map(async (signer) => {
+        const configured = configuration.signer_customizations?.[signer.id] || legacyCustomization;
+        const base = configured || tenantDefault;
+        return [signer.id, {
+          template: base?.template || 'standard',
+          display_variant: base?.display_variant || 'full',
+          primary_color: base?.primary_color || '#187A66',
+          show_logo: configured?.show_logo || false,
+          logo_png_data_url: configured?.show_logo ? await this.normalizeStampLogoDataUrl(configured.logo_png_data_url || null) : null,
+          require_drawn_signature: base?.require_drawn_signature || false,
+        } satisfies StampCustomization] as const;
+      }));
+      this.stampSignerCustomizations = Object.fromEntries(signerCustomizations);
       this.stampSignerModes = Object.fromEntries(
         this.signers().map((signer) => [
           signer.id,
@@ -2291,11 +2299,12 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
         this.signers().map((signer) => [
           signer.id,
           configuration.placements.find((item) => item.signer_id === signer.id)?.display_variant ||
-            customization?.display_variant ||
+            this.stampSignerCustomizations[signer.id]?.display_variant ||
             'full',
         ]),
       );
       this.stampSignerId = this.signers()[0]?.id || '';
+      this.stampCustomization = this.stampSignerCustomizations[this.stampSignerId] || this.emptyStampCustomization();
       this.stampEditorPdf.set(pdf);
       this.stampEditorOpen.set(true);
       this.syncModalLock();
@@ -2381,7 +2390,8 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     if (!request) return;
     const payload: StampConfiguration = {
       placements: this.stampPlacements(),
-      customization: this.customStampBrandingEnabled() ? this.stampCustomization : null,
+      customization: null,
+      signer_customizations: this.customStampBrandingEnabled() ? this.stampSignerCustomizations : {},
       signer_signature_modes: this.stampSignerModes,
     };
     await this.run(async () => {
@@ -2451,6 +2461,12 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
       logo_png_data_url: dataUrl,
       show_logo: true,
     };
+    this.persistCurrentSignerCustomization();
+  }
+  removeStampLogo(): void {
+    this.stampLogoName = '';
+    this.stampCustomization = { ...this.stampCustomization, show_logo: false, logo_png_data_url: null };
+    this.persistCurrentSignerCustomization();
   }
   private async trimTransparentPng(bitmap: ImageBitmap): Promise<string> {
     const source = document.createElement('canvas');
@@ -2540,7 +2556,10 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     return this.stampVariants[this.stampSignerId] || 'full';
   }
   selectStampSigner(value: string): void {
+    this.persistCurrentSignerCustomization();
     this.stampSignerId = value;
+    this.stampCustomization = this.stampSignerCustomizations[value] || this.emptyStampCustomization();
+    this.stampLogoName = this.stampCustomization.show_logo ? 'Logo selecionada' : '';
     if (!this.stampVariants[value]) this.stampVariants[value] = 'full';
   }
   selectStampVariant(value: 'full' | 'minimal' | 'drawn'): void {
@@ -2557,9 +2576,17 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   selectStampTemplate(value: string): void {
     if (value === 'standard' || value === 'business' || value === 'representative')
       this.stampCustomization = { ...this.stampCustomization, template: value };
+    this.persistCurrentSignerCustomization();
   }
   selectStampColor(value: string): void {
     this.stampCustomization = { ...this.stampCustomization, primary_color: value };
+    this.persistCurrentSignerCustomization();
+  }
+  private persistCurrentSignerCustomization(): void {
+    if (this.stampSignerId) this.stampSignerCustomizations = { ...this.stampSignerCustomizations, [this.stampSignerId]: { ...this.stampCustomization } };
+  }
+  private emptyStampCustomization(): StampCustomization {
+    return { template: 'standard', display_variant: 'full', primary_color: '#187A66', show_logo: false, logo_png_data_url: null, require_drawn_signature: false };
   }
   stampSignerIdentity(): string {
     const signer = this.signers().find((item) => item.id === this.stampSignerId);
@@ -2615,6 +2642,30 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   async openRequest(): Promise<void> {
     const request = this.selectedRequest();
     if (!request) return;
+    const ineligible = this.signers().find((signer) =>
+      this.stampSignerModes[signer.id] === 'serproid' &&
+      !['BR_CPF', 'BR_CNPJ'].includes(signer.identity_document_type || ''),
+    );
+    if (ineligible) {
+      const invite = await Swal.fire({
+        icon: 'info',
+        title: 'Conta necessária para usar Serpro ID',
+        text: `${ineligible.name} ainda não possui uma conta Rubrica com CPF ou CNPJ cadastrado. Deseja enviar um e-mail para ${ineligible.email} criar a conta e informar o CPF e a senha?`,
+        showCancelButton: true,
+        confirmButtonText: 'Enviar convite',
+        cancelButtonText: this.i18n.text('cancel'),
+        confirmButtonColor: '#a82035',
+      });
+      if (invite.isConfirmed) {
+        try {
+          await firstValueFrom(this.api.post(`/signature-requests/${request.id}/signers/${ineligible.id}/account-invitation`, {}));
+          await this.feedback.success(`Convite enviado para ${ineligible.email}. Abra a solicitação depois que o signatário ativar a conta e cadastrar o CPF.`);
+        } catch (error) {
+          await this.feedback.error(error);
+        }
+      }
+      return;
+    }
     const result = await Swal.fire({
       icon: 'question',
       title: this.i18n.text('openForSigning'),

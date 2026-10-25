@@ -55,7 +55,7 @@ export interface BillingCheckout { checkout_url: string; }
 export interface BillingPortal { portal_url: string; }
 export interface StampPosition { page: number; x: number; y: number; signer_id?: string | null; width?: number; height?: number; order?: number; display_variant?: 'full' | 'minimal' | 'drawn' | null; locale?: 'pt-BR' | 'en' | 'es' | 'ja-JP'; timezone?: string; }
 export interface StampCustomization { template: 'standard' | 'business' | 'representative'; display_variant: 'full' | 'minimal'; primary_color: string; show_logo: boolean; logo_png_data_url?: string | null; require_drawn_signature: boolean; }
-export interface StampConfiguration { placements: StampPosition[]; customization: StampCustomization | null; signer_signature_modes: Record<string, 'serpro_timestamp' | 'serproid'>; }
+export interface StampConfiguration { placements: StampPosition[]; customization: StampCustomization | null; signer_customizations: Record<string, StampCustomization>; signer_signature_modes: Record<string, 'serpro_timestamp' | 'serproid'>; }
 export interface SigningContext {
   request: SignatureRequest;
   signer: Signer;
