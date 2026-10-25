@@ -227,7 +227,7 @@ input:focus, select:focus { outline: 3px solid rgba(168, 32, 53, .16); border-co
 .request-row:hover, .request-row.active { border-color: #a82035; background: #fff5f3; }
 .request-row strong, .request-row small { display: block; }
 .request-progress { text-align: center; }
-.signer-list { display: grid; gap: .6rem; max-height: 300px; overflow: auto; }
+.signer-list { display: grid; gap: .6rem; }
 .signer-row { padding: .8rem 0; border-bottom: 1px solid #edf0f5; }
 .signer-row:last-child { border-bottom: 0; }
 .signer-row strong, .signer-row small { display: block; }
@@ -244,12 +244,16 @@ input:focus, select:focus { outline: 3px solid rgba(168, 32, 53, .16); border-co
 .signer-details i { margin-right: .16rem; color: #a82035; }
 .signer-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: .55rem; margin-top: .7rem; }
 .signer-actions app-rubrica-select { min-width: 0; }
+.signer-stamp-button { display: inline-flex; align-items: center; justify-content: center; gap: .48rem; min-height: 48px; padding: .65rem .85rem; border: 1px solid #dec3c8; border-radius: 10px; color: #7f1b2d; background: #fff8f9; box-shadow: 0 2px 7px rgba(127, 27, 45, .07); font: inherit; font-size: .78rem; font-weight: 800; white-space: nowrap; cursor: pointer; transition: border-color .15s ease, background .15s ease, box-shadow .15s ease, transform .15s ease; }
+.signer-stamp-button i { color: #a82035; font-size: 1rem; }
+.signer-stamp-button:hover { border-color: #a82035; background: #fff0f2; box-shadow: 0 5px 14px rgba(127, 27, 45, .12); transform: translateY(-1px); }
+.signer-stamp-button:focus-visible { outline: 3px solid rgba(168, 32, 53, .18); outline-offset: 2px; }
 .stamp-editor-signer-context { padding: .65rem .75rem; border: 1px solid #eadde0; border-radius: .65rem; background: #fff8f9; }
 .stamp-editor-signer-context small, .stamp-editor-signer-context strong { display: block; }
 .stamp-editor-signer-context small { color: #8b6670; font-size: .7rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
 .stamp-editor-signer-context strong { margin-top: .12rem; color: #5f2630; }
 @media (max-width: 520px) { .signer-details { grid-template-columns: 1fr; gap: .6rem; } .signer-details > div + div { padding-left: 0; border-left: 0; } }
-@media (max-width: 520px) { .signer-actions { grid-template-columns: 1fr; } .signer-actions .button { width: 100%; } }
+@media (max-width: 520px) { .signer-actions { grid-template-columns: 1fr; } .signer-stamp-button { width: 100%; } }
 .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: .24rem .55rem; color: #0f5d4c; background: #def7ee; font-size: .75rem; font-weight: 800; }
 .badge.pending { color: #8a5d00; background: #fff0c2; }
 .badge.complete { color: #175cd3; background: #dff0ff; }

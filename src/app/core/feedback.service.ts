@@ -171,6 +171,18 @@ export class FeedbackService {
         es: 'Todo firmante que use Serpro ID debe tener un CPF o CNPJ brasileño registrado.',
         'ja-JP': 'Serpro ID を使用する署名者にはブラジルの CPF または CNPJ の登録が必要です。',
       },
+      'every signer must have an active rubrica account with a brazilian cpf or cnpj': {
+        'pt-BR': 'Todo signatário precisa ter uma conta Rubrica ativa com CPF ou CNPJ brasileiro cadastrado.',
+        en: 'Every signer must have an active Rubrica account with a Brazilian CPF or CNPJ registered.',
+        es: 'Todo firmante debe tener una cuenta Rubrica activa con CPF o CNPJ brasileño registrado.',
+        'ja-JP': 'すべての署名者には、ブラジルの CPF または CNPJ が登録された有効な Rubrica アカウントが必要です。',
+      },
+      'an active rubrica account with a brazilian cpf or cnpj is required to sign': {
+        'pt-BR': 'Ative sua conta Rubrica e cadastre seu CPF ou CNPJ brasileiro antes de assinar.',
+        en: 'Activate your Rubrica account and register your Brazilian CPF or CNPJ before signing.',
+        es: 'Activa tu cuenta Rubrica y registra tu CPF o CNPJ brasileño antes de firmar.',
+        'ja-JP': '署名前に Rubrica アカウントを有効化し、ブラジルの CPF または CNPJ を登録してください。',
+      },
       'document changed after request creation': {
         'pt-BR': 'O documento mudou depois que esta solicitação foi criada. Crie uma nova solicitação para a versão atual.',
         en: 'The document changed after this request was created. Create a new request for the current version.',

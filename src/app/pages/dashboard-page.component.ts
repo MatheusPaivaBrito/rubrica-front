@@ -910,7 +910,7 @@ const documentTableColumns = [
                                     (valueChange)="changeSignerSignatureMode(signer, $event)"
                                   />
                                   @if (customStampPlacementEnabled()) {
-                                    <button type="button" class="button secondary compact" (click)="openStampEditor(signer.id)">
+                                    <button type="button" class="signer-stamp-button" (click)="openStampEditor(signer.id)">
                                       <i class="bi bi-bounding-box"></i><span>Organizar carimbo</span>
                                     </button>
                                   }
@@ -2221,7 +2221,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     const representedTenantId =
       this.signerParticipantRole === 'company_representative' ? this.tenantId : null;
     await this.run(async () => {
-      await firstValueFrom(
+      const created = await firstValueFrom(
         this.api.post<Signer>(`/signature-requests/${request.id}/signers`, {
           name: this.signerName.trim(),
           email: this.signerEmail.trim().toLowerCase(),
@@ -2236,6 +2236,34 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
       this.signerParticipantRole = 'external_signer';
       this.contactSearch.set('');
       await Promise.all([this.loadSigners(request.id), this.loadSignerContacts()]);
+      if (!['BR_CPF', 'BR_CNPJ'].includes(created.identity_document_type || '')) {
+        if (created.identity_account_status === 'active') {
+          await Swal.fire({
+            icon: 'info',
+            title: 'CPF necessário para assinar',
+            text: `${created.name} já possui uma conta Rubrica, mas ainda precisa cadastrar um CPF ou CNPJ na própria conta antes de assinar. A solicitação pode ser aberta normalmente.`,
+            confirmButtonText: 'Entendi',
+            confirmButtonColor: '#a82035',
+          });
+        } else {
+          const invite = await Swal.fire({
+            icon: 'info',
+            title: created.identity_account_status === 'pending' ? 'Cadastro ainda não concluído' : 'Conta necessária para assinar',
+            text: created.identity_account_status === 'pending'
+              ? `${created.name} possui um cadastro pendente. Deseja reenviar o convite para ativar a conta e cadastrar o CPF?`
+              : `${created.name} ainda não possui uma conta Rubrica. Essa pessoa só poderá assinar depois de criar a conta e cadastrar o próprio CPF. Deseja enviar o convite para ${created.email}?`,
+            showCancelButton: true,
+            confirmButtonText: created.identity_account_status === 'pending' ? 'Reenviar convite' : 'Enviar convite',
+            cancelButtonText: this.i18n.text('cancel'),
+            confirmButtonColor: '#a82035',
+          });
+          if (invite.isConfirmed) {
+            await firstValueFrom(this.api.post(`/signature-requests/${request.id}/signers/${created.id}/account-invitation`, {}));
+            await this.loadSigners(request.id);
+            await this.feedback.success(`Convite enviado para ${created.email}.`);
+          }
+        }
+      }
       const refreshed = await firstValueFrom(
         this.api.get<SignatureRequest>(`/signature-requests/${request.id}`),
       );
@@ -2522,26 +2550,6 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     if (value !== 'serpro_timestamp' && value !== 'serproid') return;
     const request = this.selectedRequest();
     if (!request || request.status !== 'draft' || signer.signature_mode === value) return;
-    if (value === 'serproid' && !['BR_CPF', 'BR_CNPJ'].includes(signer.identity_document_type || '')) {
-      const result = await Swal.fire({
-        icon: 'info',
-        title: 'Conta necessária para usar Serpro ID',
-        text: `${signer.name} ainda não possui uma conta Rubrica com CPF ou CNPJ cadastrado. Deseja enviar um e-mail para ${signer.email} criar a conta e informar o CPF e a senha?`,
-        showCancelButton: true,
-        confirmButtonText: 'Enviar convite',
-        cancelButtonText: this.i18n.text('cancel'),
-        confirmButtonColor: '#a82035',
-      });
-      if (!result.isConfirmed) return;
-      try {
-        await firstValueFrom(this.api.post(`/signature-requests/${request.id}/signers/${signer.id}/account-invitation`, {}));
-        await this.loadSigners(request.id);
-        await this.feedback.success(`Convite enviado para ${signer.email}. A modalidade Serpro ID já ficou salva para este signatário.`);
-      } catch (error) {
-        await this.feedback.error(error);
-      }
-      return;
-    }
     try {
       const updated = await firstValueFrom(this.api.put<Signer>(`/signature-requests/${request.id}/signers/${signer.id}/signature-mode`, { signature_mode: value }));
       this.signers.update((items) => items.map((item) => item.id === updated.id ? { ...item, signature_mode: updated.signature_mode } : item));
@@ -2551,29 +2559,6 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   }
   async selectStampSignerMode(value: string): Promise<void> {
     if (!this.stampSignerId || (value !== 'serpro_timestamp' && value !== 'serproid')) return;
-    const signer = this.signers().find((item) => item.id === this.stampSignerId);
-    if (value === 'serproid' && signer && !['BR_CPF', 'BR_CNPJ'].includes(signer.identity_document_type || '')) {
-      const result = await Swal.fire({
-        icon: 'info',
-        title: 'Conta necessária para usar Serpro ID',
-        text: `${signer.name} ainda não possui uma conta Rubrica com CPF ou CNPJ cadastrado. Deseja enviar um e-mail para ${signer.email} criar a conta e informar o CPF e a senha?`,
-        showCancelButton: true,
-        confirmButtonText: 'Enviar convite',
-        cancelButtonText: this.i18n.text('cancel'),
-        confirmButtonColor: '#a82035',
-      });
-      if (!result.isConfirmed) return;
-      const request = this.selectedRequest();
-      if (!request) return;
-      try {
-        await firstValueFrom(this.api.post(`/signature-requests/${request.id}/signers/${signer.id}/account-invitation`, {}));
-        this.stampSignerModes = { ...this.stampSignerModes, [this.stampSignerId]: value };
-        await this.feedback.success(`Convite enviado para ${signer.email}. Abra a solicitação depois que o signatário ativar a conta e cadastrar o CPF.`);
-      } catch (error) {
-        await this.feedback.error(error);
-      }
-      return;
-    }
     this.stampSignerModes = { ...this.stampSignerModes, [this.stampSignerId]: value };
   }
   stampVariant(): 'full' | 'minimal' | 'drawn' {
@@ -2666,30 +2651,6 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   async openRequest(): Promise<void> {
     const request = this.selectedRequest();
     if (!request) return;
-    const ineligible = this.signers().find((signer) =>
-      this.stampSignerModes[signer.id] === 'serproid' &&
-      !['BR_CPF', 'BR_CNPJ'].includes(signer.identity_document_type || ''),
-    );
-    if (ineligible) {
-      const invite = await Swal.fire({
-        icon: 'info',
-        title: 'Conta necessária para usar Serpro ID',
-        text: `${ineligible.name} ainda não possui uma conta Rubrica com CPF ou CNPJ cadastrado. Deseja enviar um e-mail para ${ineligible.email} criar a conta e informar o CPF e a senha?`,
-        showCancelButton: true,
-        confirmButtonText: 'Enviar convite',
-        cancelButtonText: this.i18n.text('cancel'),
-        confirmButtonColor: '#a82035',
-      });
-      if (invite.isConfirmed) {
-        try {
-          await firstValueFrom(this.api.post(`/signature-requests/${request.id}/signers/${ineligible.id}/account-invitation`, {}));
-          await this.feedback.success(`Convite enviado para ${ineligible.email}. Abra a solicitação depois que o signatário ativar a conta e cadastrar o CPF.`);
-        } catch (error) {
-          await this.feedback.error(error);
-        }
-      }
-      return;
-    }
     const result = await Swal.fire({
       icon: 'question',
       title: this.i18n.text('openForSigning'),

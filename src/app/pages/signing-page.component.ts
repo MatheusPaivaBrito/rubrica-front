@@ -86,13 +86,14 @@ import { LanguagePickerComponent } from '../components/language-picker.component
           @if (!administrativeView() && requiresDrawnSignature()) { <section class="signing-summary"><strong>{{ drawnSignatureLabel() }}</strong><canvas #signatureCanvas width="420" height="140" style="width:100%;height:140px;border:1px solid #ccd5e2;border-radius:8px;touch-action:none" (pointerdown)="startDrawing($event)" (pointermove)="draw($event)" (pointerup)="stopDrawing()" (pointercancel)="stopDrawing()"></canvas><button class="button secondary compact" (click)="clearDrawing()">{{ clearDrawingLabel() }}</button></section> }
           @if (signatureMode() === 'serpro_timestamp' || signatureMode() === 'serproid') { <p class="notice">{{ timestampHelpLabel() }}</p> }
           @if (signatureMode() === 'serproid') { <p class="notice">{{ certificateHelpLabel() }}</p> }
+          @if (!administrativeView() && !identityEligible()) { <p class="error">{{ identityRequiredLabel() }}</p> }
           @if (message()) { <p class="notice">{{ message() }}</p> }
 
           <div class="signing-actions">
             @if (signatureMode() === 'serproid' && !administrativeView()) {
               <button class="button" [disabled]="signing() || !placement() || !serproidEligible()" (click)="sign(true)">{{ signing() ? i18n.text('signing') : certificateLabel() }}</button>
             } @else if (!administrativeView()) {
-              <button class="button" [disabled]="signing() || completed() || !placement()" (click)="sign()">
+              <button class="button" [disabled]="signing() || completed() || !placement() || !identityEligible()" (click)="sign()">
                 {{ signing() ? i18n.text('signing') : completed() ? statusLabel() : i18n.text('signDocument') }}
               </button>
             }
@@ -298,11 +299,15 @@ export class SigningPageComponent implements OnInit {
   }
 
   administrativeView(): boolean { return this.context()?.viewer_mode === 'administrator'; }
+  identityEligible(): boolean { return ['BR_CPF', 'BR_CNPJ'].includes(this.context()?.signer.identity_document_type ?? ''); }
+  identityRequiredLabel(): string {
+    return ({ 'pt-BR': 'Para assinar, ative sua conta Rubrica e cadastre seu CPF. Depois, volte a este documento.', en: 'To sign, activate your Rubrica account and register your Brazilian CPF. Then return to this document.', es: 'Para firmar, activa tu cuenta Rubrica y registra tu CPF brasileño. Luego vuelve a este documento.', 'ja-JP': '署名するには Rubrica アカウントを有効化し、ブラジルの CPF を登録してからこの文書に戻ってください。' } as Record<string, string>)[this.i18n.locale()];
+  }
   signatureMode(): 'evidence' | 'serpro_timestamp' | 'serproid' { return this.context()?.signer.signature_mode ?? this.context()?.request.signature_mode ?? 'evidence'; }
   serproidEligible(): boolean {
     const context = this.context();
     if (!context || this.signatureMode() !== 'serproid' || (!this.serproidEnabled() && !this.serproidSimulated()) || this.administrativeView() || this.completed()) return false;
-    return ['BR_CPF', 'BR_CNPJ'].includes(context.signer.identity_document_type ?? '');
+    return this.identityEligible();
   }
   documentEndpoint(): string { return (this.context()?.request.signed_count ?? 0) > 0 ? 'signed-document' : 'document'; }
   pageHint(): string {

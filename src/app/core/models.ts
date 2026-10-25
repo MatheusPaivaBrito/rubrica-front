@@ -19,7 +19,7 @@ export interface SignatureEvidence {
   artifact_sha256: string;
   evidence: Record<string, unknown>;
 }
-export interface Signer { id: string; name: string; email: string; preferred_locale: 'pt-BR' | 'en' | 'es' | 'ja-JP'; status: string; signed_at: string | null; signature_mode?: 'serpro_timestamp' | 'serproid'; identity_document_type?: string | null; identity_document_country?: string | null; identity_document_masked?: string | null; participant_role?: ParticipantRole; represented_tenant_id?: string | null; representation_snapshot?: OrganizationSnapshot | null; }
+export interface Signer { id: string; name: string; email: string; preferred_locale: 'pt-BR' | 'en' | 'es' | 'ja-JP'; status: string; signed_at: string | null; signature_mode?: 'serpro_timestamp' | 'serproid'; identity_account_status?: 'active' | 'pending' | null; identity_document_type?: string | null; identity_document_country?: string | null; identity_document_masked?: string | null; participant_role?: ParticipantRole; represented_tenant_id?: string | null; representation_snapshot?: OrganizationSnapshot | null; }
 export interface UserCreated { id: string; name: string; email: string; role: string; is_active: boolean; }
 export interface SignerOption { id: string; name: string; email: string; }
 export interface SignerContact { name: string; email: string; }
