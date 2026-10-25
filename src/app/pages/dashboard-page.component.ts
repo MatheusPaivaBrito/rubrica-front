@@ -858,9 +858,7 @@ const documentTableColumns = [
                     @if (selectedRequest()!.status !== 'draft') {
                       <div>
                         <small>{{ signatureModeFieldLabel() }}</small
-                        ><strong>{{
-                          signatureModeLabel(selectedRequest()!.signature_mode)
-                        }}</strong>
+                        ><strong>{{ requestSignatureModesLabel() }}</strong>
                       </div>
                     }
                   </div>
@@ -878,6 +876,7 @@ const documentTableColumns = [
                             <div>
                               <strong>{{ signer.name }}</strong
                               ><small>{{ signer.email }}</small
+                              ><small>{{ signatureModeLabel(signer.signature_mode || 'serpro_timestamp') }}</small
                               ><small>{{ participantRoleLabel(signer.participant_role) }}</small>
                               @if (signer.representation_snapshot) {
                                 <small class="signer-identity"
@@ -2787,6 +2786,11 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   }
   signatureModeLabel(mode: SignatureMode): string {
     return this.signatureModeOptions(true, true)[mode] ?? mode;
+  }
+  requestSignatureModesLabel(): string {
+    const modes = [...new Set(this.signers().map((signer) => signer.signature_mode || 'serpro_timestamp'))];
+    if (modes.length === 1) return this.signatureModeLabel(modes[0]);
+    return this.i18n.locale() === 'pt-BR' ? 'Definida por signatário' : 'Defined per signer';
   }
   async generateLink(): Promise<void> {
     const request = this.selectedRequest();
