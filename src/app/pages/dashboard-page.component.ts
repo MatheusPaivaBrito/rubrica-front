@@ -901,6 +901,21 @@ const documentTableColumns = [
                                   <strong>@if (signer.identity_document_masked) { {{ identityLabel(signer) }} } @else { A confirmar }</strong>
                                 </div>
                               </div>
+                              @if (selectedRequest()!.status === 'draft') {
+                                <div class="signer-actions">
+                                  <app-rubrica-select
+                                    ariaLabel="Modalidade de assinatura"
+                                    [value]="signer.signature_mode || 'serpro_timestamp'"
+                                    [options]="stampSignatureModeOptions()"
+                                    (valueChange)="changeSignerSignatureMode(signer, $event)"
+                                  />
+                                  @if (customStampPlacementEnabled()) {
+                                    <button type="button" class="button secondary compact" (click)="openStampEditor(signer.id)">
+                                      <i class="bi bi-bounding-box"></i><span>Organizar carimbo</span>
+                                    </button>
+                                  }
+                                </div>
+                              }
                               @if (signer.signed_at) {
                                 <small>{{
                                   i18n.text('signedAt', { date: i18n.formatDate(signer.signed_at) })
@@ -1005,15 +1020,6 @@ const documentTableColumns = [
                           </button>
                         </form>
                         <div class="draft-request-actions">
-                          @if (customStampPlacementEnabled()) {
-                            <button
-                              class="button secondary full-width"
-                              (click)="openStampEditor()"
-                              [disabled]="!signers().length"
-                            >
-                              {{ stampEditorLabel() }}
-                            </button>
-                          }
                           <button
                             class="button full-width"
                             (click)="openRequest()"
@@ -1254,23 +1260,8 @@ const documentTableColumns = [
                       ×
                     </button>
                   </div>
-                  <div class="form-field">
-                    <span class="field-label">{{ signerForStampLabel() }}</span
-                    ><app-rubrica-select
-                      [ariaLabel]="signerForStampLabel()"
-                      [value]="stampSignerId"
-                      [options]="stampSignerOptions()"
-                      (valueChange)="selectStampSigner($event)"
-                    />
-                  </div>
-                  <div class="form-field">
-                    <span class="field-label">Método de assinatura</span
-                    ><app-rubrica-select
-                      ariaLabel="Método de assinatura"
-                      [value]="stampSignerMode()"
-                      [options]="stampSignatureModeOptions()"
-                      (valueChange)="selectStampSignerMode($event)"
-                    />
+                  <div class="stamp-editor-signer-context">
+                    <small>Carimbo de</small><strong>{{ stampSignerName() }}</strong>
                   </div>
                   <div class="stamp-variant-picker">
                     <span class="field-label">Escolha o carimbo para este signatário</span
@@ -2257,7 +2248,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   customStampBrandingEnabled(): boolean {
     return Boolean(this.billingAccounts()[this.tenantId]?.custom_stamp_branding);
   }
-  async openStampEditor(): Promise<void> {
+  async openStampEditor(signerId: string): Promise<void> {
     const request = this.selectedRequest();
     if (!request || !this.customStampPlacementEnabled()) return;
     await this.run(async () => {
@@ -2305,7 +2296,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
             'full',
         ]),
       );
-      this.stampSignerId = this.signers()[0]?.id || '';
+      this.stampSignerId = this.signers().some((signer) => signer.id === signerId) ? signerId : this.signers()[0]?.id || '';
       this.stampCustomization = this.stampSignerCustomizations[this.stampSignerId] || this.emptyStampCustomization();
       this.stampEditorPdf.set(pdf);
       this.stampEditorOpen.set(true);
@@ -2526,6 +2517,37 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
       { value: 'serpro_timestamp', label: 'Evidências Rúbrica + Carimbo do Tempo' },
       { value: 'serproid', label: 'Evidências Rúbrica + Serpro ID' },
     ];
+  }
+  async changeSignerSignatureMode(signer: Signer, value: string): Promise<void> {
+    if (value !== 'serpro_timestamp' && value !== 'serproid') return;
+    const request = this.selectedRequest();
+    if (!request || request.status !== 'draft' || signer.signature_mode === value) return;
+    if (value === 'serproid' && !['BR_CPF', 'BR_CNPJ'].includes(signer.identity_document_type || '')) {
+      const result = await Swal.fire({
+        icon: 'info',
+        title: 'Conta necessária para usar Serpro ID',
+        text: `${signer.name} ainda não possui uma conta Rubrica com CPF ou CNPJ cadastrado. Deseja enviar um e-mail para ${signer.email} criar a conta e informar o CPF e a senha?`,
+        showCancelButton: true,
+        confirmButtonText: 'Enviar convite',
+        cancelButtonText: this.i18n.text('cancel'),
+        confirmButtonColor: '#a82035',
+      });
+      if (!result.isConfirmed) return;
+      try {
+        await firstValueFrom(this.api.post(`/signature-requests/${request.id}/signers/${signer.id}/account-invitation`, {}));
+        await this.loadSigners(request.id);
+        await this.feedback.success(`Convite enviado para ${signer.email}. A modalidade Serpro ID já ficou salva para este signatário.`);
+      } catch (error) {
+        await this.feedback.error(error);
+      }
+      return;
+    }
+    try {
+      const updated = await firstValueFrom(this.api.put<Signer>(`/signature-requests/${request.id}/signers/${signer.id}/signature-mode`, { signature_mode: value }));
+      this.signers.update((items) => items.map((item) => item.id === updated.id ? { ...item, signature_mode: updated.signature_mode } : item));
+    } catch (error) {
+      await this.feedback.error(error);
+    }
   }
   async selectStampSignerMode(value: string): Promise<void> {
     if (!this.stampSignerId || (value !== 'serpro_timestamp' && value !== 'serproid')) return;
