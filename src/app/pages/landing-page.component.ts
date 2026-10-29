@@ -12,6 +12,14 @@ const copy = {
   'ja-JP': { navProduct:'製品', navSecurity:'セキュリティ', navPrice:'料金', enter:'ログイン', start:'無料アカウント作成', mainNavigation:'メインナビゲーション', flowLabel:'署名フロー', freeFive:'無料5件', noCard:'カード不要', demoSignedBy:'署名者', demoHash:'ハッシュ検証済み · 14:32', demoIntegrity:'文書の完全性を確認済み', sponsorLink:'SIB — ウェブサイトを開く', eyebrow:'シンプルな電子署名', title:'明確で安全、信頼できる電子署名。', lead:'PDFをアップロードし、署名者を招待して進捗を確認。証拠情報は署名済み文書に組み込まれます。', primary:'無料5件から始める', secondary:'仕組みを見る', trust:'大切な文書のために', trustCopy:'本人情報、日時、端末、IP、ファイルハッシュを検証可能な証拠として記録します。', step1:'PDFを送信', step2:'署名者を招待', step3:'追跡・確認', feature1:'PDF上の署名スタンプ', feature2:'二要素認証', feature3:'履歴と証拠', plans:'用途に合わせたプラン', plansHelp:'文書への電子署名は含まれます。月間上限はアカウントがアップロードしたファイル数です。', base:'エッセンシャル', intermediate:'プロフェッショナル', team:'チーム', enterprise:'エンタープライズ', enterpriseHelp:'企業の業務に合わせたRubricaソリューション。', enterpriseFeature:'個別のワークフロー、利用量、サポート', perMonth:'／月・アカウント', currencies:'BRL · USD · EUR · JPY', baseFiles:'月20ファイルまで', baseAnnual:'年額 R$ 299.00', intermediateFiles:'月80ファイルまで', professionalAccounts:'最大3アカウント', professionalAnnual:'年額 R$ 699.00', teamAccounts:'最大10アカウント', teamFiles:'月200ファイルまで', teamAnnual:'年額 R$ 1,499.90', signaturesIncluded:'電子署名を含む', emailIncluded:'メールで署名依頼を送信', choosePlan:'無料で始める', talkToSales:'Rubricaに相談', cta:'次の文書を今日署名しませんか。', supporters:'サポーター', supportersHelp:'Rubricaの開発を支援する組織です。', contact:'お問い合わせ', privacy:'プライバシー', terms:'利用規約', deletion:'データ削除', rights:'Rubrica。署名された文書、記録された意思決定。' },
 } as const;
 
+const currentPlanCopy = {
+  ...copy,
+  'pt-BR': { ...copy['pt-BR'], teamFiles: 'Até 220 arquivos por mês', teamAccounts: '10 cadeiras incluídas' },
+  en: { ...copy.en, teamFiles: 'Up to 220 files per month', teamAccounts: '10 seats included' },
+  es: { ...copy.es, teamFiles: 'Hasta 220 archivos por mes', teamAccounts: '10 asientos incluidos' },
+  'ja-JP': { ...copy['ja-JP'], teamFiles: '月220ファイルまで', teamAccounts: '10シート込み' },
+} as const;
+
 @Component({
   standalone: true,
   imports: [RouterLink, LanguagePickerComponent],
@@ -57,6 +65,6 @@ const copy = {
 })
 export class LandingPageComponent {
   readonly year = new Date().getFullYear();
-  readonly t = computed(() => copy[this.i18n.locale()]);
+  readonly t = computed(() => currentPlanCopy[this.i18n.locale()]);
   constructor(readonly i18n: I18nService, seo: SeoService) { seo.setCanonical('/'); }
 }

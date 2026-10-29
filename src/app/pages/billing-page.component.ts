@@ -188,8 +188,8 @@ export class BillingPageComponent implements OnInit {
         en:['80 files per month','Up to 3 accounts per tenant','Email invitations','Business registration with CNPJ'], es:['80 archivos al mes','Hasta 3 cuentas por tenant','Invitaciones por correo','Registro empresarial con CNPJ'], 'ja-JP':['月80ファイル','テナントごとに最大3アカウント','メール招待','CNPJによる法人登録'],
       },
       rubrica_team: {
-        'pt-BR':['200 arquivos por mês','Até 10 contas por tenant','Convites e solicitações por e-mail','Cadastro empresarial com CNPJ'],
-        en:['200 files per month','Up to 10 accounts per tenant','Email invitations and requests','Business registration with CNPJ'], es:['200 archivos al mes','Hasta 10 cuentas por tenant','Invitaciones y solicitudes por correo','Registro empresarial con CNPJ'], 'ja-JP':['月200ファイル','テナントごとに最大10アカウント','メール招待と依頼','CNPJによる法人登録'],
+        'pt-BR':['220 arquivos por mês','10 cadeiras incluídas','Convites e solicitações por e-mail','Cadastro empresarial com CNPJ'],
+        en:['220 files per month','10 seats included','Email invitations and requests','Business registration with CNPJ'], es:['220 archivos al mes','10 asientos incluidos','Invitaciones y solicitudes por correo','Registro empresarial con CNPJ'], 'ja-JP':['月220ファイル','10シート込み','メール招待と依頼','CNPJによる法人登録'],
       },
     } as const;
     return [...features[plan][this.i18n.locale()]];
@@ -208,7 +208,7 @@ export class BillingPageComponent implements OnInit {
   businessSavedLabel(): string { return this.local({ 'pt-BR':'Cadastro empresarial concluído. O Time foi liberado.', en:'Business registration completed. Team access is enabled.', es:'Registro empresarial completado. El equipo está habilitado.', 'ja-JP':'法人登録が完了し、チームが有効になりました。' }); }
   pendingLabel(): string { return this.local({ 'pt-BR':'Pendente', en:'Pending', es:'Pendiente', 'ja-JP':'保留中' }); }
   teamPlanLabel(): string { return this.local({ 'pt-BR':'Equipe', en:'Team', es:'Equipo', 'ja-JP':'チーム' }); }
-  teamPlanHelp(): string { return this.local({ 'pt-BR':'Até 10 contas, 200 arquivos por mês e solicitações por e-mail.', en:'Up to 10 accounts, 200 files per month and email requests.', es:'Hasta 10 cuentas, 200 archivos al mes y solicitudes por correo.', 'ja-JP':'最大10アカウント、月200ファイル、メール依頼。' }); }
+  teamPlanHelp(): string { return this.local({ 'pt-BR':'10 cadeiras, 220 arquivos por mês e expansão por pacotes adicionais.', en:'10 seats, 220 files per month and expansion through additional packages.', es:'10 asientos, 220 archivos al mes y ampliación mediante paquetes adicionales.', 'ja-JP':'10シート、月220ファイル、追加パッケージで拡張可能。' }); }
   monthlyLabel(): string { return this.local({ 'pt-BR':'Mensal', en:'Monthly', es:'Mensual', 'ja-JP':'月払い' }); }
   annualLabel(): string { return this.local({ 'pt-BR':'Anual', en:'Annual', es:'Anual', 'ja-JP':'年払い' }); }
   private local(values: Record<'pt-BR' | 'en' | 'es' | 'ja-JP', string>): string { return values[this.i18n.locale()]; }
@@ -230,7 +230,7 @@ export class BillingPageComponent implements OnInit {
   private async loadAccount(): Promise<void> { const account = await firstValueFrom(this.api.get<BillingAccount>(`/billing/tenants/${this.tenantId()}/account`)); this.account.set(account); const selected = this.availablePlans()[0] ?? 'rubrica_base'; this.selectedPlan.set(selected); }
   private planUrl(tenant: TenantItem, accountSlug: string): string { return tenantDashboardUrl(tenant, accountSlug).replace(/dashboard$/, 'plan'); }
   private async leaveComplimentaryBilling(): Promise<boolean> { return false; }
-  private fileLimit(account: BillingAccount): number | null { if (typeof account.files_limit === 'number') return account.files_limit; if (!['active', 'past_due'].includes(account.status)) return null; if (account.current_product_code === 'rubrica_base') return 20; if (account.current_product_code === 'rubrica_intermediate') return 80; if (account.current_product_code === 'rubrica_team') return 200; return null; }
+  private fileLimit(account: BillingAccount): number | null { if (typeof account.files_limit === 'number') return account.files_limit; if (!['active', 'past_due'].includes(account.status)) return null; if (account.current_product_code === 'rubrica_base') return 20; if (account.current_product_code === 'rubrica_intermediate') return 80; if (account.current_product_code === 'rubrica_team') return 220; return null; }
   private filesUsed(account: BillingAccount): number { return account.files_uploaded_in_period ?? 0; }
   private async redirect<T extends BillingCheckout | BillingPortal>(path: string, key: keyof T, payload: object = {}): Promise<void> {
     this.submitting.set(true);

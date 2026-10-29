@@ -17,17 +17,17 @@ import { RubricaSelectComponent, RubricaSelectOption } from '../components/rubri
     <div class="workspace-layout"><app-workspace-sidebar [tenant]="tenant()" />
       <section class="container dashboard-container team-container">
         <header class="dashboard-header"><div><p class="eyebrow">{{ tenant()?.name }}</p><h1>{{ copy().team }}</h1><p class="muted">{{ copy().help }}</p></div>
-          @if (team()?.can_manage && canAddMember(team()!)) { <button class="button" (click)="inviteOpen.set(true)"><i class="bi bi-person-plus" aria-hidden="true"></i> {{ inviteLabel() }}</button> }
+          @if (team()?.can_manage) { <button class="button" (click)="inviteOpen.set(true)"><i class="bi bi-person-plus" aria-hidden="true"></i> {{ inviteLabel() }}</button> }
         </header>
         @if (loading()) { <p class="notice">{{ i18n.text('loading') }}</p> }
         @else if (team(); as state) {
           @if (state.requires_selection) { <p class="notice warning" role="alert">{{ copy().overLimit }}</p> }
           @if (!state.can_manage) { <p class="notice">{{ copy().readonly }}</p> }
           <article class="card table-card">
-            <div class="section-heading"><div><h2>{{ copy().limit }}: {{ memberLimitLabel(state) }}</h2><p class="muted">{{ copy().choose }}: {{ state.active_count }} · {{ selected().size }} {{ copy().selected }}</p></div></div>
+            <div class="section-heading"><div><h2>{{ copy().limit }}: {{ memberLimitLabel(state) }}</h2><p class="muted">{{ cycleHelp(state) }}</p><p class="muted">{{ copy().choose }}: {{ selected().size }} {{ copy().selected }}</p></div></div>
             <div class="table-wrap"><table class="data-table"><thead><tr><th>{{ i18n.text('email') }}</th><th>{{ i18n.text('profile') }}</th><th>{{ i18n.text('status') }}</th><th>{{ copy().choose }}</th></tr></thead><tbody>
               @for (member of state.members; track member.id) {
-                <tr><td>{{ member.auth_user_id }}</td><td [attr.data-label]="i18n.text('profile')">@if (member.role === 'admin') { {{ copy().admin }} } @else { <app-rubrica-select [ariaLabel]="i18n.text('profile') + ': ' + member.auth_user_id" [disabled]="saving()" [value]="member.role" [options]="roleOptions()" (valueChange)="changeRole(member, $event)" /> }</td><td [attr.data-label]="i18n.text('status')"><span class="badge" [class.complete]="member.status === 'active'">{{ member.status === 'active' ? copy().active : copy().suspended }}</span></td>
+                <tr><td>{{ member.auth_user_id }}</td><td [attr.data-label]="i18n.text('profile')">@if (member.role === 'admin') { {{ copy().admin }} } @else { <app-rubrica-select [ariaLabel]="i18n.text('profile') + ': ' + member.auth_user_id" [disabled]="saving()" [value]="member.role" [options]="roleOptions()" (valueChange)="changeRole(member, $event)" /> }</td><td [attr.data-label]="i18n.text('status')"><span class="badge" [class.complete]="member.status === 'active'">{{ member.status === 'active' ? copy().active : withoutSeatLabel() }}</span></td>
                   <td [attr.data-label]="copy().choose"><input class="team-checkbox" type="checkbox" [attr.aria-label]="copy().choose + ': ' + member.auth_user_id" [checked]="selected().has(member.id)" [disabled]="disabled(member)" (change)="toggle(member.id)" /></td></tr>
               }
             </tbody></table></div>
@@ -104,9 +104,8 @@ export class TeamPageComponent implements OnInit {
   }
   private setTeam(team: TenantTeam) {
     this.team.set(team);
-    this.selected.set(new Set(team.members.filter(m => m.status === 'active').map(m => m.id)));
+    this.selected.set(new Set(team.next_cycle_member_ids?.length ? team.next_cycle_member_ids : team.current_seat_member_ids));
   }
-  canAddMember(team: TenantTeam): boolean { return team.member_limit === null || team.active_count < team.member_limit; }
   exceedsMemberLimit(team: TenantTeam): boolean { return team.member_limit !== null && this.selected().size > team.member_limit; }
   memberLimitLabel(team: TenantTeam): string | number { return team.member_limit ?? this.i18n.text('unlimited'); }
   disabled(member: TenantMember): boolean {
@@ -119,11 +118,14 @@ export class TeamPageComponent implements OnInit {
     if (selected.has(id)) selected.delete(id); else selected.add(id);
     this.selected.set(selected); this.saved.set(false);
   }
-  dirty(): boolean { return this.team()?.members.some(m => (m.status === 'active') !== this.selected().has(m.id)) ?? false; }
+  dirty(): boolean {
+    const expected = new Set(this.team()?.next_cycle_member_ids ?? []);
+    return expected.size !== this.selected().size || [...this.selected()].some(id => !expected.has(id));
+  }
   async save() {
     this.saving.set(true);
     try {
-      this.setTeam(await firstValueFrom(this.api.patch<TenantTeam>(`/tenants/${this.tenant()!.id}/team`, { active_member_ids: [...this.selected()] })));
+      this.setTeam(await firstValueFrom(this.api.put<TenantTeam>(`/tenants/${this.tenant()!.id}/team/next-cycle`, { member_ids: [...this.selected()] })));
       this.saved.set(true);
     } catch (error) { await this.feedback.error(error); }
     finally { this.saving.set(false); }
@@ -154,6 +156,12 @@ export class TeamPageComponent implements OnInit {
   sendInviteLabel() { return this.local({ 'pt-BR':'Enviar convite', en:'Send invitation', es:'Enviar invitación', 'ja-JP':'招待を送信' }); }
   inviteSentLabel() { return this.local({ 'pt-BR':'Convite enviado. O membro poderá criar a senha pelo e-mail.', en:'Invitation sent. The member can create a password from the email.', es:'Invitación enviada. El miembro podrá crear su contraseña desde el correo.', 'ja-JP':'招待を送信しました。メンバーはメールからパスワードを作成できます。' }); }
   roleUpdatedLabel() { return this.local({ 'pt-BR':'Perfil e acessos atualizados.', en:'Role and access updated.', es:'Perfil y accesos actualizados.', 'ja-JP':'役割とアクセス権を更新しました。' }); }
+  withoutSeatLabel() { return this.local({ 'pt-BR':'Sem cadeira', en:'No seat', es:'Sin asiento', 'ja-JP':'シートなし' }); }
+  cycleHelp(team: TenantTeam) {
+    if (!team.next_cycle_starts_at) return this.local({ 'pt-BR':'A composição atual permanece vigente.', en:'The current roster remains active.', es:'La composición actual sigue vigente.', 'ja-JP':'現在の構成が有効です。' });
+    const date = new Intl.DateTimeFormat(this.i18n.locale()).format(new Date(team.next_cycle_starts_at));
+    return this.local({ 'pt-BR':`Escolha os ocupantes do próximo ciclo, válido a partir de ${date}. A lista atual permanece travada até lá.`, en:`Choose next cycle's occupants, effective ${date}. The current roster stays locked until then.`, es:`Elige los ocupantes del próximo ciclo, vigente desde ${date}. La lista actual queda bloqueada hasta entonces.`, 'ja-JP':`${date}からの次回サイクル利用者を選択します。現在の一覧はそれまで固定されます。` });
+  }
   private local(values: Record<'pt-BR' | 'en' | 'es' | 'ja-JP', string>) { return values[this.i18n.locale()]; }
   async logout() { await this.auth.logout(); await this.router.navigateByUrl('/login'); }
 }

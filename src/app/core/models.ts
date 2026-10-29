@@ -45,6 +45,12 @@ export interface BillingAccount {
   usage_period_starts_at?: string | null;
   complimentary_lifetime: boolean;
   current_product_code?: string | null;
+  plan_code?: string;
+  contracted_seats?: number;
+  entitlements?: string[];
+  trusted_timestamp?: boolean;
+  serproid_signature?: boolean;
+  team_management?: boolean;
   provider_customer_id?: string | null;
   provider_subscription_id?: string | null;
   current_period_ends_at?: string | null;
@@ -69,4 +75,15 @@ export interface SigningContext {
   issuer_snapshot?: OrganizationSnapshot | null;
 }
 
-export interface TenantTeam { members: TenantMember[]; member_limit: number | null; active_count: number; requires_selection: boolean; can_manage: boolean; current_member_id: string; }
+export interface TenantTeam {
+  members: TenantMember[];
+  member_limit: number | null;
+  active_count: number;
+  requires_selection: boolean;
+  can_manage: boolean;
+  current_member_id: string;
+  current_seat_member_ids: string[];
+  next_cycle_member_ids: string[];
+  next_cycle_starts_at: string | null;
+  seat_roster_locked: boolean;
+}

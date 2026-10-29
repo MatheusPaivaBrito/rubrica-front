@@ -6,6 +6,8 @@ function team(memberLimit: number | null, requiresSelection: boolean): TenantTea
     current_member_id: 'admin', member_limit: memberLimit,
     active_count: memberLimit === null ? 12 : requiresSelection ? memberLimit + 1 : memberLimit,
     requires_selection: requiresSelection, can_manage: true, members: [],
+    current_seat_member_ids: [], next_cycle_member_ids: [],
+    next_cycle_starts_at: null, seat_roster_locked: true,
   };
 }
 
