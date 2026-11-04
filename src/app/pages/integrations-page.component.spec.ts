@@ -8,6 +8,22 @@ import { IntegrationsPageComponent } from './integrations-page.component';
 import { TenantItem } from '../core/models';
 
 describe('IntegrationsPageComponent', () => {
+  it('disables an integration only after confirmation and erases displayed secrets', async () => {
+    const calls: unknown[] = [];
+    const page = component({ patch: (_path: string, body: unknown) => { calls.push(body); return of({ id: 'integration', enabled: false }); } });
+    page.tenant.set({ id: 'tenant' } as TenantItem);
+    page.selected.set({ id: 'integration', name: 'ERP', enabled: true, environment: 'staging', sandbox: true });
+    page.secret.set('sensitive');
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    try { await page.setEnabled(false); expect(calls).toEqual([{ enabled: false }]); expect(page.secret()).toBe(''); expect(page.selected()?.enabled).toBe(false); }
+    finally { confirm.mockRestore(); }
+  });
+  it('does not reconcile while an integration is disabled', async () => {
+    const calls: string[] = [];
+    const page = component({ post: (path: string) => { calls.push(path); return of({}); } });
+    page.selected.set({ id: 'integration', name: 'ERP', enabled: false, environment: 'staging', sandbox: false });
+    await page.reconcile('operation'); expect(calls).toHaveLength(0);
+  });
   function component(api: object = { post: () => of({ token: 'secret' }) }) {
     TestBed.configureTestingModule({ providers: [
       { provide: ApiService, useValue: api },

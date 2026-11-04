@@ -12,6 +12,7 @@ import { EnterpriseContract, EnterpriseContractComponent } from '../components/e
 
 interface Integration { id: string; name: string; environment: string; sandbox: boolean; enabled: boolean }
 interface Compartment { id: string; name: string }
+interface ProviderOperation { id: string; request_id: string; signer_id: string; status: string; error_code: string | null }
 interface ProviderConfiguration { provider: string; status: string; version: number }
 interface UsageTotals { signatures: number; billable_signatures: number; uploaded_bytes: number; downloaded_bytes: number; requests: number; errors: number; amount_minor: number }
 interface UsageSummary { totals: UsageTotals; tokens: (UsageTotals & { token_public_id: string })[]; storage_bytes: number; tenant_storage_bytes: number; tenant_included_storage_bytes: number }
@@ -45,6 +46,16 @@ interface TelemetrySummary { available: boolean; projection?: { totals: { averag
           }
         </div>
         @if (selected(); as item) {
+          <article class="card form"><h2>Estado da integração</h2><p>{{ item.enabled ? 'Ativa' : 'Desativada' }}</p>
+            <button class="button secondary" [disabled]="busy() || (!item.enabled && !contract()?.operational)" (click)="setEnabled(!item.enabled)">{{ item.enabled ? 'Desativar integração' : 'Reativar integração' }}</button>
+            <p class="muted">Desativar impede novas operações e trabalhos ainda na fila. Uma assinatura já emitida deve ser reconciliada; não é emitida novamente.</p>
+            @for (operation of operations(); track operation.id) {
+              <p><code>{{ operation.request_id }}</code> · {{ operation.status }} · {{ operation.error_code ?? 'sem erro registrado' }}</p>
+              @if (operation.status === 'uncertain' || operation.status === 'result_ready') {
+                <button class="button secondary" [disabled]="busy() || !item.enabled || !contract()?.operational" (click)="reconcile(operation.id)">Reconciliar resultado existente</button>
+              }
+            }
+          </article>
           @if (usage(); as consumption) {
             <article class="card form"><h2>Consumo da integração</h2><p class="muted">Atividade dos últimos 30 dias. Armazenamento mostra o volume mantido agora.</p>
               @if (item.sandbox) { <p class="notice">Sandbox: dados e limites separados. Assinaturas são simuladas e não geram cobrança.</p> }
@@ -66,7 +77,7 @@ interface TelemetrySummary { available: boolean; projection?: { totals: { averag
             </article>
           }
           @if (contract()?.operational || contract()?.recovery) { <app-enterprise-storage [tenantId]="tenant()!.id" [integrationId]="item.id" [sandbox]="item.sandbox" /> }
-          @if (contract()?.operational) {
+          @if (contract()?.operational && item.enabled) {
           <article class="card form"><h2>{{ item.name }}</h2>
             <p class="notice">O token deve ficar no servidor da sua plataforma. Gerar outro invalida imediatamente o anterior desta integração.</p>
             <label>Validade<select [(ngModel)]="validity"><option value="never">Sem expiração</option><option value="15">15 dias</option><option value="30">30 dias</option></select></label>
@@ -111,6 +122,7 @@ interface TelemetrySummary { available: boolean; projection?: { totals: { averag
   styles: [`:host{display:block}.form{margin-bottom:1rem}.integrations-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.75rem;margin:1rem 0}.integration-choice{text-align:left;display:grid;gap:.5rem;min-width:0;cursor:pointer}.integration-choice small,code{overflow-wrap:anywhere}.integration-choice.selected{border-color:#a82035}.actions{display:flex;gap:.75rem;flex-wrap:wrap}fieldset{display:grid;gap:.5rem;border:1px solid #ddd;border-radius:.5rem}textarea{display:block;width:100%;min-height:7rem;resize:vertical;margin:.75rem 0}select{max-width:100%}`],
 })
 export class IntegrationsPageComponent implements OnInit, OnDestroy {
+  readonly operations = signal<ProviderOperation[]>([]);
   readonly contract = signal<EnterpriseContract | null>(null);
   updateContract(state: EnterpriseContract) {
     this.contract.set(state);
@@ -188,13 +200,31 @@ export class IntegrationsPageComponent implements OnInit, OnDestroy {
   }
   async choose(item: Integration) {
     if (this.busy()) return;
-    this.busy.set(true); this.secret.set(''); this.selected.set(item); this.compartments.set([]); this.providers.set([]); this.clearProviderSecrets(); this.usage.set(null); this.telemetry.set(null);
+    this.busy.set(true); this.secret.set(''); this.selected.set(item); this.compartments.set([]); this.providers.set([]); this.clearProviderSecrets(); this.usage.set(null); this.telemetry.set(null); this.operations.set([]);
     try {
-      if (!this.contract()?.operational) return;
+      if (!this.contract()?.operational || !item.enabled) return;
+      this.operations.set(await firstValueFrom(this.api.get<ProviderOperation[]>(`${this.base()}/${item.id}/operations`)));
       this.compartments.set(await firstValueFrom(this.api.get<Compartment[]>(`${this.base()}/${item.id}/compartments`)));
       this.providers.set(await firstValueFrom(this.api.get<ProviderConfiguration[]>(`${this.providerBase()}?sandbox=${item.sandbox}`)));
       this.usage.set(await firstValueFrom(this.api.get<UsageSummary>(`${this.base()}/${item.id}/usage`)));
     }
+    catch (error) { await this.feedback.error(error); } finally { this.busy.set(false); }
+  }
+  async setEnabled(enabled: boolean) {
+    const item = this.selected();
+    if (!item || this.busy() || (!enabled && !window.confirm('Desativar esta integração e impedir novas operações?'))) return;
+    this.busy.set(true); this.secret.set(''); this.clearProviderSecrets();
+    try {
+      const updated = await firstValueFrom(this.api.patch<Integration>(`${this.base()}/${item.id}`, { enabled }));
+      if (!this.alive || this.selected()?.id !== item.id) return;
+      this.selected.set(updated); this.integrations.update(items => items.map(value => value.id === item.id ? updated : value));
+    } catch (error) { await this.feedback.error(error); } finally { this.busy.set(false); }
+  }
+  async reconcile(id: string) {
+    const item = this.selected();
+    if (!item?.enabled || !this.contract()?.operational || this.busy()) return;
+    this.busy.set(true);
+    try { await firstValueFrom(this.api.post(`${this.base()}/${item.id}/operations/${id}/reconcile`, {})); }
     catch (error) { await this.feedback.error(error); } finally { this.busy.set(false); }
   }
   async rotate() {

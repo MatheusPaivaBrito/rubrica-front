@@ -34,7 +34,13 @@
     "!/**/*__*",
     "!/**/*__*/**",
     "!/test-accounts",
-    "!/test-accounts/**"
+    "!/test-accounts/**",
+    "!/docs",
+    "!/docs/**",
+    "!/api/v1",
+    "!/api/v1/**",
+    "!/enterprise",
+    "!/enterprise/**"
   ],
   "assetGroups": [
     {

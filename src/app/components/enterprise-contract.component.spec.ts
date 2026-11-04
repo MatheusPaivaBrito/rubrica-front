@@ -8,6 +8,23 @@ const active: EnterpriseContract = { status: 'active', operational: true, recove
   automatic_current_copy_purge_enabled: false, internal_retention_complete: false, notices: [] };
 
 describe('EnterpriseContractComponent', () => {
+  it('does not reopen without complete closure permission', async () => {
+    const { component, calls } = setup(); component.contract.set(active);
+    await component.reopen(); expect(calls).toHaveLength(0);
+  });
+  it('requires explicit confirmation before starting a new empty contract', async () => {
+    const { component, calls } = setup(); component.contract.set({ ...active, recontract_allowed: true, closure_id: 'closure' });
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    try { await component.reopen(); expect(calls).toHaveLength(0); } finally { confirm.mockRestore(); }
+  });
+  it('binds reopening to the server closure receipt', async () => {
+    const { component, calls } = setup(); component.contract.set({ ...active, recontract_allowed: true, closure_id: 'closure' });
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    try {
+      await component.reopen();
+      expect(calls[0]).toEqual({ method: 'POST', path: '/enterprise/tenants/tenant/contract/reopen', body: { confirm_empty_contract: true, closure_id: 'closure' } });
+    } finally { confirm.mockRestore(); }
+  });
   function setup(overrides: object = {}) {
     const calls: { method: string; path: string; body?: unknown }[] = [];
     const api = { get: (path: string) => of(path.endsWith('/contract') ? active : path.endsWith('/webhook') ? { configured: false, deliveries: [] } : []),
