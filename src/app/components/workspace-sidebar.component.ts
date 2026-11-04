@@ -49,6 +49,7 @@ import { LanguagePickerComponent } from './language-picker.component';
               <div class="sidebar-settings-menu">
                 @if (tenant.role === 'admin') { <a [routerLink]="url('plan')" routerLinkActive="selected" ariaCurrentWhenActive="page" (click)="closeMobile()"><i class="bi bi-credit-card" aria-hidden="true"></i><span>{{ i18n.text('billing') }}</span></a> }
                 <button type="button" class="sidebar-action" [class.selected]="securityActive()" (click)="security()"><i class="bi bi-shield-lock" aria-hidden="true"></i><span>{{ i18n.text('dashboardSecurity') }}</span></button>
+                @if (showIntegrations()) { <a [routerLink]="url('integrations')" routerLinkActive="selected" ariaCurrentWhenActive="page" (click)="closeMobile()"><i class="bi bi-plug" aria-hidden="true"></i><span>Integrações e API</span></a> }
                 <div class="sidebar-settings-language"><app-language-picker /></div>
               </div>
             }
@@ -68,18 +69,29 @@ export class WorkspaceSidebarComponent implements OnChanges {
   private readonly router = inject(Router);
   private readonly api = inject(ApiService);
   readonly showTeam = signal(false);
+  readonly showIntegrations = signal(false);
   readonly billingAccount = signal<BillingAccount | null>(null);
   readonly mobileOpen = signal(false);
   readonly settingsOpen = signal(false);
   async ngOnChanges() {
     this.showTeam.set(false);
+    this.showIntegrations.set(false);
     this.billingAccount.set(null);
     if (!this.tenant) return;
+    const tenantId = this.tenant.id;
     try {
       const account = await firstValueFrom(this.api.get<BillingAccount>(`/billing/tenants/${this.tenant.id}/account`));
+      if (this.tenant?.id !== tenantId) return;
       const paid = account.status === 'active' || account.status === 'past_due';
       this.billingAccount.set(account);
-      this.showTeam.set(this.tenant.role === 'admin' && (account.complimentary_lifetime || (paid && ['rubrica_intermediate', 'rubrica_team'].includes(account.current_product_code ?? ''))));
+      this.showTeam.set(this.tenant.role === 'admin' && (account.complimentary_lifetime || (paid && ['rubrica_intermediate', 'rubrica_team', 'rubrica_enterprise'].includes(account.current_product_code ?? ''))));
+      this.showIntegrations.set(this.tenant.role === 'admin' && account.current_product_code === 'rubrica_enterprise');
+      if (this.tenant.role === 'admin' && !this.showIntegrations()) {
+        try {
+          const contract = await firstValueFrom(this.api.get<{ recovery: boolean }>(`/enterprise/tenants/${tenantId}/contract`));
+          if (this.tenant?.id === tenantId) this.showIntegrations.set(contract.recovery);
+        } catch { /* A tenant without a previous enterprise contract has no recovery area. */ }
+      }
     } catch { this.showTeam.set(false); this.billingAccount.set(null); }
   }
   copy() { return teamCopy[this.i18n.locale()]; }
@@ -87,12 +99,12 @@ export class WorkspaceSidebarComponent implements OnChanges {
   closeMobile() { this.mobileOpen.set(false); }
   toggleSettings() { this.settingsOpen.update((open) => !open); }
   @HostListener('document:keydown.escape') onEscape() { this.closeMobile(); }
-  url(page: 'dashboard' | 'team' | 'plan'): string {
+  url(page: 'dashboard' | 'team' | 'plan' | 'integrations'): string {
     const slug = this.auth.context()?.account_public_slug;
     return this.tenant && slug ? tenantDashboardUrl(this.tenant, slug).replace(/dashboard$/, page) : `/${page}`;
   }
   security() { this.closeMobile(); return this.router.navigate(['/security']); }
-  settingsActive() { return this.router.url.includes('/plan') || this.securityActive(); }
+  settingsActive() { return this.router.url.includes('/plan') || this.router.url.includes('/integrations') || this.securityActive(); }
   securityActive() { return this.router.url.startsWith('/security'); }
   settingsLabel(): string { return ({ 'pt-BR':'Configurações', en:'Settings', es:'Configuración', 'ja-JP':'設定' })[this.i18n.locale()]; }
   async logout() { this.closeMobile(); await this.auth.logout(); await this.router.navigate(['/login']); }
