@@ -1,5 +1,4 @@
 {
-  "/docs": { "target": "http://localhost:8100", "secure": false },
   "/enterprise/tenants": { "target": "http://localhost:8100", "secure": false },
   "/api/v1": { "target": "http://localhost:8100", "secure": false },
   "/contact": { "target": "http://localhost:8100", "secure": false, "changeOrigin": true },

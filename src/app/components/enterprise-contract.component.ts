@@ -4,25 +4,18 @@ import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../core/api.service';
 import { FeedbackService } from '../core/feedback.service';
 
-export interface EnterpriseContract { status: string; operational: boolean; recovery: boolean; suspends_at: string | null; delete_after: string | null; cycle_end?: string; automatic_current_copy_purge_enabled: boolean; internal_retention_complete: boolean; closure_id?: string | null; metadata_erased?: boolean; credentials_retired?: boolean; backups_verified?: boolean; recontract_allowed?: boolean; notices: { id: string; kind: string; email_delivered: boolean }[] }
+export interface EnterpriseContract { status: string; operational: boolean; recovery: boolean; suspends_at: string | null; delete_after: string | null; cycle_end?: string; automatic_current_copy_purge_enabled: boolean; internal_retention_complete: boolean; notices: { id: string; kind: string; email_delivered: boolean }[] }
 interface WebhookState { configured: boolean; url?: string; enabled?: boolean; version?: number; deliveries: { id: string; event_id: string; status: string; attempts: number }[] }
 interface PendingRequest { id: string; document_id: string; status: string }
 
 @Component({ selector: 'app-enterprise-contract', standalone: true, imports: [FormsModule],
-  template: `<article class="card contract-panel"><h2>Contrato da API</h2><a href="/docs" target="_blank" rel="noopener">Documentação e exemplos da API</a>
+  template: `<article class="card contract-panel"><h2>Contrato da API</h2>
     @if (contract(); as state) {
       <p><strong>{{ state.operational ? 'Acesso operacional disponível' : state.recovery ? 'Prazo para retirar seus arquivos' : 'Operações suspensas' }}</strong></p>
       @if (state.cycle_end) { <p>Próximo corte do ciclo: {{ date(state.cycle_end) }}</p> }
       @if (state.suspends_at) { <p>Suspensão: {{ date(state.suspends_at) }} · Prazo para retirada: {{ date(state.delete_after) }}</p> }
       @if (!state.operational) { <p class="notice">Tokens e novas assinaturas estão bloqueados. Durante a recuperação, o administrador pode exportar ou migrar os arquivos. A migração não estende o prazo. Regularize antes da data limite para recuperar o acesso; depois dela, a recuperação dos dados não é garantida.</p> }
       @if (!state.automatic_current_copy_purge_enabled || !state.internal_retention_complete) { <p class="notice">A política completa de expurgo ainda não está validada neste ambiente. O prazo do contrato continua em vigor; a confirmação da limpeza deve ser acompanhada pelo operador.</p> }
-      @if (state.closure_id) {
-        <p>Encerramento: metadados {{ state.metadata_erased ? 'removidos' : 'pendentes' }} · credenciais {{ state.credentials_retired ? 'invalidadas' : 'pendentes' }} · backups {{ state.backups_verified ? 'verificados' : 'aguardando comprovação' }}.</p>
-      }
-      @if (state.recontract_allowed) {
-        <p>O novo contrato começa vazio. Os dados apagados e os tokens anteriores não serão recuperados.</p>
-        <button class="button primary" [disabled]="busy()" (click)="reopen()">Ativar novo contrato vazio</button>
-      }
       @for (notice of state.notices; track notice.id) { <p class="muted">{{ noticeLabel(notice.kind) }} · E-mail {{ notice.email_delivered ? 'enviado' : 'pendente' }}</p> }
       @if (state.recovery && requests().length) {
         <h3>Assinaturas que impedem a migração</h3><p>Encerre as solicitações abertas para migrar esses documentos. Assinaturas já concluídas serão preservadas.</p>
@@ -95,14 +88,6 @@ export class EnterpriseContractComponent implements OnChanges, OnDestroy {
   async cancelRequest(id: string) {
     if (!this.contract()?.recovery || !window.confirm('Cancelar esta solicitação para permitir a migração? As assinaturas concluídas serão preservadas.')) return;
     await this.perform(async () => { await firstValueFrom(this.api.post(`${this.base()}/integrations/${this.integrationId}/recovery-requests/${id}/cancel`, {})); await this.refresh(); });
-  }
-  async reopen() {
-    const state = this.contract();
-    if (!state?.recontract_allowed || !state.closure_id || !window.confirm('Ativar um contrato vazio? Os arquivos e tokens apagados não serão restaurados.')) return;
-    await this.perform(async () => {
-      await firstValueFrom(this.api.post(`${this.base()}/contract/reopen`, { confirm_empty_contract: true, closure_id: state.closure_id }));
-      await this.refresh();
-    });
   }
   date(value: string | null) { return value ? new Date(value).toLocaleString('pt-BR') : '—'; }
   noticeLabel(value: string) { return ({ 'contract.suspended': 'Acesso suspenso', 'contract.reactivated': 'Acesso regularizado',
