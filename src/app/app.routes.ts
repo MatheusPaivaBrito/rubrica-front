@@ -5,7 +5,6 @@ import { LandingPageComponent } from './pages/landing-page.component';
 export const routes: Routes = [
   { path: '', pathMatch: 'full', component: LandingPageComponent },
   { path: 'contact', loadComponent: () => import('./pages/legal-page.component').then(module => module.LegalPageComponent), data: { page: 'contact' } },
-  { path: 'enterprise', loadComponent: () => import('./pages/legal-page.component').then(module => module.LegalPageComponent), data: { page: 'enterprise' } },
   { path: 'privacy', loadComponent: () => import('./pages/legal-page.component').then(module => module.LegalPageComponent), data: { page: 'privacy' } },
   { path: 'terms', loadComponent: () => import('./pages/legal-page.component').then(module => module.LegalPageComponent), data: { page: 'terms' } },
   { path: 'data-deletion', loadComponent: () => import('./pages/legal-page.component').then(module => module.LegalPageComponent), data: { page: 'data-deletion' } },

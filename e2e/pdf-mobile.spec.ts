@@ -39,17 +39,10 @@ test('mostra a bandeira de cada idioma suportado', async ({ page }) => {
   await expect(page.locator('.language-options .language-flag')).toHaveText(['🇺🇸', '🇧🇷', '🇪🇸', '🇯🇵']);
 });
 
-test('mostra três planos compactos e abre o fluxo empresarial', async ({ page }) => {
-  await page.route('**/contact/config', route => route.fulfill({ status: 200, contentType: 'application/json', body: '{"turnstile_site_key":""}' }));
+test('mostra apenas os três cartões de planos desta release', async ({ page }) => {
   await page.goto('/');
-
-  const cards = page.locator('.pricing-grid .price-card');
-  await expect(cards).toHaveCount(3);
-  await expect(cards.last().locator('a')).toHaveAttribute('href', '/enterprise');
-  await page.goto('/enterprise');
-  await expect(page).toHaveURL(/\/enterprise$/);
-  await expect(page.locator('input[name="company"]')).toBeVisible();
-  await expect(page.locator('select[name="teamSize"]')).toBeVisible();
+  await expect(page.locator('.pricing-grid .price-card')).toHaveCount(3);
+  await expect(page.locator('a[href="/enterprise"]')).toHaveCount(0);
 });
 
 test('exibe arquivo no painel e na assinatura sem leitor nativo', async ({ page }, testInfo) => {
