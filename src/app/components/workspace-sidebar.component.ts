@@ -85,7 +85,7 @@ export class WorkspaceSidebarComponent implements OnChanges {
       const paid = account.status === 'active' || account.status === 'past_due';
       this.billingAccount.set(account);
       this.showTeam.set(this.tenant.role === 'admin' && (account.complimentary_lifetime || (paid && ['rubrica_intermediate', 'rubrica_team', 'rubrica_enterprise'].includes(account.current_product_code ?? ''))));
-      this.showIntegrations.set(this.tenant.role === 'admin' && !account.complimentary_lifetime && account.current_product_code === 'rubrica_enterprise');
+      this.showIntegrations.set(this.tenant.role === 'admin' && account.current_product_code === 'rubrica_enterprise');
       if (this.tenant.role === 'admin' && !this.showIntegrations()) {
         try {
           const contract = await firstValueFrom(this.api.get<{ recovery: boolean }>(`/enterprise/tenants/${tenantId}/contract`));

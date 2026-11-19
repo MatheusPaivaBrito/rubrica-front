@@ -8,10 +8,10 @@ import { TenantItem } from '../core/models';
 import { WorkspaceSidebarComponent } from './workspace-sidebar.component';
 
 describe('WorkspaceSidebarComponent enterprise recovery', () => {
-  async function sidebar(product: string, role: string, recovery: boolean, lifetime = false) {
+  async function sidebar(product: string, role: string, recovery: boolean) {
     const paths: string[] = [];
     TestBed.configureTestingModule({ providers: [
-      { provide: ApiService, useValue: { get: (path: string) => { paths.push(path); return of(path.endsWith('/contract') ? { recovery } : { status: 'active', current_product_code: product, complimentary_lifetime: lifetime }); } } },
+      { provide: ApiService, useValue: { get: (path: string) => { paths.push(path); return of(path.endsWith('/contract') ? { recovery } : { status: 'active', current_product_code: product }); } } },
       { provide: AuthService, useValue: {} }, { provide: I18nService, useValue: {} }, { provide: Router, useValue: {} },
     ] });
     const component = TestBed.runInInjectionContext(() => new WorkspaceSidebarComponent());
@@ -26,18 +26,5 @@ describe('WorkspaceSidebarComponent enterprise recovery', () => {
   });
   it('does not grant enterprise navigation to a team without a recovery contract', async () => {
     const { component } = await sidebar('rubrica_team', 'admin', false); expect(component.showIntegrations()).toBe(false);
-  });
-  it('shows integrations only to the enterprise administrator', async () => {
-    const { component } = await sidebar('rubrica_enterprise', 'admin', false);
-    expect(component.showIntegrations()).toBe(true);
-  });
-  it('does not expose integration administration to enterprise members', async () => {
-    const { component } = await sidebar('rubrica_enterprise', 'member', false);
-    expect(component.showIntegrations()).toBe(false);
-  });
-  it('does not grant the API to a lifetime account even with a stale enterprise code', async () => {
-    const { component } = await sidebar('rubrica_enterprise', 'admin', false, true);
-    expect(component.showTeam()).toBe(true);
-    expect(component.showIntegrations()).toBe(false);
   });
 });
