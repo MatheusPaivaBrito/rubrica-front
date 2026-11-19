@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, ViewChild, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -258,6 +259,11 @@ export class AccountPageComponent implements OnInit {
   async resetPassword(): Promise<void> { if (!this.passwordMeetsPolicy()) { await this.feedback.error(this.i18n.text('reviewData')); return; } const reset = await this.action('/auth/password-reset', { token: this.token, new_password: this.password }, this.i18n.text('passwordChanged')); if (reset) await this.router.navigate(['/login'], { queryParams: this.returnUrl ? { returnUrl: this.returnUrl } : undefined }); }
   private async action(path: string, body: unknown, message: string): Promise<boolean> {
     try { await firstValueFrom(this.api.post(path, body)); await this.feedback.success(message); return true; }
-    catch { await this.feedback.error(this.i18n.text('reviewData')); return false; }
+    catch (error) {
+      const duplicateRegistration =
+        path === '/auth/register' && error instanceof HttpErrorResponse && error.status === 409;
+      await this.feedback.error(this.i18n.text(duplicateRegistration ? 'registrationConflict' : 'reviewData'));
+      return false;
+    }
   }
 }
