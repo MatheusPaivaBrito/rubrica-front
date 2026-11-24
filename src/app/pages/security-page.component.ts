@@ -8,7 +8,9 @@ import Swal from 'sweetalert2';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { FeedbackService } from '../core/feedback.service';
-import { I18nService } from '../core/i18n.service';
+import { I18nService, MessageKey } from '../core/i18n.service';
+import { SUPPORTED_COUNTRIES } from '../core/countries';
+import { AccountIdentifier } from '../core/models';
 import { LanguagePickerComponent } from '../components/language-picker.component';
 import { OneTimeCodeComponent } from '../components/one-time-code.component';
 import { PasswordFieldComponent } from '../components/password-field.component';
@@ -40,6 +42,41 @@ interface RecoveryCodes { recovery_codes: string[]; }
         }
         @if (recoveryCodes().length) { <section class="recovery-panel"><h2>{{ i18n.text('saveCodes') }}</h2><p>{{ i18n.text('saveCodesHelp') }}</p><div class="codes">@for (item of recoveryCodes(); track item) { <code>{{ item }}</code> }</div><div class="button-row"><button class="button secondary" (click)="downloadCodes()">{{ i18n.text('downloadCodes') }}</button><button class="button" (click)="returnToDashboard()">{{ i18n.text('backDashboard') }}</button></div></section> }
       </section>
+      @if (status() && !status()?.setup_required) {
+        <section class="settings-card card" style="margin-top: 1rem">
+          <h2>{{ identityText('title') }}</h2>
+          <ul>
+            @for (item of identifiers(); track item.id) {
+              <li>
+                {{ item.issuing_country }} · {{ item.identifier_type }} {{ item.masked_display }}
+                @if (item.is_preferred) { <strong>{{ identityText('preferred') }}</strong> }
+                @else if (item.verification_status !== 'legacy') {
+                  <button type="button" class="button secondary" (click)="preferIdentifier(item.id)" [disabled]="identitySaving()">{{ identityText('makePreferred') }}</button>
+                }
+              </li>
+            }
+          </ul>
+          <form class="form" (ngSubmit)="addIdentifier()">
+            <label>{{ i18n.text('documentCountry') }}
+              <select name="identityCountry" [(ngModel)]="identityCountry" (ngModelChange)="identityType = 'PASSPORT'" required>
+                <option value="">{{ i18n.text('chooseCountry') }}</option>
+                @for (country of countries; track country.code) {
+                  <option [value]="country.code">{{ i18n.text(country.nameKey) }}</option>
+                }
+              </select>
+            </label>
+            <label>{{ i18n.text('documentType') }}
+              <select name="identityType" [(ngModel)]="identityType" required>
+                @for (type of documentTypes(); track type.code) { <option [value]="type.code">{{ i18n.text(type.label) }}</option> }
+              </select>
+            </label>
+            <label>{{ i18n.text('documentNumber') }}
+              <input name="identityValue" [(ngModel)]="identityValue" required minlength="4" maxlength="80" autocomplete="off" />
+            </label>
+            <button class="button" [disabled]="identitySaving() || !identityCountry || identityValue.trim().length < 4">{{ identityText('add') }}</button>
+          </form>
+        </section>
+      }
     </main>
   `,
   styles: [`.settings-shell{min-height:100dvh;background:#f4f7fb;padding:2rem 2rem max(2rem,env(safe-area-inset-bottom))}.settings-top{max-width:900px;margin:0 auto 1rem;display:flex;justify-content:space-between;align-items:center}.brand-button{border:0;background:transparent;cursor:pointer}.settings-card{max-width:900px;margin:auto;padding:2rem}.setup-grid{display:grid;grid-template-columns:280px 1fr;gap:2rem}.qr-panel{background:white;border:1px solid #dce3ec;border-radius:16px;padding:1rem;display:grid;place-items:center}.qr-panel img{width:100%;max-width:240px}.secret{display:flex;flex-direction:column;gap:.4rem}.secret code,.codes code{background:#edf3f8;padding:.65rem;border-radius:8px}.mfa-confirm-form{scroll-margin-block:20dvh}.mfa-confirm-form .button{min-height:48px}.codes{display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem;margin:1rem 0}.status-ok{color:#087b60;font-weight:800;font-size:1.15rem}.recovery-panel{margin-top:2rem;padding:1.25rem;border:1px solid #f0c36a;background:#fffaf0;border-radius:14px}@media(max-width:700px){.settings-shell{padding:1rem 1rem max(1.25rem,env(safe-area-inset-bottom))}.settings-top{align-items:flex-start;gap:1rem}.settings-top .button-row{justify-content:flex-end}.settings-card{padding:1.25rem}.setup-grid{grid-template-columns:1fr;gap:1.25rem}.qr-panel img{max-width:190px}.mfa-confirm-form{padding:.85rem;border:1px solid #e2e8f0;border-radius:14px;background:#f8fafc}.mfa-confirm-form .button{width:100%}.codes{grid-template-columns:1fr}}`],
@@ -47,8 +84,56 @@ interface RecoveryCodes { recovery_codes: string[]; }
 export class SecurityPageComponent implements OnInit {
   readonly loading = signal(true); readonly confirming = signal(false); readonly status = signal<MfaStatus | null>(null); readonly setup = signal<MfaSetup | null>(null); readonly qrCode = signal(''); readonly recoveryCodes = signal<string[]>([]);
   code = ''; password = '';
+  readonly countries = SUPPORTED_COUNTRIES;
+  readonly identifiers = signal<AccountIdentifier[]>([]);
+  readonly identitySaving = signal(false);
+  identityCountry = '';
+  identityType = 'PASSPORT';
+  identityValue = '';
   constructor(private readonly api: ApiService, private readonly auth: AuthService, private readonly route: ActivatedRoute, private readonly router: Router, private readonly feedback: FeedbackService, readonly i18n: I18nService) {}
-  async ngOnInit() { if (!await this.auth.restore()) { await this.router.navigate(['/login']); return; } await this.loadStatus(); this.loading.set(false); }
+  async ngOnInit() { if (!await this.auth.restore()) { await this.router.navigate(['/login']); return; } await this.loadStatus(); this.loading.set(false); if (!this.status()?.setup_required) await this.loadIdentifiers(); }
+  identityText(key: 'title' | 'preferred' | 'makePreferred' | 'add'): string {
+    const copy = {
+      'pt-BR': { title: 'Documentos de identificação', preferred: 'Padrão', makePreferred: 'Usar como padrão', add: 'Adicionar documento' },
+      en: { title: 'Identity documents', preferred: 'Default', makePreferred: 'Set as default', add: 'Add document' },
+      es: { title: 'Documentos de identidad', preferred: 'Predeterminado', makePreferred: 'Usar por defecto', add: 'Añadir documento' },
+      'ja-JP': { title: '本人確認書類', preferred: '既定', makePreferred: '既定にする', add: '書類を追加' },
+    };
+    return copy[this.i18n.locale()][key];
+  }
+  documentTypes(): { code: string; label: MessageKey }[] {
+    const passport = { code: 'PASSPORT', label: 'passport' } as const;
+    if (this.identityCountry === 'BR') return [passport, { code: 'BR_CPF', label: 'cpf' }, { code: 'BR_CNPJ', label: 'cnpj' }];
+    if (this.identityCountry === 'PT') return [passport, { code: 'PT_NIF', label: 'nif' }];
+    if (this.identityCountry === 'JP') return [passport, { code: 'RESIDENCE_CARD', label: 'residenceCard' }, { code: 'DRIVER_LICENSE', label: 'driverLicense' }];
+    return [passport, { code: 'NATIONAL_ID', label: 'nationalId' }];
+  }
+  private async loadIdentifiers() {
+    try {
+      this.identifiers.set(await firstValueFrom(this.api.get<AccountIdentifier[]>('/users/me/identifiers')));
+    } catch (error) { await this.feedback.error(error); }
+  }
+  async addIdentifier() {
+    if (this.identitySaving() || !this.identityCountry || this.identityValue.trim().length < 4) return;
+    this.identitySaving.set(true);
+    try {
+      await firstValueFrom(this.api.post('/users/me/identifiers', {
+        issuing_country: this.identityCountry, identifier_type: this.identityType, value: this.identityValue.trim(),
+      }));
+      this.identityValue = '';
+      await this.loadIdentifiers();
+    } catch (error) { await this.feedback.error(error); }
+    finally { this.identitySaving.set(false); }
+  }
+  async preferIdentifier(id: string) {
+    if (this.identitySaving()) return;
+    this.identitySaving.set(true);
+    try {
+      await firstValueFrom(this.api.put(`/users/me/identifiers/${id}/preferred`, {}));
+      await this.loadIdentifiers();
+    } catch (error) { await this.feedback.error(error); }
+    finally { this.identitySaving.set(false); }
+  }
   async startSetup() { try { const setup = await firstValueFrom(this.api.post<MfaSetup>('/auth/mfa/setup', {})); this.setup.set(setup); this.qrCode.set(await QRCode.toDataURL(setup.provisioning_uri, { width: 320, margin: 1 })); } catch (error) { await this.feedback.error(error); } }
   async confirm() { if (this.confirming() || this.code.length !== 6) return; this.confirming.set(true); try { const result = await firstValueFrom(this.api.post<RecoveryCodes>('/auth/mfa/confirm', { code: this.code })); this.recoveryCodes.set(result.recovery_codes); this.setup.set(null); this.code=''; await this.auth.refreshContext(); await this.loadStatus(); await Swal.fire({ icon: 'success', title: this.i18n.text('mfaEnabled'), html: `<p>${this.i18n.text('mfaEnabledFlowHelp')}</p><p><strong>${this.i18n.text('saveCodes')}</strong><br>${this.i18n.text('saveCodesHelp')}</p>`, confirmButtonText: this.i18n.text('reviewRecoveryCodes'), confirmButtonColor: '#a82035' }); } catch (error) { await this.feedback.error(error); } finally { this.confirming.set(false); } }
   completeSetupCode(code: string): void { this.code = code; void this.confirm(); }

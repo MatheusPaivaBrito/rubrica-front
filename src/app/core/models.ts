@@ -77,6 +77,10 @@ export interface SigningContext {
 }
 
 export interface TenantTeam {
+  closure_requested_at?: string | null;
+  export_until?: string | null;
+  can_request_branch?: boolean;
+  organization_root?: boolean;
   members: TenantMember[];
   member_limit: number | null;
   active_count: number;
@@ -87,4 +91,14 @@ export interface TenantTeam {
   next_cycle_member_ids: string[];
   next_cycle_starts_at: string | null;
   seat_roster_locked: boolean;
+}
+
+
+export interface AccountIdentifier {
+  id: string;
+  issuing_country: string;
+  identifier_type: string;
+  masked_display: string;
+  verification_status: string;
+  is_preferred: boolean;
 }

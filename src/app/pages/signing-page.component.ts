@@ -7,7 +7,7 @@ import { PdfStampViewerComponent } from '../components/pdf-stamp-viewer.componen
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { FeedbackService } from '../core/feedback.service';
-import { Signer, SigningContext, StampPosition } from '../core/models';
+import { AccountIdentifier, Signer, SigningContext, StampPosition } from '../core/models';
 import { dateTime } from '../core/date-time';
 import { I18nService } from '../core/i18n.service';
 import { LanguagePickerComponent } from '../components/language-picker.component';
@@ -89,6 +89,15 @@ import { LanguagePickerComponent } from '../components/language-picker.component
           @if (!administrativeView() && !identityEligible()) { <p class="error">{{ identityRequiredLabel() }}</p> }
           @if (message()) { <p class="notice">{{ message() }}</p> }
 
+          @if (identifiers().length && !completed() && !administrativeView()) {
+            <label>{{ i18n.text('documentType') }}
+              <select [value]="selectedIdentifier()" (change)="selectIdentifier($event)">
+                @for (item of identifiers(); track item.id) {
+                  <option [value]="item.id" [selected]="item.id === selectedIdentifier()">{{ item.issuing_country }} · {{ item.identifier_type }} {{ item.masked_display }}</option>
+                }
+              </select>
+            </label>
+          }
           <div class="signing-actions">
             @if (signatureMode() === 'serproid' && !administrativeView()) {
               <button class="button" [disabled]="signing() || !placement() || !serproidEligible()" (click)="sign(true)">{{ signing() ? i18n.text('signing') : certificateLabel() }}</button>
@@ -110,6 +119,8 @@ import { LanguagePickerComponent } from '../components/language-picker.component
 export class SigningPageComponent implements OnInit {
   @ViewChild('signatureCanvas') signatureCanvas?: ElementRef<HTMLCanvasElement>;
   readonly context = signal<SigningContext | null>(null);
+  readonly identifiers = signal<AccountIdentifier[]>([]);
+  readonly selectedIdentifier = signal('');
   readonly placement = signal<StampPosition | null>(null);
   readonly loading = signal(true);
   readonly signing = signal(false);
@@ -144,6 +155,17 @@ export class SigningPageComponent implements OnInit {
     try {
       const context = await firstValueFrom(this.api.get<SigningContext>(`/signing/links/${this.token}`));
       this.applyContext(context);
+      if (context.viewer_mode === 'signer' && context.signer.status !== 'signed' && context.signer.signature_mode !== 'serproid') {
+        try {
+          const identifiers = await firstValueFrom(this.api.get<AccountIdentifier[]>('/users/me/identifiers'));
+          const eligible = identifiers.filter(item => item.verification_status !== 'legacy' && (
+            this.signatureMode() === 'evidence' ||
+            (item.issuing_country === 'BR' && ['BR_CPF', 'BR_CNPJ'].includes(item.identifier_type))
+          ));
+          this.identifiers.set(eligible);
+          this.selectedIdentifier.set(eligible.find(item => item.is_preferred)?.id ?? eligible[0]?.id ?? '');
+        } catch { this.identifiers.set([]); }
+      }
       const certificateOutcome = this.route.snapshot.queryParamMap.get('serproid');
       if (certificateOutcome === 'success') this.message.set(this.i18n.text('signedSuccess'));
       if (certificateOutcome === 'denied') this.message.set(this.certificateDeniedLabel());
@@ -231,7 +253,7 @@ export class SigningPageComponent implements OnInit {
       screen_height: window.screen?.height || null,
     };
     if (this.requiresDrawnSignature() && !this.hasDrawing) { await this.feedback.warning(this.drawnSignatureLabel()); return; }
-    const command = { consent: true, consent_version: 'rubrica-evidence-v2', stamp: { ...stamp, locale: this.i18n.locale(), timezone: dateTime.timezone() }, drawn_signature_png_data_url: this.hasDrawing ? this.signatureCanvas?.nativeElement.toDataURL('image/png') : null, client, geolocation };
+    const command = { identifier_id: this.selectedIdentifier() || null, consent: true, consent_version: 'rubrica-evidence-v2', stamp: { ...stamp, locale: this.i18n.locale(), timezone: dateTime.timezone() }, drawn_signature_png_data_url: this.hasDrawing ? this.signatureCanvas?.nativeElement.toDataURL('image/png') : null, client, geolocation };
     if (useCertificate && !this.serproidSimulated()) {
       this.signing.set(true);
       try {
@@ -263,7 +285,8 @@ export class SigningPageComponent implements OnInit {
     return this.i18n.formatDate(value);
   }
 
-  identityLabel(): string { const signer = this.context()?.signer; if (!signer?.identity_document_masked) return ''; const type = (signer.identity_document_type ?? '').replace('BR_', '').replace('PT_', '').replaceAll('_', ' '); const country = this.alpha3Country(signer.identity_document_country); return [country, `${type} ${signer.identity_document_masked}`.trim()].filter(Boolean).join(' · '); }
+  selectIdentifier(event: Event): void { this.selectedIdentifier.set((event.target as HTMLSelectElement).value); }
+  identityLabel(): string { const selected = this.identifiers().find(item => item.id === this.selectedIdentifier()); if (selected && !this.completed()) return `${selected.issuing_country} · ${selected.identifier_type} ${selected.masked_display}`; const signer = this.context()?.signer; if (!signer?.identity_document_masked) return ''; const type = (signer.identity_document_type ?? '').replace('BR_', '').replace('PT_', '').replaceAll('_', ' '); const country = this.alpha3Country(signer.identity_document_country); return [country, `${type} ${signer.identity_document_masked}`.trim()].filter(Boolean).join(' · '); }
   organizationLabel(snapshot: NonNullable<Signer['representation_snapshot']>): string { return [snapshot.legal_name || snapshot.name, snapshot.registration_masked].filter(Boolean).join(' · '); }
   representativeLabel(): string { return ({ 'pt-BR':'Representando', en:'Representing', es:'En representación de', 'ja-JP':'代表する会社' } as Record<string, string>)[this.i18n.locale()]; }
   issuerLabel(): string { return ({ 'pt-BR':'Empresa emissora', en:'Issuing company', es:'Empresa emisora', 'ja-JP':'発行会社' } as Record<string, string>)[this.i18n.locale()]; }

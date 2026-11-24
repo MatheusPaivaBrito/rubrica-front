@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
+import Swal from 'sweetalert2';
 import { ApiService } from '../core/api.service';
 import { AuthService, tenantDashboardUrl } from '../core/auth.service';
 import { FeedbackService } from '../core/feedback.service';
@@ -11,23 +12,32 @@ import { teamCopy } from '../core/team-copy';
 import { WorkspaceSidebarComponent } from '../components/workspace-sidebar.component';
 import { RubricaSelectComponent, RubricaSelectOption } from '../components/rubrica-select.component';
 
+interface BranchReview {
+  id: string;
+  legal_name: string;
+  cnpj_masked: string;
+  status: 'pending' | 'approved' | 'rejected';
+  workspace_active?: boolean;
+}
+
 @Component({
   standalone: true, imports: [WorkspaceSidebarComponent, FormsModule, RubricaSelectComponent],
   template: `<main class="shell">
     <div class="workspace-layout"><app-workspace-sidebar [tenant]="tenant()" />
       <section class="container dashboard-container team-container">
         <header class="dashboard-header"><div><p class="eyebrow">{{ tenant()?.name }}</p><h1>{{ copy().team }}</h1><p class="muted">{{ copy().help }}</p></div>
-          @if (team()?.can_manage) { <button class="button" (click)="inviteOpen.set(true)"><i class="bi bi-person-plus" aria-hidden="true"></i> {{ inviteLabel() }}</button> }
+          @if (team()?.can_manage && !team()?.export_until) { <button class="button" (click)="inviteOpen.set(true)"><i class="bi bi-person-plus" aria-hidden="true"></i> {{ inviteLabel() }}</button> }
         </header>
         @if (loading()) { <p class="notice">{{ i18n.text('loading') }}</p> }
         @else if (team(); as state) {
+          @if (!state.export_until) {
           @if (state.requires_selection) { <p class="notice warning" role="alert">{{ copy().overLimit }}</p> }
           @if (!state.can_manage) { <p class="notice">{{ copy().readonly }}</p> }
           <article class="card table-card">
             <div class="section-heading"><div><h2>{{ copy().limit }}: {{ memberLimitLabel(state) }}</h2><p class="muted">{{ cycleHelp(state) }}</p><p class="muted">{{ copy().choose }}: {{ selected().size }} {{ copy().selected }}</p></div></div>
             <div class="table-wrap"><table class="data-table"><thead><tr><th>{{ i18n.text('email') }}</th><th>{{ i18n.text('profile') }}</th><th>{{ i18n.text('status') }}</th><th>{{ documentScopeLabel() }}</th><th>{{ copy().choose }}</th>@if (state.can_manage) { <th>{{ accessActionLabel() }}</th> }</tr></thead><tbody>
               @for (member of state.members; track member.id) {
-                <tr><td>{{ member.auth_user_id }}</td><td [attr.data-label]="i18n.text('profile')">@if (member.role === 'admin') { {{ copy().admin }} } @else { <app-rubrica-select [ariaLabel]="i18n.text('profile') + ': ' + member.auth_user_id" [disabled]="saving()" [value]="member.role" [options]="roleOptions()" (valueChange)="changeRole(member, $event)" /> }</td><td [attr.data-label]="i18n.text('status')"><span class="badge" [class.complete]="member.status === 'active'">{{ member.status === 'active' ? copy().active : member.status === 'offboarded' ? offboardedLabel() : withoutSeatLabel() }}</span></td>
+                <tr><td>{{ member.auth_user_id }}</td><td [attr.data-label]="i18n.text('profile')">@if (member.id === team()?.current_member_id) { {{ copy().admin }} } @else { <app-rubrica-select [ariaLabel]="i18n.text('profile') + ': ' + member.auth_user_id" [disabled]="saving()" [value]="member.role" [options]="workspaceRoleOptions(member)" (valueChange)="changeRole(member, $event)" /> }</td><td [attr.data-label]="i18n.text('status')"><span class="badge" [class.complete]="member.status === 'active'">{{ member.status === 'active' ? copy().active : member.status === 'offboarded' ? offboardedLabel() : withoutSeatLabel() }}</span></td>
                   <td [attr.data-label]="documentScopeLabel()">
                     @if (member.role === 'admin') { {{ documentScopeText('all') }} }
                     @else if (state.can_manage) {
@@ -67,6 +77,43 @@ import { RubricaSelectComponent, RubricaSelectOption } from '../components/rubri
               @if (saved()) { <p role="status">{{ copy().saved }}</p> }
             </div>
           </article>
+          @if (state.can_request_branch) {
+            <article class="card">
+              <h2>{{ branchLabel() }}</h2>
+              <form class="form" (ngSubmit)="requestBranch()">
+                <label>{{ i18n.text('name') }}<input name="branchName" [(ngModel)]="branchName" maxlength="240" required /></label>
+                <label>CNPJ<input name="branchCnpj" [(ngModel)]="branchCnpj" inputmode="numeric" required /></label>
+                <button type="submit" class="button" [disabled]="saving() || !branchName.trim() || !branchCnpj.trim()">{{ i18n.text('save') }}</button>
+              </form>
+              @for (branch of branches(); track branch.id) {
+                <p>{{ branch.legal_name }} · {{ branch.cnpj_masked }} · {{ branch.workspace_active ? copy().active : branchStatus(branch.status) }}
+                  @if (branch.status === 'approved' && !branch.workspace_active) {
+                    <button type="button" class="button secondary" [disabled]="saving()" (click)="checkoutBranch(branch)">{{ branchCheckoutLabel() }}</button>
+                  }
+                </p>
+              }
+            </article>
+          }
+          }
+          @if (state.can_manage && tenant()?.kind === 'business') {
+            <article class="card">
+              <h2>{{ closureLabel() }}</h2>
+              @if (state.export_until) {
+                <p role="status">{{ exportNotice(state.export_until) }}</p>
+              } @else {
+                @if (state.closure_requested_at) {
+                  <p role="status">{{ closurePendingText() }}</p>
+                  <button type="button" class="button" [disabled]="saving()" (click)="confirmClosure()">
+                    {{ confirmClosureLabel() }}
+                  </button>
+                }
+                <button type="button" class="button secondary" [disabled]="saving()"
+                  (click)="changeClosureRequest(!state.closure_requested_at)">
+                  {{ closureAction(!state.closure_requested_at) }}
+                </button>
+              }
+            </article>
+          }
         } @else { <p class="notice">{{ copy().empty }}</p> }
       </section>
     </div>
@@ -99,12 +146,22 @@ export class TeamPageComponent implements OnInit {
   readonly saving = signal(false);
   readonly saved = signal(false);
   readonly inviteOpen = signal(false);
+  readonly branches = signal<BranchReview[]>([]);
+  branchName = '';
+  branchCnpj = '';
   memberName = '';
   memberDocument = '';
   memberEmail = '';
   memberRole: 'member' | 'auditor' = 'member';
   copy() { return teamCopy[this.i18n.locale()]; }
   roleOptions(): RubricaSelectOption[] { return [{ value: 'member', label: this.copy().member }, { value: 'auditor', label: this.copy().auditor }]; }
+  workspaceRoleOptions(member: TenantMember): RubricaSelectOption[] {
+    const roles = this.roleOptions();
+    if (this.tenant()?.kind === 'business' && (member.status === 'active' || member.role === 'admin')) {
+      roles.push({ value: 'admin', label: this.copy().admin });
+    }
+    return roles;
+  }
   selectMemberRole(value: string): void { this.memberRole = value as 'member' | 'auditor'; }
   async ngOnInit() {
     try {
@@ -125,13 +182,127 @@ export class TeamPageComponent implements OnInit {
       if (this.router.url.split('?')[0] !== canonical) { await this.router.navigateByUrl(canonical, { replaceUrl: true }); return; }
       this.tenant.set(tenant);
       const team = await firstValueFrom(this.api.get<TenantTeam>(`/tenants/${tenant.id}/team`));
-      if (shouldLeaveTeamPage(team)) {
+      if (!team.export_until && shouldLeaveTeamPage(team)) {
         await this.router.navigateByUrl(tenantDashboardUrl(tenant, context.account_public_slug), { replaceUrl: true });
         return;
       }
       this.setTeam(team);
+      if (team.can_request_branch) await this.loadBranches(tenant.id);
     } catch (error) { await this.feedback.error(error); }
     finally { this.loading.set(false); }
+  }
+  exportNotice(deadline: string): string {
+    const date = new Intl.DateTimeFormat(this.i18n.locale(), { dateStyle: 'long', timeStyle: 'short' }).format(new Date(deadline));
+    return this.local({
+      'pt-BR': `Workspace encerrado. Baixe os PDFs pelo painel até ${date}.`,
+      en: `Workspace closed. Download PDFs from the dashboard before ${date}.`,
+      es: `Espacio cerrado. Descarga los PDF desde el panel antes del ${date}.`,
+      'ja-JP': `ワークスペースは閉鎖されました。${date}までにダッシュボードからPDFをダウンロードしてください。`,
+    });
+  }
+  confirmClosureLabel(): string {
+    return this.local({ 'pt-BR': 'Confirmar encerramento', en: 'Confirm closure', es: 'Confirmar el cierre', 'ja-JP': '閉鎖を確認する' });
+  }
+  async confirmClosure(): Promise<void> {
+    const tenant = this.tenant();
+    if (!tenant || this.saving()) return;
+    const result = await Swal.fire({
+      title: this.confirmClosureLabel(),
+      text: this.local({
+        'pt-BR': 'As solicitações em aberto serão canceladas. Administradores poderão baixar os PDFs por 30 dias.',
+        en: 'Open requests will be cancelled. Administrators can download PDFs for 30 days.',
+        es: 'Se cancelarán las solicitudes abiertas. Los administradores podrán descargar los PDF durante 30 días.',
+        'ja-JP': '進行中の署名依頼はキャンセルされます。管理者は30日間PDFをダウンロードできます。',
+      }),
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: this.confirmClosureLabel(),
+      cancelButtonText: this.i18n.text('cancel'),
+    });
+    if (!result.isConfirmed) return;
+    this.saving.set(true);
+    try {
+      this.setTeam(await firstValueFrom(this.api.post<TenantTeam>(`/tenants/${tenant.id}/close`, {})));
+    } catch (error) { await this.feedback.error(error); }
+    finally { this.saving.set(false); }
+  }
+  closureLabel(): string {
+    return this.local({ 'pt-BR': 'Encerramento do workspace', en: 'Workspace closure', es: 'Cierre del espacio', 'ja-JP': 'ワークスペースの閉鎖' });
+  }
+  closurePendingText(): string {
+    return this.local({
+      'pt-BR': 'A solicitação foi registrada. O workspace continua ativo.',
+      en: 'The request was recorded. The workspace remains active.',
+      es: 'La solicitud quedó registrada. El espacio sigue activo.',
+      'ja-JP': 'リクエストが記録されました。ワークスペースは引き続き利用できます。',
+    });
+  }
+  closureAction(requested: boolean): string {
+    return requested
+      ? this.local({ 'pt-BR': 'Solicitar encerramento', en: 'Request closure', es: 'Solicitar el cierre', 'ja-JP': '閉鎖を申請する' })
+      : this.local({ 'pt-BR': 'Retirar solicitação', en: 'Withdraw request', es: 'Retirar la solicitud', 'ja-JP': '申請を取り下げる' });
+  }
+  async changeClosureRequest(requested: boolean): Promise<void> {
+    const tenant = this.tenant();
+    if (!tenant || this.saving()) return;
+    const result = await Swal.fire({
+      title: this.closureAction(requested),
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: this.closureAction(requested),
+      cancelButtonText: this.i18n.text('cancel'),
+    });
+    if (!result.isConfirmed) return;
+    this.saving.set(true);
+    try {
+      const team = await firstValueFrom(this.api.put<TenantTeam>(
+        `/tenants/${tenant.id}/closure-request`, { requested },
+      ));
+      this.setTeam(team);
+    } catch (error) { await this.feedback.error(error); }
+    finally { this.saving.set(false); }
+  }
+  branchLabel(): string {
+    return this.local({ 'pt-BR': 'Filiais', en: 'Branches', es: 'Sucursales', 'ja-JP': '支店' });
+  }
+  branchCheckoutLabel(): string {
+    return this.local({ 'pt-BR': 'Continuar para pagamento', en: 'Continue to payment', es: 'Continuar al pago', 'ja-JP': '支払いに進む' });
+  }
+  branchStatus(status: BranchReview['status']): string {
+    return {
+      pending: this.local({ 'pt-BR': 'Em análise', en: 'Under review', es: 'En revisión', 'ja-JP': '審査中' }),
+      approved: this.local({ 'pt-BR': 'Aprovada', en: 'Approved', es: 'Aprobada', 'ja-JP': '承認済み' }),
+      rejected: this.local({ 'pt-BR': 'Rejeitada', en: 'Rejected', es: 'Rechazada', 'ja-JP': '却下' }),
+    }[status];
+  }
+  private async loadBranches(tenantId: string): Promise<void> {
+    this.branches.set(await firstValueFrom(this.api.get<BranchReview[]>(`/tenants/${tenantId}/branches`)));
+  }
+  async requestBranch(): Promise<void> {
+    const tenant = this.tenant();
+    if (!tenant || this.saving()) return;
+    this.saving.set(true);
+    try {
+      await firstValueFrom(this.api.post<BranchReview>(`/tenants/${tenant.id}/branches`, {
+        legal_name: this.branchName.trim(), cnpj: this.branchCnpj.trim(),
+      }));
+      this.branchName = '';
+      this.branchCnpj = '';
+      await this.loadBranches(tenant.id);
+    } catch (error) { await this.feedback.error(error); }
+    finally { this.saving.set(false); }
+  }
+  async checkoutBranch(branch: BranchReview): Promise<void> {
+    const tenant = this.tenant();
+    if (!tenant || this.saving()) return;
+    this.saving.set(true);
+    try {
+      const result = await firstValueFrom(this.api.post<{ checkout_url: string }>(
+        `/billing/tenants/${tenant.id}/branches/${branch.id}/checkout`, {},
+      ));
+      window.location.assign(result.checkout_url);
+    } catch (error) { await this.feedback.error(error); }
+    finally { this.saving.set(false); }
   }
   private setTeam(team: TenantTeam) {
     this.team.set(team);
@@ -243,7 +414,29 @@ export class TeamPageComponent implements OnInit {
     finally { this.saving.set(false); }
   }
   async changeRole(member: TenantMember, value: string) {
-    const role = value as 'member' | 'auditor';
+    if (value !== 'admin' && value !== 'member' && value !== 'auditor') return;
+    const role = value;
+    if (role === member.role) return;
+    if (role === 'admin') {
+      const result = await Swal.fire({
+        icon: 'warning',
+        text: this.team()?.organization_root ? this.local({
+          'pt-BR': 'Este membro poderá administrar e abrir os documentos da sede e de todas as filiais da organização.',
+          en: 'This member can manage and open documents in the main workspace and every branch.',
+          es: 'Este miembro podrá administrar y abrir documentos en la sede y todas las sucursales.',
+          'ja-JP': 'このメンバーは本部とすべての支店の文書を開き、管理できます。',
+        }) : this.local({
+          'pt-BR': 'Este membro terá acesso administrativo e poderá abrir todos os documentos deste workspace.',
+          en: 'This member will have administrator access and can open every document in this workspace.',
+          es: 'Este miembro tendrá acceso administrativo y podrá abrir todos los documentos de este espacio.',
+          'ja-JP': 'このメンバーは管理権限を取得し、このワークスペースのすべての文書を開けるようになります。',
+        }),
+        showCancelButton: true,
+        confirmButtonText: this.copy().admin,
+        cancelButtonText: this.i18n.text('cancel'),
+      });
+      if (!result.isConfirmed) return;
+    }
     this.saving.set(true);
     try {
       this.setTeam(await firstValueFrom(this.api.patch<TenantTeam>(`/tenants/${this.tenant()!.id}/team/${member.id}/role`, { role })));
