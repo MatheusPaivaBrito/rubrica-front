@@ -62,7 +62,11 @@ interface BranchReview {
     .branch-section { display: grid; gap: 1rem; }
     .branch-section h2, .branch-section p { margin: 0; }
     .branch-form { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; align-items: end; gap: .75rem; }
-    .branch-card { border: 1px solid #e6ecf3; border-radius: .75rem; }
+    .branch-list { border: 1px solid #e6ecf3; border-radius: .75rem; }
+    .branch-card + .branch-card { border-top: 1px solid #e6ecf3; }
+    .branch-search { max-width: 23rem; }
+    .branch-pagination { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+    .branch-list-empty { padding: .85rem 1rem; }
     .branch-card-header { width: 100%; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem; padding: .85rem 1rem; }
     button.branch-card-header { color: inherit; text-align: left; background: transparent; border: 0; cursor: pointer; }
     .branch-card-name { display: grid; min-width: 0; gap: .2rem; overflow-wrap: anywhere; }
@@ -134,19 +138,24 @@ interface BranchReview {
                 <label>CNPJ<input name="branchCnpj" [(ngModel)]="branchCnpj" inputmode="numeric" required /></label>
                 <button type="submit" class="button" [disabled]="saving() || !branchName.trim() || !branchCnpj.trim()">{{ createBranchLabel() }}</button>
               </form>
-              @for (branch of branches(); track branch.id) {
+              @if (branches().length > 0) {
+              <label class="branch-search">{{ branchCopy('search') }}
+                <input type="search" [value]="branchSearch()" (input)="setBranchSearch($event)" />
+              </label>
+              <div class="branch-list">
+              @for (branch of visibleBranches(); track branch.id) {
                 <section class="branch-card">
-                  @if (branch.workspace_active && branch.business_tenant_id) {
                     <button type="button" class="branch-card-header" [attr.aria-expanded]="expandedBranch() === branch.id"
                       [attr.aria-controls]="'branch-members-' + branch.id" (click)="toggleBranch(branch)">
                       <span class="branch-card-name"><strong>{{ branch.legal_name }}</strong><small class="muted">CNPJ {{ branch.cnpj_masked }}</small></span>
-                      <span class="branch-card-meta">{{ branchMemberCount(branch.member_count) }}
+                      <span class="branch-card-meta">{{ branch.workspace_active ? branchMemberCount(branch.member_count) : branchStatus(branch) }}
                         <i class="bi" [class.bi-chevron-up]="expandedBranch() === branch.id"
                           [class.bi-chevron-down]="expandedBranch() !== branch.id" aria-hidden="true"></i>
                       </span>
                     </button>
                     <div class="branch-card-body" [id]="'branch-members-' + branch.id" [hidden]="expandedBranch() !== branch.id">
                       @if (expandedBranch() === branch.id) {
+                        @if (branch.workspace_active && branch.business_tenant_id) {
                         <button type="button" class="button secondary" (click)="openInvite(branch)"><i class="bi bi-person-plus" aria-hidden="true"></i> {{ inviteLabel() }}</button>
                         @if (branchLoading() === branch.id) { <p role="status">{{ i18n.text('loading') }}</p> }
                         @else if (branchMembers()[branch.id]; as members) {
@@ -163,19 +172,26 @@ interface BranchReview {
                             </table></div>
                           }
                         }
+                        } @else {
+                          <p class="muted">{{ branchDetail(branch) }}</p>
+                          @if (branch.status === 'approved' && !branch.workspace_closed) {
+                            <button type="button" class="button secondary" [disabled]="saving()" (click)="checkoutBranch(branch)">{{ branchCheckoutLabel() }}</button>
+                          }
+                        }
                       }
                     </div>
-                  } @else {
-                    <div class="branch-card-header">
-                      <span class="branch-card-name"><strong>{{ branch.legal_name }}</strong><small class="muted">CNPJ {{ branch.cnpj_masked }}</small></span>
-                      <span class="branch-card-meta">{{ branch.workspace_closed ? closureLabel() : branchStatus(branch.status) }}
-                        @if (branch.status === 'approved' && !branch.workspace_closed) {
-                          <button type="button" class="button secondary" [disabled]="saving()" (click)="checkoutBranch(branch)">{{ branchCheckoutLabel() }}</button>
-                        }
-                      </span>
-                    </div>
-                  }
                 </section>
+              } @empty {
+                <p class="muted branch-list-empty">{{ branchCopy('noResults') }}</p>
+              }
+              </div>
+              @if (branchPageCount() > 1) {
+                <nav class="branch-pagination" [attr.aria-label]="branchLabel()">
+                  <button type="button" class="button secondary" [disabled]="branchPage() === 0" (click)="moveBranchPage(-1)">{{ branchCopy('previous') }}</button>
+                  <span>{{ branchPage() + 1 }} / {{ branchPageCount() }}</span>
+                  <button type="button" class="button secondary" [disabled]="branchPage() + 1 >= branchPageCount()" (click)="moveBranchPage(1)">{{ branchCopy('next') }}</button>
+                </nav>
+              }
               }
             </article>
           }
@@ -281,6 +297,19 @@ export class TeamPageComponent implements OnInit {
   readonly saved = signal(false);
   readonly inviteOpen = signal(false);
   readonly branches = signal<BranchReview[]>([]);
+  readonly branchSearch = signal('');
+  readonly branchPage = signal(0);
+  private readonly branchesPerPage = 10;
+  readonly filteredBranches = computed(() => {
+    const query = this.branchSearch().trim().toLocaleLowerCase(this.i18n.locale());
+    return this.branches().filter(branch => branch.legal_name.toLocaleLowerCase(this.i18n.locale()).includes(query)
+      || branch.cnpj_masked.includes(query));
+  });
+  readonly branchPageCount = computed(() => Math.ceil(this.filteredBranches().length / this.branchesPerPage));
+  readonly visibleBranches = computed(() => {
+    const start = this.branchPage() * this.branchesPerPage;
+    return this.filteredBranches().slice(start, start + this.branchesPerPage);
+  });
   readonly expandedBranch = signal<string | null>(null);
   readonly branchLoading = signal<string | null>(null);
   readonly branchMembers = signal<Record<string, TenantMember[]>>({});
@@ -470,6 +499,7 @@ export class TeamPageComponent implements OnInit {
   async toggleBranch(branch: BranchReview): Promise<void> {
     if (this.expandedBranch() === branch.id) { this.expandedBranch.set(null); return; }
     this.expandedBranch.set(branch.id);
+    if (!branch.workspace_active) return;
     try { await this.loadBranchMembers(branch); }
     catch (error) { await this.feedback.error(error); }
   }
@@ -497,12 +527,45 @@ export class TeamPageComponent implements OnInit {
   branchCheckoutLabel(): string {
     return this.local({ 'pt-BR': 'Continuar para pagamento', en: 'Continue to payment', es: 'Continuar al pago', 'ja-JP': '支払いに進む' });
   }
-  branchStatus(status: BranchReview['status']): string {
+  setBranchSearch(event: Event): void {
+    this.branchSearch.set((event.target as HTMLInputElement).value);
+    this.branchPage.set(0);
+    this.expandedBranch.set(null);
+  }
+  moveBranchPage(direction: number): void {
+    this.branchPage.update(page => Math.max(0, Math.min(page + direction, this.branchPageCount() - 1)));
+    this.expandedBranch.set(null);
+  }
+  branchCopy(key: 'search' | 'noResults' | 'previous' | 'next'): string {
+    return this.local({
+      search: { 'pt-BR': 'Buscar filial', en: 'Find a branch', es: 'Buscar sucursal', 'ja-JP': '支店を検索' },
+      noResults: { 'pt-BR': 'Nenhuma filial encontrada.', en: 'No branches found.', es: 'No se encontraron sucursales.', 'ja-JP': '支店が見つかりません。' },
+      previous: { 'pt-BR': 'Anterior', en: 'Previous', es: 'Anterior', 'ja-JP': '前へ' },
+      next: { 'pt-BR': 'Próxima', en: 'Next', es: 'Siguiente', 'ja-JP': '次へ' },
+    }[key]);
+  }
+  branchStatus(branch: BranchReview): string {
+    if (branch.workspace_closed) {
+      return this.local({ 'pt-BR': 'Encerrada', en: 'Closed', es: 'Cerrada', 'ja-JP': '閉鎖済み' });
+    }
     return {
-      pending: this.local({ 'pt-BR': 'Em análise', en: 'Under review', es: 'En revisión', 'ja-JP': '審査中' }),
-      approved: this.local({ 'pt-BR': 'Aprovada', en: 'Approved', es: 'Aprobada', 'ja-JP': '承認済み' }),
-      rejected: this.local({ 'pt-BR': 'Rejeitada', en: 'Rejected', es: 'Rechazada', 'ja-JP': '却下' }),
-    }[status];
+      pending: this.local({ 'pt-BR': 'Aguardando revisão do CNPJ', en: 'CNPJ review pending', es: 'CNPJ pendiente de revisión', 'ja-JP': 'CNPJ審査待ち' }),
+      approved: this.local({ 'pt-BR': 'Aguardando pagamento', en: 'Awaiting payment', es: 'Pendiente de pago', 'ja-JP': '支払い待ち' }),
+      rejected: this.local({ 'pt-BR': 'CNPJ não aprovado', en: 'CNPJ not approved', es: 'CNPJ no aprobado', 'ja-JP': 'CNPJ未承認' }),
+    }[branch.status];
+  }
+  branchDetail(branch: BranchReview): string {
+    if (branch.workspace_closed) return this.branchStatus(branch);
+    return {
+      pending: this.local({
+        'pt-BR': 'A solicitação foi recebida. Após a revisão manual do CNPJ, o pagamento será liberado. A filial fica disponível para convidar membros após a confirmação do pagamento.',
+        en: 'Request received. Payment becomes available after manual CNPJ review. You can invite members once payment is confirmed.',
+        es: 'Solicitud recibida. El pago se habilita tras la revisión manual del CNPJ. Podrás invitar miembros cuando se confirme el pago.',
+        'ja-JP': '申請を受け付けました。CNPJの審査後に支払いが可能です。支払い確認後にメンバーを招待できます。',
+      }),
+      approved: this.local({ 'pt-BR': 'CNPJ aprovado. Conclua o pagamento para ativar a filial.', en: 'CNPJ approved. Complete payment to activate the branch.', es: 'CNPJ aprobado. Completa el pago para activar la sucursal.', 'ja-JP': 'CNPJが承認されました。支払いを完了して支店を有効にしてください。' }),
+      rejected: this.local({ 'pt-BR': 'Confira os dados e envie uma nova solicitação pelo formulário acima.', en: 'Check the details and resubmit using the form above.', es: 'Revisa los datos y vuelve a enviar la solicitud con el formulario.', 'ja-JP': '情報を確認し、上のフォームから再申請してください。' }),
+    }[branch.status];
   }
   private async loadBranches(tenantId: string): Promise<void> {
     this.branches.set(await firstValueFrom(this.api.get<BranchReview[]>(`/tenants/${tenantId}/branches`)));
