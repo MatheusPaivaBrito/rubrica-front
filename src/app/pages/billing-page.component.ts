@@ -25,32 +25,42 @@ interface BusinessUpgradeReview {
     <main class="shell">
       <div class="workspace-layout"><app-workspace-sidebar [tenant]="selectedTenant()" />
       <section class="container dashboard-container billing-container">
-      <article class="billing-card card">
-        <div class="heading"><div><p class="eyebrow">Stripe</p><h1>{{ i18n.text('billing') }}</h1><p class="muted">{{ i18n.text('billingHelp') }}</p></div><i class="bi bi-credit-card-2-front"></i></div>
+      <header class="billing-heading">
+        <h1>{{ i18n.text('billing') }}</h1>
+        @if (selectedTenant(); as tenant) { <p class="muted">{{ tenant.name }}</p> }
+      </header>
         @if (loading()) { <p class="notice">{{ i18n.text('loading') }}</p> }
         @else if (!tenants().length) { <p class="notice warning">{{ i18n.text('billingAdminOnly') }}</p> }
         @else {
           @if (account()) {
-            <div class="plan-banner"><div><small>{{ i18n.text('plan') }}</small><h2>{{ planName() }}</h2><p>{{ planHelp() }}</p></div><span class="status" [attr.data-status]="account()!.complimentary_lifetime ? 'complimentary' : account()!.status">{{ account()!.complimentary_lifetime ? i18n.text('complimentary') : statusLabel(account()!.status) }}</span></div>
-            @if (showPortalAction()) {
-              <div class="actions"><button type="button" class="button secondary" [disabled]="submitting()" (click)="manageSubscription()">{{ manageSubscriptionLabel() }}</button></div>
-            }
-            <div class="metrics">
-              <article><small>{{ usageLabel() }}</small><strong>{{ usageValue() }}</strong></article>
-              <article><small>{{ i18n.text('availableNow') }}</small><strong>{{ availability() }}</strong></article>
-              <article><small>{{ account()!.cancel_at_period_end ? i18n.text('cancelsOn') : i18n.text('currentPeriod') }}</small><strong>{{ i18n.formatDate(account()!.cancels_at || account()!.current_period_ends_at) }}</strong></article>
-            </div>
+            <article class="card billing-summary">
+              <div class="summary-header">
+                <div><p class="muted">{{ sectionLabel('current') }}</p><h2>{{ planName() }}</h2><p class="muted">{{ planHelp() }}</p></div>
+                <span class="status" [attr.data-status]="account()!.complimentary_lifetime ? 'complimentary' : account()!.status">{{ account()!.complimentary_lifetime ? i18n.text('complimentary') : statusLabel(account()!.status) }}</span>
+              </div>
+              <dl class="metrics">
+                <div><dt>{{ usageLabel() }}</dt><dd>{{ usageValue() }}</dd></div>
+                <div><dt>{{ i18n.text('availableNow') }}</dt><dd>{{ availability() }}</dd></div>
+                <div><dt>{{ account()!.cancel_at_period_end ? i18n.text('cancelsOn') : i18n.text('currentPeriod') }}</dt><dd>{{ i18n.formatDate(account()!.cancels_at || account()!.current_period_ends_at) }}</dd></div>
+              </dl>
+              @if (showPortalAction()) {
+                <div class="actions summary-actions"><button type="button" class="button secondary" [disabled]="submitting()" (click)="manageSubscription()"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i> {{ manageSubscriptionLabel() }}</button></div>
+              }
+            </article>
             @if (canSubscribe() || showPortalAction()) {
+              <article class="card billing-plans">
+              <header class="plans-header">
+                <h2>{{ sectionLabel('plans') }}</h2>
+                <div class="billing-interval" role="group" [attr.aria-label]="sectionLabel('frequency')"><button type="button" [attr.aria-pressed]="billingInterval() === 'month'" (click)="billingInterval.set('month')">{{ monthlyLabel() }}</button><button type="button" [attr.aria-pressed]="billingInterval() === 'year'" (click)="billingInterval.set('year')">{{ annualLabel() }}</button></div>
+              </header>
               <div class="plans" [class.two-options]="availablePlans().length === 2">
                 @for (plan of availablePlans(); track plan) {
-                  <button class="plan-option" [class.selected]="selectedPlan() === plan" (click)="selectedPlan.set(plan)">
-                    <strong>{{ planLabel(plan) }}</strong><span>{{ planPrice(plan) }}</span>
+                  <button type="button" class="plan-option" [attr.aria-pressed]="selectedPlan() === plan" [class.selected]="selectedPlan() === plan" (click)="selectedPlan.set(plan)">
+                    <strong>{{ planLabel(plan) }}</strong><span class="plan-price">{{ planPrice(plan) }}</span>
                     <ul>@for (feature of planFeatures(plan); track feature) { <li>{{ feature }}</li> }</ul>
                   </button>
                 }
               </div>
-              <div class="billing-interval"><button type="button" [class.selected]="billingInterval() === 'month'" (click)="billingInterval.set('month')">{{ monthlyLabel() }}</button><button type="button" [class.selected]="billingInterval() === 'year'" (click)="billingInterval.set('year')">{{ annualLabel() }}</button></div>
-            }
             @if (needsBusinessReview()) {
               <section class="business-card">
                 <h2>{{ businessReviewLabel() }}</h2>
@@ -72,8 +82,10 @@ interface BusinessUpgradeReview {
               @if (showPortalAction() && !needsBusinessReview()) { <button class="button" [disabled]="submitting()" (click)="portal()"><i class="bi bi-arrow-left-right"></i> {{ confirmChangeLabel() }}</button> }
             </div>
             @if (checkoutUrl()) { <div class="checkout-qr"><img [src]="checkoutQrCode()" [alt]="i18n.text('checkoutQrAlt')" /><div><strong>{{ i18n.text('checkoutFinalize') }}</strong><p>{{ i18n.text('checkoutScan') }}</p><button class="button" (click)="openCheckout()">{{ i18n.text('openStripe') }}</button></div></div> }
+              </article>
+            }
             @if (selectedTenant()?.kind !== 'business' && businessEligible() && !needsBusinessReview()) {
-              <section class="business-card business-registration"><div><p class="eyebrow">{{ businessEyebrow() }}</p><h2>{{ businessPendingTitle() }}</h2><p class="muted">{{ businessFormHelp() }}</p></div><span class="status" data-status="pending">{{ pendingLabel() }}</span>
+              <section class="card business-card business-registration"><div><p class="eyebrow">{{ businessEyebrow() }}</p><h2>{{ businessPendingTitle() }}</h2><p class="muted">{{ businessFormHelp() }}</p></div><span class="status" data-status="pending">{{ pendingLabel() }}</span>
                 <form class="form business-registration-form" (ngSubmit)="completeBusinessRegistration()">
                   <label>{{ legalNameLabel() }}<input name="businessLegalName" [(ngModel)]="businessLegalName" required autocomplete="organization" /></label>
                   <label>CNPJ<input name="businessCnpj" [(ngModel)]="businessCnpj" required inputmode="numeric" placeholder="00.000.000/0000-00" autocomplete="off" /></label>
@@ -83,16 +95,17 @@ interface BusinessUpgradeReview {
             }
           }
         }
-      </article>
           @if (closureState(); as state) {
-            <article class="card">
-              <h2>{{ closureLabel() }}</h2>
+            <details class="card closure-card" [open]="!!state.export_until || !!state.closure_requested_at">
+              <summary><span>{{ closureLabel() }}</span><i class="bi bi-chevron-down" aria-hidden="true"></i></summary>
+              <div class="closure-body">
               @if (state.export_until) {
                 <p role="status">{{ exportNotice(state.export_until) }}</p>
               } @else {
                 <p class="muted">{{ closureHelp() }}</p>
+                @if (state.closure_requested_at) { <p role="status">{{ closurePendingText() }}</p> }
+                <div class="actions closure-actions">
                 @if (state.closure_requested_at) {
-                  <p role="status">{{ closurePendingText() }}</p>
                   <button type="button" class="button" [disabled]="submitting()" (click)="confirmClosure()">
                     {{ confirmClosureLabel() }}
                   </button>
@@ -101,15 +114,62 @@ interface BusinessUpgradeReview {
                   (click)="changeClosureRequest(!state.closure_requested_at)">
                   {{ closureAction(!state.closure_requested_at) }}
                 </button>
+                </div>
               }
-            </article>
+              </div>
+            </details>
           }
       </section></div>
     </main>
   `,
   styles: [`
-    .billing-container{padding-top:2rem;padding-bottom:3rem}.billing-card{max-width:980px;margin:auto;padding:2rem}.actions{display:flex;gap:.75rem;align-items:center}.heading{display:flex;justify-content:space-between;gap:1rem}.heading>i{font-size:2.5rem;color:#a82035}.tenant-select{display:grid;gap:.45rem;max-width:420px;margin:2rem 0;font-weight:700}.billing-tenant-picker{margin-top:0}.billing-tenant-options small{margin-left:.4rem}.plan-banner{display:flex;justify-content:space-between;gap:1rem;background:linear-gradient(135deg,#8f1d2c,#c63845);color:white;padding:1.5rem;border-radius:18px}.plan-banner h2{margin:.25rem 0}.plan-banner p{margin:0;opacity:.9}.status{align-self:flex-start;background:#fff;color:#641923;padding:.4rem .7rem;border-radius:999px;font-weight:800}.metrics,.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin:1rem 0}.metrics article{border:1px solid #dde5ee;border-radius:14px;padding:1.1rem;display:grid;gap:.5rem}.metrics strong{font-size:1.1rem}.plan-option{display:grid;gap:.45rem;padding:1rem;border:1px solid #d7dde5;border-radius:14px;background:#fff;text-align:left}.plan-option.selected{border-color:#a82035;box-shadow:0 0 0 2px #a8203522}.plan-option span{color:#64748b}.billing-interval{display:flex;justify-content:flex-end;gap:.5rem}.billing-interval button{padding:.6rem 1rem;border:1px solid #d7dde5;border-radius:999px;background:#fff;font-weight:700}.billing-interval button.selected{border-color:#a82035;color:#a82035;background:#fff5f6}.actions{justify-content:flex-end;margin-top:1.5rem}.checkout-qr{display:flex;align-items:center;justify-content:center;gap:1.5rem;margin-top:1.5rem;padding:1.25rem;border:1px solid #dde5ee;border-radius:16px}.checkout-qr img{width:190px;border-radius:10px}.checkout-qr p{color:#64748b}.business-card,.team-card{margin-top:2rem;padding:1.5rem;border:1px solid #e3c9cd;border-radius:18px;background:#fffaf9}.business-card{display:flex;justify-content:space-between;gap:1.5rem;flex-wrap:wrap}.business-card h2,.team-card h2{margin:.25rem 0}.business-registration-form{flex:1 0 100%;display:grid;grid-template-columns:1fr 240px auto;gap:.75rem;align-items:end}.business-registration-form label{display:grid;gap:.4rem}.member-list{display:grid;margin:1rem 0}.member-row{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.85rem 0;border-top:1px solid #eadadd}.member-row span:first-child{display:grid;gap:.2rem}.member-row small{color:#64748b}.member-form{display:grid;grid-template-columns:minmax(220px,1fr) 180px auto;gap:.75rem;align-items:end}.member-form label{display:grid;gap:.4rem}@media(max-width:700px){.billing-container{padding-top:1rem}.billing-card{padding:1.2rem}.plan-banner,.checkout-qr,.business-card{flex-direction:column}.metrics,.plans,.member-form,.business-registration-form{grid-template-columns:1fr}.actions{flex-direction:column}.actions .button,.member-form .button,.business-registration-form .button{width:100%}}
-    .plans.two-options{grid-template-columns:repeat(2,minmax(0,1fr))}.plan-option ul{margin:.35rem 0 0;padding-left:1.2rem;color:#475569}.plan-option li+li{margin-top:.3rem}
+    .billing-container { max-width: 1050px; display: grid; align-content: start; gap: 1rem; padding-top: 2rem; padding-bottom: 3rem; }
+    .billing-heading h1, .billing-heading p, .summary-header h2, .summary-header p, .plans-header h2 { margin: 0; }
+    .billing-heading p { margin-top: .3rem; }
+    .billing-summary, .billing-plans { padding: clamp(1rem, 2.2vw, 1.6rem); min-width: 0; }
+    .summary-header, .plans-header { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem 1rem; flex-wrap: wrap; }
+    .summary-header h2 { margin: .2rem 0 .35rem; font-size: clamp(1.45rem, 2.4vw, 2rem); }
+    .summary-header > div > p:first-child { font-size: .85rem; font-weight: 700; }
+    .status { align-self: flex-start; background: #eef2f7; color: #334155; padding: .4rem .7rem; border-radius: 999px; font-size: .82rem; font-weight: 750; }
+    .status[data-status="active"], .status[data-status="complimentary"] { background: #e4f4ed; color: #17604b; }
+    .status[data-status="past_due"], .status[data-status="pending"] { background: #fff2de; color: #7a4515; }
+    .metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .85rem; margin: 1.2rem 0 0; padding-top: 1rem; border-top: 1px solid #e6ecf3; }
+    .metrics dt { color: #52647a; font-size: .85rem; }
+    .metrics dd { margin: .3rem 0 0; font-weight: 750; }
+    .plans-header { align-items: center; }
+    .plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .85rem; margin-top: 1rem; }
+    .plans.two-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .plan-option { display: flex; flex-direction: column; align-items: flex-start; gap: .35rem; min-width: 0; padding: 1rem; border: 1px solid #d4deea; border-radius: 12px; color: #1c293b; background: #fff; text-align: left; cursor: pointer; }
+    .plan-option.selected { border-color: #a82035; background: #fff8f8; box-shadow: 0 0 0 1px #a82035; }
+    .plan-option:focus-visible, .billing-interval button:focus-visible, .closure-card summary:focus-visible { outline: 2px solid #a82035; outline-offset: 3px; }
+    .plan-option .plan-price { font-size: 1.2rem; font-weight: 750; }
+    .plan-option ul { margin: .5rem 0 0; padding-left: 1.15rem; color: #475569; }
+    .plan-option li + li { margin-top: .3rem; }
+    .billing-interval { display: inline-flex; gap: .2rem; padding: .2rem; border-radius: 10px; background: #eef2f7; }
+    .billing-interval button { padding: .45rem .75rem; border: 1px solid transparent; border-radius: 8px; background: transparent; font-weight: 700; color: #475569; cursor: pointer; }
+    .billing-interval button[aria-pressed="true"] { color: #86172a; border-color: #eddcde; background: #fff; }
+    .actions { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: .65rem; }
+    .actions:not(:empty) { margin-top: 1rem; }
+    .summary-actions { justify-content: flex-start; }
+    .checkout-qr { display: flex; align-items: center; gap: 1rem; margin-top: 1rem; padding: 1rem; border: 1px solid #dde5ee; border-radius: 12px; }
+    .checkout-qr img { width: min(150px, 100%); }
+    .business-card { padding: 1rem; margin-top: 1rem; border: 1px solid #ebd9dc; border-radius: 12px; background: #fffafa; }
+    .business-registration { margin-top: 0; }
+    .business-card h2 { margin: 0 0 .5rem; }
+    .business-registration-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .7fr) auto; gap: .75rem; align-items: end; }
+    .closure-card { padding: 0; }
+    .closure-card summary { display: flex; justify-content: space-between; align-items: center; gap: .75rem; padding: 1rem 1.25rem; list-style: none; font-weight: 750; cursor: pointer; }
+    .closure-card summary::-webkit-details-marker { display: none; }
+    .closure-card[open] summary i { transform: rotate(180deg); }
+    .closure-body { padding: 0 1.25rem 1rem; }
+    .closure-body p { margin: 0 0 .65rem; }
+    .closure-actions { justify-content: flex-start; }
+    @media (max-width: 700px) {
+      .billing-container { padding-top: 1rem; }
+      .plans, .plans.two-options, .business-registration-form { grid-template-columns: minmax(0, 1fr); }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .checkout-qr { flex-direction: column; align-items: flex-start; }
+    }
   `],
 })
 export class BillingPageComponent implements OnInit {
@@ -322,6 +382,13 @@ export class BillingPageComponent implements OnInit {
     if (this.selectedTenant()?.kind !== 'personal') return;
     const review = await firstValueFrom(this.api.get<BusinessUpgradeReview | null>(`/tenants/${id}/business-upgrade-review`));
     if (id === this.tenantId()) this.businessReview.set(review);
+  }
+  sectionLabel(section: 'current' | 'plans' | 'frequency'): string {
+    return this.local({
+      current: { 'pt-BR': 'Plano atual', en: 'Current plan', es: 'Plan actual', 'ja-JP': '現在のプラン' },
+      plans: { 'pt-BR': 'Planos disponíveis', en: 'Available plans', es: 'Planes disponibles', 'ja-JP': '利用可能なプラン' },
+      frequency: { 'pt-BR': 'Frequência de cobrança', en: 'Billing frequency', es: 'Frecuencia de cobro', 'ja-JP': '請求頻度' },
+    }[section]);
   }
   manageSubscriptionLabel(): string {
     return this.local({ 'pt-BR': 'Gerenciar ou cancelar assinatura', en: 'Manage or cancel subscription', es: 'Gestionar o cancelar suscripción', 'ja-JP': '契約の管理・解約' });
