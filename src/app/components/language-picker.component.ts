@@ -3,11 +3,14 @@ import { Component, EventEmitter, Input, Output, inject } from '@angular/core';
 import { SUPPORTED_LANGUAGES } from '../core/countries';
 import { I18nService, Locale } from '../core/i18n.service';
 
+import { ViewportDropdownDirective } from './viewport-dropdown.directive';
+
 @Component({
   selector: 'app-language-picker',
   standalone: true,
+  imports: [ViewportDropdownDirective],
   template: `
-    <details class="language-picker" #menu [attr.name]="menuGroup || null">
+    <details class="language-picker" #menu [attr.name]="menuGroup || null" [appViewportDropdown]="fitViewport">
       <summary [attr.aria-label]="i18n.text('language')">
         <img class="language-flag" [src]="flagAsset(currentLanguage()?.countryCode)" alt="" />
         <span>{{ languageName() }}</span>
@@ -27,6 +30,7 @@ import { I18nService, Locale } from '../core/i18n.service';
 export class LanguagePickerComponent {
   @Input() value?: Locale;
   @Input() menuGroup = '';
+  @Input() fitViewport = false;
   @Output() readonly valueChange = new EventEmitter<Locale>();
   readonly i18n = inject(I18nService);
   readonly languages = SUPPORTED_LANGUAGES;

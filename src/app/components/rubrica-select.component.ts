@@ -6,11 +6,14 @@ export interface RubricaSelectOption {
   disabled?: boolean;
 }
 
+import { ViewportDropdownDirective } from './viewport-dropdown.directive';
+
 @Component({
   selector: 'app-rubrica-select',
   standalone: true,
+  imports: [ViewportDropdownDirective],
   template: `
-    <details class="rubrica-select" #menu [attr.name]="menuGroup || null" [class.disabled]="disabled" (toggle)="disabled && menu.removeAttribute('open')">
+    <details class="rubrica-select" #menu [attr.name]="menuGroup || null" [appViewportDropdown]="fitViewport" [class.disabled]="disabled" (toggle)="disabled && menu.removeAttribute('open')">
       <summary [attr.aria-label]="ariaLabel" [attr.aria-disabled]="disabled">
         <span>{{ selectedLabel() }}</span><i class="bi bi-chevron-down" aria-hidden="true"></i>
       </summary>
@@ -31,6 +34,7 @@ export class RubricaSelectComponent {
   @Input() disabled = false;
   @Input() ariaLabel = '';
   @Input() menuGroup = '';
+  @Input() fitViewport = false;
   @Output() readonly valueChange = new EventEmitter<string>();
 
   selectedLabel(): string { return this.options.find(option => option.value === this.value)?.label ?? ''; }

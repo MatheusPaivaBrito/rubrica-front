@@ -71,8 +71,8 @@ interface BranchReview {
     .branch-section { display: grid; gap: 1rem; }
     .branch-section h2, .branch-section p { margin: 0; }
     .branch-form { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; align-items: end; gap: .75rem; }
-    .branch-list { border: 1px solid #e6ecf3; border-radius: .75rem; }
-    .branch-card + .branch-card { border-top: 1px solid #e6ecf3; }
+    .branch-controls, .branch-list { display: grid; gap: .85rem; }
+    .branch-card { padding: 0; }
     .branch-search { max-width: 23rem; }
     .branch-pagination { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
     .branch-list-empty { padding: .85rem 1rem; }
@@ -155,7 +155,8 @@ interface BranchReview {
             <ng-container [ngTemplateOutlet]="workspaceRoster" />
           }
           @if (state.can_request_branch) {
-            <article class="card branch-section">
+            <section class="branch-section">
+              <div class="card branch-controls">
               <h2>{{ branchLabel() }}</h2>
               <form class="form branch-form" (ngSubmit)="requestBranch()">
                 <label>{{ i18n.text('name') }}<input name="branchName" [(ngModel)]="branchName" maxlength="240" required /></label>
@@ -165,9 +166,10 @@ interface BranchReview {
               <label class="branch-search">{{ branchCopy('search') }}
                 <input type="search" [value]="branchSearch()" (input)="setBranchSearch($event)" />
               </label>
+              </div>
               <div class="branch-list">
               @for (branch of visibleBranches(); track branch.id) {
-                <section class="branch-card">
+                <article class="card branch-card">
                     <button type="button" class="branch-card-header" [attr.aria-expanded]="expandedBranch() === branch.id"
                       [attr.aria-controls]="'branch-members-' + branch.id" (click)="toggleBranch(branch)">
                       <span class="branch-card-name"><strong>{{ branch.legal_name }}</strong>@if (branch.cnpj_masked) { <small class="muted">CNPJ {{ branch.cnpj_masked }}</small> }</span>
@@ -208,7 +210,7 @@ interface BranchReview {
                         }
                       </div></div>
                     </div>
-                </section>
+                </article>
               } @empty {
                 <p class="muted branch-list-empty">{{ branchCopy('noResults') }}</p>
               }
@@ -220,7 +222,7 @@ interface BranchReview {
                   <button type="button" class="button secondary" [disabled]="branchPage() + 1 >= branchPageCount()" (click)="moveBranchPage(1)">{{ branchCopy('next') }}</button>
                 </nav>
               }
-            </article>
+            </section>
           }
           }
           @if (state.export_until) { <p class="notice" role="status">{{ exportNotice(state.export_until) }}</p> }

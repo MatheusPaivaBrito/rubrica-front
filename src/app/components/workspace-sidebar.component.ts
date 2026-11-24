@@ -58,13 +58,13 @@ import { LanguagePickerComponent } from './language-picker.component';
                 @if (workspaces().length > 1) {
                   <div class="sidebar-settings-workspace">
                     <span class="sidebar-picker-label">{{ workspaceLabel() }}</span>
-                    <app-rubrica-select menuGroup="sidebar-preferences" [ariaLabel]="workspaceLabel()" [value]="tenant.id"
+                    <app-rubrica-select menuGroup="sidebar-preferences" [fitViewport]="true" [ariaLabel]="workspaceLabel()" [value]="tenant.id"
                       [options]="workspaceOptions(tenant)" (valueChange)="switchWorkspace($event)" />
                   </div>
                 }
                 <div class="sidebar-settings-language">
                   <span class="sidebar-picker-label">{{ changeLanguageLabel() }}</span>
-                  <app-language-picker menuGroup="sidebar-preferences" />
+                  <app-language-picker menuGroup="sidebar-preferences" [fitViewport]="true" />
                 </div>
               </div>
             }

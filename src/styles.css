@@ -905,9 +905,24 @@ input:focus, select:focus { outline: 3px solid rgba(168, 32, 53, .16); border-co
 .sidebar-settings-workspace .rubrica-select summary span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sidebar-settings-workspace .rubrica-select-options,
 .sidebar-settings-language .language-options {
-  position: absolute; top: auto; right: auto; bottom: calc(100% + .4rem); left: 0;
-  width: 100%; max-height: min(17rem, 45dvh); overflow-y: auto; overscroll-behavior: contain;
-  z-index: 40; transform-origin: bottom;
+  position: absolute; top: calc(100% + .4rem); right: auto; bottom: auto; left: 0;
+  width: 100%; max-height: min(17rem, var(--sidebar-dropdown-height, 45dvh));
+  overflow-y: auto; overscroll-behavior: contain;
+  z-index: 40; transform-origin: top; animation: sidebar-picker-in .16s ease-out;
+  --sidebar-picker-offset: -5px;
+}
+.sidebar-settings-workspace .opens-up .rubrica-select-options,
+.sidebar-settings-language .opens-up .language-options {
+  top: auto; bottom: calc(100% + .4rem); transform-origin: bottom;
+  --sidebar-picker-offset: 5px;
+}
+@keyframes sidebar-picker-in {
+  from { opacity: 0; transform: translateY(var(--sidebar-picker-offset)) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-settings-workspace .rubrica-select-options,
+  .sidebar-settings-language .language-options { animation: none; }
 }
 .sidebar-main:has(.sidebar-settings-menu details[open]) { overflow: visible; }
 .sidebar-settings-workspace .rubrica-select-options button span { overflow-wrap: anywhere; }
