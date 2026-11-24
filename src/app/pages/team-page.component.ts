@@ -22,6 +22,41 @@ interface BranchReview {
 
 @Component({
   standalone: true, imports: [WorkspaceSidebarComponent, FormsModule, RubricaSelectComponent],
+  styles: [`
+    .team-roster { padding: 0; overflow: visible; }
+    .team-roster-header, .team-roster-footer {
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+      gap: 1rem; padding: 1.25rem 1.5rem;
+    }
+    .team-roster h2, .team-roster p { margin: 0; }
+    .team-roster-header p { margin-top: .35rem; }
+    .team-seat-count { display: grid; gap: .2rem; border-radius: .65rem; background: #f3f6fa; padding: .65rem 1rem; }
+    .team-seat-count strong { font-size: 1.25rem; line-height: 1.1; }
+    .team-seat-count small, .team-member-identity small { color: #53647a; }
+    .team-members { list-style: none; padding: 0; margin: 0; }
+    .team-member, .team-roster-footer { border-top: 1px solid #e6ecf3; }
+    .team-member-summary {
+      display: grid; grid-template-columns: minmax(0, 1fr) minmax(6rem, auto) minmax(6rem, auto) 7rem;
+      align-items: center; gap: 1rem; padding: .85rem 1.5rem;
+    }
+    .team-member-identity { display: flex; align-items: center; gap: .75rem; min-width: 0; }
+    .team-member-identity strong { display: block; overflow-wrap: anywhere; }
+    .team-member-identity small { display: block; margin-top: .15rem; }
+    .team-avatar { display: grid; place-items: center; flex: 0 0 2.25rem; height: 2.25rem; border-radius: .65rem; background: #eef3f9; color: #354960; font-weight: 700; }
+    .team-member-summary .badge { justify-self: start; }
+    .team-seat-option { display: inline-flex; align-items: center; gap: .5rem; font-size: .875rem; margin: 0; }
+    .team-seat-option input.team-checkbox { inline-size: 1rem; block-size: 1rem; min-height: 0; flex: 0 0 1rem; padding: 0; margin: 0; }
+    .team-manage { min-width: 0; padding: .45rem .65rem; justify-self: stretch; }
+    .team-member-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: .85rem 1.25rem; background: #f6f8fb; border-radius: .65rem; margin: 0 1.5rem .85rem; padding: 1rem; }
+    .team-member-actions { display: flex; flex-wrap: wrap; gap: .5rem; grid-column: 1 / -1; }
+    .team-destructive { color: #a82035; }
+    @media (max-width: 700px) {
+      .team-member-summary { grid-template-columns: 1fr auto; gap: .65rem; }
+      .team-member-identity { grid-column: 1 / -1; }
+      .team-manage { grid-column: 1 / -1; justify-self: start; }
+      .team-member-settings { grid-template-columns: 1fr; }
+    }
+  `],
   template: `<main class="shell">
     <div class="workspace-layout"><app-workspace-sidebar [tenant]="tenant()" />
       <section class="container dashboard-container team-container">
@@ -33,49 +68,75 @@ interface BranchReview {
           @if (!state.export_until) {
           @if (state.requires_selection) { <p class="notice warning" role="alert">{{ copy().overLimit }}</p> }
           @if (!state.can_manage) { <p class="notice">{{ copy().readonly }}</p> }
-          <article class="card table-card">
-            <div class="section-heading"><div><h2>{{ copy().limit }}: {{ memberLimitLabel(state) }}</h2><p class="muted">{{ cycleHelp(state) }}</p><p class="muted">{{ copy().choose }}: {{ selected().size }} {{ copy().selected }}</p></div></div>
-            <div class="table-wrap"><table class="data-table"><thead><tr><th>{{ i18n.text('email') }}</th><th>{{ i18n.text('profile') }}</th><th>{{ i18n.text('status') }}</th><th>{{ documentScopeLabel() }}</th><th>{{ copy().choose }}</th>@if (state.can_manage) { <th>{{ accessActionLabel() }}</th> }</tr></thead><tbody>
+          <article class="card team-roster">
+            <div class="team-roster-header">
+              <div><h2>{{ copy().choose }}</h2><p class="muted">{{ cycleHelp(state) }}</p></div>
+              <div class="team-seat-count"><strong>{{ selected().size }} / {{ memberLimitLabel(state) }}</strong><small>{{ copy().selected }}</small></div>
+            </div>
+            <ul class="team-members">
               @for (member of state.members; track member.id) {
-                <tr><td>{{ member.auth_user_id }}</td><td [attr.data-label]="i18n.text('profile')">@if (member.id === team()?.current_member_id) { {{ copy().admin }} } @else { <app-rubrica-select [ariaLabel]="i18n.text('profile') + ': ' + member.auth_user_id" [disabled]="saving()" [value]="member.role" [options]="workspaceRoleOptions(member)" (valueChange)="changeRole(member, $event)" /> }</td><td [attr.data-label]="i18n.text('status')"><span class="badge" [class.complete]="member.status === 'active'">{{ member.status === 'active' ? copy().active : member.status === 'offboarded' ? offboardedLabel() : withoutSeatLabel() }}</span></td>
-                  <td [attr.data-label]="documentScopeLabel()">
-                    @if (member.role === 'admin') { {{ documentScopeText('all') }} }
-                    @else if (state.can_manage) {
-                      <app-rubrica-select [ariaLabel]="documentScopeLabel() + ': ' + member.auth_user_id"
-                        [disabled]="saving()" [value]="member.document_scope ?? 'own'" [options]="documentScopeOptions(member)"
-                        (valueChange)="changeDocumentScope(member, $event)" />
-                      @if (tenant()?.kind === 'business') {
-                        <label>
-                          <input type="checkbox" [checked]="member.sign_company_only ?? false" [disabled]="saving()"
-                            (change)="changeSigningPermission(member, $event)" />
-                          {{ companyOnlyLabel() }}
-                        </label>
-                      }
-                    } @else { {{ documentScopeText(member.document_scope ?? 'own') }} }
-                  </td>
-                  <td [attr.data-label]="copy().choose"><input class="team-checkbox" type="checkbox" [attr.aria-label]="copy().choose + ': ' + member.auth_user_id" [checked]="selected().has(member.id)" [disabled]="disabled(member)" (change)="toggle(member.id)" /></td>
-                  @if (state.can_manage) {
-                    <td [attr.data-label]="accessActionLabel()">
+                <li class="team-member">
+                  <div class="team-member-summary">
+                    <div class="team-member-identity">
+                      <span class="team-avatar" aria-hidden="true">{{ member.auth_user_id.slice(0, 1).toUpperCase() }}</span>
+                      <div><strong>{{ member.auth_user_id }}</strong><small>{{ roleLabel(member) }}</small></div>
+                    </div>
+                    <span class="badge" [class.complete]="member.status === 'active'">{{ member.status === 'active' ? copy().active : member.status === 'offboarded' ? offboardedLabel() : withoutSeatLabel() }}</span>
+                    <label class="team-seat-option">
+                      <input class="team-checkbox" type="checkbox" [attr.aria-label]="copy().choose + ' · ' + member.auth_user_id"
+                        [checked]="selected().has(member.id)" [disabled]="disabled(member)" (change)="toggle(member.id)" />
+                      {{ seatLabel() }}
+                    </label>
+                    @if (state.can_manage && member.id !== state.current_member_id) {
+                      <button type="button" class="button secondary team-manage"
+                        [attr.aria-expanded]="expandedMember() === member.id"
+                        (click)="expandedMember.set(expandedMember() === member.id ? null : member.id)">
+                        {{ manageLabel() }}
+                      </button>
+                    }
+                  </div>
+                  @if (expandedMember() === member.id && state.can_manage && member.id !== state.current_member_id) {
+                    <div class="team-member-settings">
+                      <div class="form-field"><span class="field-label">{{ i18n.text('profile') }}</span>
+                        <app-rubrica-select [ariaLabel]="i18n.text('profile') + ' · ' + member.auth_user_id"
+                          [disabled]="saving()" [value]="member.role" [options]="workspaceRoleOptions(member)" (valueChange)="changeRole(member, $event)" />
+                      </div>
+                      <div class="form-field"><span class="field-label">{{ documentScopeLabel() }}</span>
+                        @if (member.role === 'admin') { <span>{{ documentScopeText('all') }}</span> }
+                        @else {
+                          <app-rubrica-select [ariaLabel]="documentScopeLabel() + ' · ' + member.auth_user_id"
+                            [disabled]="saving()" [value]="member.document_scope ?? 'own'" [options]="documentScopeOptions(member)"
+                            (valueChange)="changeDocumentScope(member, $event)" />
+                        }
+                      </div>
                       @if (member.role !== 'admin') {
-                        <details>
-                          <summary>{{ accessActionLabel() }}</summary>
+                        @if (tenant()?.kind === 'business') {
+                          <label class="team-seat-option team-company-option">
+                            <input class="team-checkbox" type="checkbox" [checked]="member.sign_company_only ?? false" [disabled]="saving()"
+                              (change)="changeSigningPermission(member, $event)" />
+                            {{ companyOnlyLabel() }}
+                          </label>
+                        }
+                        <div class="team-member-actions">
                           @if (member.status === 'offboarded') {
                             <button type="button" class="button secondary" [disabled]="saving()" (click)="changeMemberAccess(member, 'restore')">{{ accessActionText('restore') }}</button>
                             <button type="button" class="button secondary" [disabled]="saving()" (click)="changeMemberAccess(member, 'fresh')">{{ accessActionText('fresh') }}</button>
                           } @else {
-                            <button type="button" class="button secondary" [disabled]="saving()" (click)="changeMemberAccess(member, 'offboard')">{{ accessActionText('offboard') }}</button>
+                            <button type="button" class="button secondary team-destructive" [disabled]="saving()" (click)="changeMemberAccess(member, 'offboard')">{{ accessActionText('offboard') }}</button>
                           }
-                        </details>
+                        </div>
                       }
-                    </td>
+                    </div>
                   }
-                </tr>
+                </li>
               }
-            </tbody></table></div>
-            <div class="team-footer"><p class="muted">{{ copy().preserved }}</p>
-              @if (state.can_manage) { <p class="muted">{{ copy().owner }}</p><button class="button" [disabled]="saving() || !dirty() || exceedsMemberLimit(state)" (click)="save()">{{ saving() ? i18n.text('loading') : copy().save }}</button> }
-              @if (saved()) { <p role="status">{{ copy().saved }}</p> }
-            </div>
+            </ul>
+            <footer class="team-roster-footer">
+              <div><p class="muted">{{ copy().preserved }}</p>@if (saved()) { <p role="status">{{ copy().saved }}</p> }</div>
+              @if (state.can_manage) {
+                <button class="button" [disabled]="saving() || !dirty() || exceedsMemberLimit(state)" (click)="save()">{{ saving() ? i18n.text('loading') : copy().save }}</button>
+              }
+            </footer>
           </article>
           @if (state.can_request_branch) {
             <article class="card">
@@ -139,6 +200,7 @@ export class TeamPageComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly feedback = inject(FeedbackService);
+  readonly expandedMember = signal<string | null>(null);
   readonly tenant = signal<TenantItem | undefined>(undefined);
   readonly team = signal<TenantTeam | null>(null);
   readonly selected = signal(new Set<string>());
@@ -154,6 +216,15 @@ export class TeamPageComponent implements OnInit {
   memberEmail = '';
   memberRole: 'member' | 'auditor' = 'member';
   copy() { return teamCopy[this.i18n.locale()]; }
+  roleLabel(member: TenantMember): string {
+    return member.role === 'admin' ? this.copy().admin : member.role === 'auditor' ? this.copy().auditor : this.copy().member;
+  }
+  manageLabel(): string {
+    return this.local({ 'pt-BR': 'Permissões', en: 'Permissions', es: 'Permisos', 'ja-JP': '権限' });
+  }
+  seatLabel(): string {
+    return this.local({ 'pt-BR': 'Assento', en: 'Seat', es: 'Asiento', 'ja-JP': 'シート' });
+  }
   roleOptions(): RubricaSelectOption[] { return [{ value: 'member', label: this.copy().member }, { value: 'auditor', label: this.copy().auditor }]; }
   workspaceRoleOptions(member: TenantMember): RubricaSelectOption[] {
     const roles = this.roleOptions();
