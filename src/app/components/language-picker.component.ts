@@ -7,7 +7,7 @@ import { I18nService, Locale } from '../core/i18n.service';
   selector: 'app-language-picker',
   standalone: true,
   template: `
-    <details class="language-picker" #menu>
+    <details class="language-picker" #menu [attr.name]="menuGroup || null">
       <summary [attr.aria-label]="i18n.text('language')">
         <img class="language-flag" [src]="flagAsset(currentLanguage()?.countryCode)" alt="" />
         <span>{{ languageName() }}</span>
@@ -26,6 +26,7 @@ import { I18nService, Locale } from '../core/i18n.service';
 })
 export class LanguagePickerComponent {
   @Input() value?: Locale;
+  @Input() menuGroup = '';
   @Output() readonly valueChange = new EventEmitter<Locale>();
   readonly i18n = inject(I18nService);
   readonly languages = SUPPORTED_LANGUAGES;

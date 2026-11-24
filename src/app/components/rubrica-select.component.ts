@@ -10,7 +10,7 @@ export interface RubricaSelectOption {
   selector: 'app-rubrica-select',
   standalone: true,
   template: `
-    <details class="rubrica-select" #menu [class.disabled]="disabled" (toggle)="disabled && menu.removeAttribute('open')">
+    <details class="rubrica-select" #menu [attr.name]="menuGroup || null" [class.disabled]="disabled" (toggle)="disabled && menu.removeAttribute('open')">
       <summary [attr.aria-label]="ariaLabel" [attr.aria-disabled]="disabled">
         <span>{{ selectedLabel() }}</span><i class="bi bi-chevron-down" aria-hidden="true"></i>
       </summary>
@@ -30,6 +30,7 @@ export class RubricaSelectComponent {
   @Input() value = '';
   @Input() disabled = false;
   @Input() ariaLabel = '';
+  @Input() menuGroup = '';
   @Output() readonly valueChange = new EventEmitter<string>();
 
   selectedLabel(): string { return this.options.find(option => option.value === this.value)?.label ?? ''; }

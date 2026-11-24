@@ -896,16 +896,21 @@ input:focus, select:focus { outline: 3px solid rgba(168, 32, 53, .16); border-co
 .sidebar-settings-menu a.selected, .sidebar-settings-menu .sidebar-action.selected { color: #8f172c; background: #fff; }
 .sidebar-settings-language, .sidebar-settings-language app-language-picker, .sidebar-settings-language .language-picker, .sidebar-settings-language .language-picker summary { width: 100%; min-width: 0; }
 .sidebar-settings-language .language-picker summary { min-height: 42px; padding: .55rem .7rem; border-color: rgba(255,255,255,.16); border-radius: 11px; color: #fff; background: rgba(255,255,255,.08); font-size: .86rem; box-shadow: none; }
-.sidebar-settings-workspace { display: grid; gap: .3rem; margin: .2rem 0 .35rem; min-width: 0; }
-.sidebar-workspace-label { padding-left: .15rem; color: #fff; font-size: .78rem; font-weight: 600; }
+.sidebar-settings-workspace, .sidebar-settings-language { display: grid; gap: .3rem; margin: .2rem 0 .35rem; min-width: 0; }
+.sidebar-picker-label { padding-left: .15rem; color: #fff; font-size: .78rem; font-weight: 600; }
 .sidebar-settings-workspace app-rubrica-select, .sidebar-settings-workspace .rubrica-select { min-width: 0; }
 .sidebar-settings-workspace .rubrica-select summary { color: #fff; background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.16); border-radius: 11px; font-size: .86rem; }
 .sidebar-settings-workspace .rubrica-select summary i { color: inherit; }
 .sidebar-settings-workspace .rubrica-select summary:focus-visible { outline: 2px solid #fff; }
 .sidebar-settings-workspace .rubrica-select summary span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sidebar-settings-workspace .rubrica-select-options { position: static; width: 100%; margin-top: .35rem; }
+.sidebar-settings-workspace .rubrica-select-options,
+.sidebar-settings-language .language-options {
+  position: absolute; top: auto; right: auto; bottom: calc(100% + .4rem); left: 0;
+  width: 100%; max-height: min(17rem, 45dvh); overflow-y: auto; overscroll-behavior: contain;
+  z-index: 40; transform-origin: bottom;
+}
+.sidebar-main:has(.sidebar-settings-menu details[open]) { overflow: visible; }
 .sidebar-settings-workspace .rubrica-select-options button span { overflow-wrap: anywhere; }
-.sidebar-settings-language .language-options { top: calc(100% + .4rem); right: 0; bottom: auto; left: 0; z-index: 30; width: 100%; }
 .sidebar-tools { display: grid; flex: 0 0 auto; gap: .4rem; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, .16); }
 .sidebar-tools app-language-picker, .sidebar-tools .language-picker, .sidebar-tools .language-picker summary { width: 100%; min-width: 0; }
 .sidebar-tools .language-picker summary { border-color: rgba(255, 255, 255, .16); color: #fff; background: rgba(255, 255, 255, .09); box-shadow: none; }
@@ -916,7 +921,6 @@ input:focus, select:focus { outline: 3px solid rgba(168, 32, 53, .16); border-co
   .workspace-layout > app-workspace-sidebar, .workspace-sidebar { background: #a82035; }
   .workspace-sidebar { gap: 1.2rem; padding: 1.3rem 1.15rem 1.15rem; box-shadow: 10px 0 34px rgba(67, 13, 24, .16); }
   .sidebar-main { gap: 1.15rem; padding-right: 0; }
-  .sidebar-main:has(.sidebar-settings-language .language-picker[open]) { overflow: visible; }
   .sidebar-brand { min-height: 74px; justify-content: center; margin: 0 .25rem; padding: .2rem .5rem 1rem; border-bottom: 1px solid rgba(255,255,255,.13); border-radius: 0; }
   .sidebar-brand img { width: 190px; height: 62px; }
   .sidebar-account { gap: .28rem; padding: 1rem 1.05rem; border-color: rgba(255,255,255,.2); border-radius: 16px; background: linear-gradient(145deg, rgba(82,5,22,.34), rgba(48,3,14,.16)); box-shadow: inset 0 1px rgba(255,255,255,.08), 0 12px 26px rgba(52,5,16,.12); }

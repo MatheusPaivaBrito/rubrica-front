@@ -57,12 +57,15 @@ import { LanguagePickerComponent } from './language-picker.component';
                 <button type="button" class="sidebar-action" [class.selected]="securityActive()" (click)="security()"><i class="bi bi-shield-lock" aria-hidden="true"></i><span>{{ i18n.text('dashboardSecurity') }}</span></button>
                 @if (workspaces().length > 1) {
                   <div class="sidebar-settings-workspace">
-                    <span class="sidebar-workspace-label">{{ workspaceLabel() }}</span>
-                    <app-rubrica-select [ariaLabel]="workspaceLabel()" [value]="tenant.id"
+                    <span class="sidebar-picker-label">{{ workspaceLabel() }}</span>
+                    <app-rubrica-select menuGroup="sidebar-preferences" [ariaLabel]="workspaceLabel()" [value]="tenant.id"
                       [options]="workspaceOptions(tenant)" (valueChange)="switchWorkspace($event)" />
                   </div>
                 }
-                <div class="sidebar-settings-language"><app-language-picker /></div>
+                <div class="sidebar-settings-language">
+                  <span class="sidebar-picker-label">{{ changeLanguageLabel() }}</span>
+                  <app-language-picker menuGroup="sidebar-preferences" />
+                </div>
               </div>
             }
           </div>
@@ -117,6 +120,9 @@ export class WorkspaceSidebarComponent implements OnChanges {
   }
   createPersonalLabel(): string {
     return ({ 'pt-BR': 'Criar espaço pessoal', en: 'Create personal workspace', es: 'Crear espacio personal', 'ja-JP': '個人用ワークスペースを作成' })[this.i18n.locale()];
+  }
+  changeLanguageLabel(): string {
+    return ({ 'pt-BR': 'Trocar de idioma', en: 'Change language', es: 'Cambiar de idioma', 'ja-JP': '言語を変更' })[this.i18n.locale()];
   }
   workspaceLabel(): string {
     return ({ 'pt-BR': 'Trocar de workspace', en: 'Switch workspace', es: 'Cambiar de espacio', 'ja-JP': 'ワークスペースを切り替え' })[this.i18n.locale()];
