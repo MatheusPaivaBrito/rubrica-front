@@ -17,3 +17,10 @@ describe('tenantDashboardUrl', () => {
     expect(accountLandingUrl([], 'account-public')).toBe('/reactivate-account');
   });
 });
+
+
+it('opens the only selectable workspace even if an ineligible workspace is listed first', () => {
+  const business = { id: 'business', slug: 'office', name: 'Office', kind: 'business' as const, role: 'member', currency: 'BRL', workspace_selectable: false };
+  const personal = { id: 'personal', slug: 'me', name: 'Personal', kind: 'personal' as const, role: 'admin', currency: 'BRL', workspace_selectable: true };
+  expect(accountLandingUrl([business, personal], 'account-public')).toBe('/a/account-public/dashboard');
+});

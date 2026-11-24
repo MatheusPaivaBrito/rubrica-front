@@ -702,6 +702,9 @@ const documentTableColumns = [
                 </button>
               </header>
               <form class="modal-body form" (ngSubmit)="upload()">
+                @if (selectedTenant(); as destination) {
+                  <p class="notice">{{ uploadDestinationText(destination) }}</p>
+                }
                 <label
                   >{{ i18n.text('title') }}
                   <input name="title" [(ngModel)]="title" required /></label
@@ -734,7 +737,7 @@ const documentTableColumns = [
                 <footer class="modal-footer">
                   <button type="button" class="button secondary" (click)="closeUploadModal()">
                     {{ i18n.text('cancel') }}</button
-                  ><button class="button" [disabled]="!file || submitting()">
+                  ><button class="button" [disabled]="!file || !selectedTenant() || submitting()">
                     {{ i18n.text('uploadFile') }}
                   </button>
                 </footer>
@@ -2085,15 +2088,26 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  uploadDestinationText(destination: TenantItem): string {
+    const copy = {
+      'pt-BR': ['Salvar em', 'usa o plano da empresa', 'usa seu plano pessoal'],
+      en: ['Save to', 'uses the company plan', 'uses your personal plan'],
+      es: ['Guardar en', 'usa el plan de la empresa', 'usa tu plan personal'],
+      'ja-JP': ['保存先', '会社のプランを使用', '個人プランを使用'],
+    }[this.i18n.locale()];
+    return `${copy[0]} ${destination.name} · ${copy[destination.kind === 'business' ? 1 : 2]}`;
+  }
+
   async upload(): Promise<void> {
-    if (!this.file || !this.tenantSlug || this.submitting()) return;
+    const destination = this.selectedTenant();
+    if (!this.file || !destination || this.submitting()) return;
     this.submitting.set(true);
     try {
       const file = this.file;
       const content = await file.arrayBuffer();
       await firstValueFrom(
         this.api.postFile<DocumentItem>('/documents', content, file.type || 'application/pdf', {
-          organization_id: this.tenantSlug,
+          organization_id: destination.slug,
           title: this.title,
           filename: file.name,
           content_type: file.type || 'application/pdf',

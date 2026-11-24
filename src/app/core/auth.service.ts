@@ -29,7 +29,9 @@ export function tenantDashboardUrl(tenant: Pick<TenantItem, 'slug' | 'kind'>, ac
 }
 
 export function accountLandingUrl(tenants: TenantItem[], accountPublicSlug: string): string {
-  return tenants.length ? tenantDashboardUrl(tenants[0], accountPublicSlug) : '/reactivate-account';
+  const selectable = tenants.filter(tenant => tenant.workspace_selectable === true);
+  const tenant = selectable.length === 1 ? selectable[0] : tenants[0];
+  return tenant ? tenantDashboardUrl(tenant, accountPublicSlug) : '/reactivate-account';
 }
 
 @Injectable({ providedIn: 'root' })

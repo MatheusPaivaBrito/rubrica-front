@@ -38,6 +38,17 @@ import { LanguagePickerComponent } from './language-picker.component';
             </div>
           }
         </div>
+        @if (workspaces().length > 1) {
+          <label class="workspace-picker">
+            {{ workspaceLabel() }}
+            <select (change)="switchWorkspace($event)">
+              @if (!isSelectable(tenant.id)) { <option value="" selected disabled>{{ tenant.name }}</option> }
+              @for (workspace of workspaces(); track workspace.id) {
+                <option [value]="workspace.id" [selected]="workspace.id === tenant.id">{{ workspace.name }}</option>
+              }
+            </select>
+          </label>
+        }
         <nav class="sidebar-navigation" [attr.aria-label]="copy().nav">
           <a [routerLink]="url('dashboard')" routerLinkActive="selected" ariaCurrentWhenActive="page" (click)="closeMobile()"><i class="bi bi-grid-1x2" aria-hidden="true"></i><span>{{ copy().dashboard }}</span></a>
           @if (showTeam()) { <a [routerLink]="url('team')" routerLinkActive="selected" ariaCurrentWhenActive="page" (click)="closeMobile()"><i class="bi bi-people" aria-hidden="true"></i><span>{{ copy().team }}</span></a> }
@@ -60,6 +71,10 @@ import { LanguagePickerComponent } from './language-picker.component';
       </div>
     </aside>
   }`,
+  styles: [`
+    .workspace-picker { display: grid; gap: .4rem; margin: 0 0 .75rem; color: white; }
+    .workspace-picker select { width: 100%; }
+  `],
 })
 export class WorkspaceSidebarComponent implements OnChanges {
   @Input() tenant?: TenantItem;
@@ -68,19 +83,48 @@ export class WorkspaceSidebarComponent implements OnChanges {
   private readonly router = inject(Router);
   private readonly api = inject(ApiService);
   readonly showTeam = signal(false);
+  readonly workspaces = signal<TenantItem[]>([]);
+  private workspaceRequest = 0;
   readonly billingAccount = signal<BillingAccount | null>(null);
   readonly mobileOpen = signal(false);
   readonly settingsOpen = signal(false);
   async ngOnChanges() {
+    const request = ++this.workspaceRequest;
+    const tenant = this.tenant;
     this.showTeam.set(false);
     this.billingAccount.set(null);
-    if (!this.tenant) return;
+    this.workspaces.set([]);
+    if (!tenant) return;
+
     try {
-      const account = await firstValueFrom(this.api.get<BillingAccount>(`/billing/tenants/${this.tenant.id}/account`));
+      const workspaces = await firstValueFrom(this.api.get<TenantItem[]>('/tenants'));
+      if (request !== this.workspaceRequest) return;
+      this.workspaces.set(workspaces.filter(workspace => workspace.workspace_selectable === true));
+    } catch {
+      if (request !== this.workspaceRequest) return;
+    }
+    if (tenant.role !== 'admin') return;
+
+    try {
+      const account = await firstValueFrom(this.api.get<BillingAccount>(`/billing/tenants/${tenant.id}/account`));
+      if (request !== this.workspaceRequest) return;
       const paid = account.status === 'active' || account.status === 'past_due';
       this.billingAccount.set(account);
-      this.showTeam.set(this.tenant.role === 'admin' && (account.complimentary_lifetime || (paid && ['rubrica_intermediate', 'rubrica_team'].includes(account.current_product_code ?? ''))));
-    } catch { this.showTeam.set(false); this.billingAccount.set(null); }
+      this.showTeam.set(account.complimentary_lifetime || (paid && ['rubrica_intermediate', 'rubrica_team'].includes(account.current_product_code ?? '')));
+    } catch { /* Leave billing navigation hidden when its account is unavailable. */ }
+  }
+  workspaceLabel(): string {
+    return ({ 'pt-BR': 'Trocar de workspace', en: 'Switch workspace', es: 'Cambiar de espacio', 'ja-JP': 'ワークスペースを切り替え' })[this.i18n.locale()];
+  }
+  isSelectable(id: string): boolean { return this.workspaces().some(workspace => workspace.id === id); }
+  switchWorkspace(event: Event) {
+    const select = event.target as HTMLSelectElement;
+    const workspace = this.workspaces().find(item => item.id === select.value);
+    const slug = this.auth.context()?.account_public_slug;
+    if (workspace && slug && workspace.id !== this.tenant?.id) {
+      // Reload the dashboard so the previous workspace's documents cannot linger.
+      window.location.assign(tenantDashboardUrl(workspace, slug));
+    }
   }
   copy() { return teamCopy[this.i18n.locale()]; }
   openMobile() { this.mobileOpen.set(true); }
