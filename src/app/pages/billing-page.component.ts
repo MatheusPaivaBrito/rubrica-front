@@ -3,12 +3,13 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import QRCode from 'qrcode';
+import Swal from 'sweetalert2';
 
 import { ApiService } from '../core/api.service';
 import { AuthService, tenantDashboardUrl } from '../core/auth.service';
 import { FeedbackService } from '../core/feedback.service';
 import { I18nService } from '../core/i18n.service';
-import { BillingAccount, BillingCheckout, BillingPortal, TenantItem } from '../core/models';
+import { BillingAccount, BillingCheckout, BillingPortal, TenantItem, TenantTeam } from '../core/models';
 import { WorkspaceSidebarComponent } from '../components/workspace-sidebar.component';
 
 interface BusinessUpgradeReview {
@@ -31,6 +32,9 @@ interface BusinessUpgradeReview {
         @else {
           @if (account()) {
             <div class="plan-banner"><div><small>{{ i18n.text('plan') }}</small><h2>{{ planName() }}</h2><p>{{ planHelp() }}</p></div><span class="status" [attr.data-status]="account()!.complimentary_lifetime ? 'complimentary' : account()!.status">{{ account()!.complimentary_lifetime ? i18n.text('complimentary') : statusLabel(account()!.status) }}</span></div>
+            @if (showPortalAction()) {
+              <div class="actions"><button type="button" class="button secondary" [disabled]="submitting()" (click)="manageSubscription()">{{ manageSubscriptionLabel() }}</button></div>
+            }
             <div class="metrics">
               <article><small>{{ usageLabel() }}</small><strong>{{ usageValue() }}</strong></article>
               <article><small>{{ i18n.text('availableNow') }}</small><strong>{{ availability() }}</strong></article>
@@ -80,6 +84,26 @@ interface BusinessUpgradeReview {
           }
         }
       </article>
+          @if (closureState(); as state) {
+            <article class="card">
+              <h2>{{ closureLabel() }}</h2>
+              @if (state.export_until) {
+                <p role="status">{{ exportNotice(state.export_until) }}</p>
+              } @else {
+                <p class="muted">{{ closureHelp() }}</p>
+                @if (state.closure_requested_at) {
+                  <p role="status">{{ closurePendingText() }}</p>
+                  <button type="button" class="button" [disabled]="submitting()" (click)="confirmClosure()">
+                    {{ confirmClosureLabel() }}
+                  </button>
+                }
+                <button type="button" class="button secondary" [disabled]="submitting()"
+                  (click)="changeClosureRequest(!state.closure_requested_at)">
+                  {{ closureAction(!state.closure_requested_at) }}
+                </button>
+              }
+            </article>
+          }
       </section></div>
     </main>
   `,
@@ -91,6 +115,7 @@ interface BusinessUpgradeReview {
 export class BillingPageComponent implements OnInit {
   readonly tenants = signal<TenantItem[]>([]);
   readonly tenantId = signal('');
+  readonly closureState = signal<TenantTeam | null>(null);
   readonly account = signal<BillingAccount | null>(null);
   readonly loading = signal(true);
   readonly submitting = signal(false);
@@ -282,6 +307,14 @@ export class BillingPageComponent implements OnInit {
   private async loadAccount(): Promise<void> {
     const id = this.tenantId();
     this.businessReview.set(null);
+    this.closureState.set(null);
+    this.account.set(null);
+    if (this.selectedTenant()?.kind === 'business') {
+      const state = await firstValueFrom(this.api.get<TenantTeam>(`/tenants/${id}/team`));
+      if (id !== this.tenantId()) return;
+      this.closureState.set(state);
+      if (state.export_until) return;
+    }
     const account = await firstValueFrom(this.api.get<BillingAccount>(`/billing/tenants/${id}/account`));
     if (id !== this.tenantId()) return;
     this.account.set(account);
@@ -289,6 +322,92 @@ export class BillingPageComponent implements OnInit {
     if (this.selectedTenant()?.kind !== 'personal') return;
     const review = await firstValueFrom(this.api.get<BusinessUpgradeReview | null>(`/tenants/${id}/business-upgrade-review`));
     if (id === this.tenantId()) this.businessReview.set(review);
+  }
+  manageSubscriptionLabel(): string {
+    return this.local({ 'pt-BR': 'Gerenciar ou cancelar assinatura', en: 'Manage or cancel subscription', es: 'Gestionar o cancelar suscripción', 'ja-JP': '契約の管理・解約' });
+  }
+  async manageSubscription(): Promise<void> {
+    await this.redirect<BillingPortal>(`/billing/tenants/${this.tenantId()}/subscription-management`, 'portal_url');
+  }
+  closureHelp(): string {
+    return this.local({
+      'pt-BR': 'Para parar a cobrança, cancele a assinatura no Stripe. Encerre o workspace se também quiser bloquear novos envios e iniciar o prazo de 30 dias para baixar os PDFs.',
+      en: 'Cancel your Stripe subscription to stop billing. Close the workspace to also block new uploads and start the 30-day PDF download window.',
+      es: 'Cancela la suscripción en Stripe para detener los cobros. Cierra el espacio para bloquear las cargas nuevas e iniciar los 30 días de descarga.',
+      'ja-JP': '請求を止めるには Stripe で契約を解約します。ワークスペースを閉鎖すると新規アップロードが停止し、30日間PDFをダウンロードできます。',
+    });
+  }
+  exportNotice(deadline: string): string {
+    const date = new Intl.DateTimeFormat(this.i18n.locale(), { dateStyle: 'long', timeStyle: 'short' }).format(new Date(deadline));
+    return this.local({
+      'pt-BR': `Workspace encerrado. Baixe os PDFs pelo painel até ${date}.`,
+      en: `Workspace closed. Download PDFs from the dashboard before ${date}.`,
+      es: `Espacio cerrado. Descarga los PDF desde el panel antes del ${date}.`,
+      'ja-JP': `ワークスペースは閉鎖されました。${date}までにダッシュボードからPDFをダウンロードしてください。`,
+    });
+  }
+  confirmClosureLabel(): string {
+    return this.local({ 'pt-BR': 'Confirmar encerramento', en: 'Confirm closure', es: 'Confirmar el cierre', 'ja-JP': '閉鎖を確認する' });
+  }
+  async confirmClosure(): Promise<void> {
+    const tenant = this.selectedTenant();
+    if (!tenant || this.submitting()) return;
+    const result = await Swal.fire({
+      title: this.confirmClosureLabel(),
+      text: this.local({
+        'pt-BR': 'As solicitações em aberto serão canceladas. Administradores poderão baixar os PDFs por 30 dias.',
+        en: 'Open requests will be cancelled. Administrators can download PDFs for 30 days.',
+        es: 'Se cancelarán las solicitudes abiertas. Los administradores podrán descargar los PDF durante 30 días.',
+        'ja-JP': '進行中の署名依頼はキャンセルされます。管理者は30日間PDFをダウンロードできます。',
+      }),
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: this.confirmClosureLabel(),
+      cancelButtonText: this.i18n.text('cancel'),
+    });
+    if (!result.isConfirmed) return;
+    this.submitting.set(true);
+    try {
+      this.closureState.set(await firstValueFrom(this.api.post<TenantTeam>(`/tenants/${tenant.id}/close`, {})));
+      this.account.set(null);
+    } catch (error) { await this.feedback.error(error); }
+    finally { this.submitting.set(false); }
+  }
+  closureLabel(): string {
+    return this.local({ 'pt-BR': 'Encerramento do workspace', en: 'Workspace closure', es: 'Cierre del espacio', 'ja-JP': 'ワークスペースの閉鎖' });
+  }
+  closurePendingText(): string {
+    return this.local({
+      'pt-BR': 'A solicitação foi registrada. O workspace continua ativo.',
+      en: 'The request was recorded. The workspace remains active.',
+      es: 'La solicitud quedó registrada. El espacio sigue activo.',
+      'ja-JP': 'リクエストが記録されました。ワークスペースは引き続き利用できます。',
+    });
+  }
+  closureAction(requested: boolean): string {
+    return requested
+      ? this.local({ 'pt-BR': 'Solicitar encerramento', en: 'Request closure', es: 'Solicitar el cierre', 'ja-JP': '閉鎖を申請する' })
+      : this.local({ 'pt-BR': 'Retirar solicitação', en: 'Withdraw request', es: 'Retirar la solicitud', 'ja-JP': '申請を取り下げる' });
+  }
+  async changeClosureRequest(requested: boolean): Promise<void> {
+    const tenant = this.selectedTenant();
+    if (!tenant || this.submitting()) return;
+    const result = await Swal.fire({
+      title: this.closureAction(requested),
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: this.closureAction(requested),
+      cancelButtonText: this.i18n.text('cancel'),
+    });
+    if (!result.isConfirmed) return;
+    this.submitting.set(true);
+    try {
+      const team = await firstValueFrom(this.api.put<TenantTeam>(
+        `/tenants/${tenant.id}/closure-request`, { requested },
+      ));
+      this.closureState.set(team);
+    } catch (error) { await this.feedback.error(error); }
+    finally { this.submitting.set(false); }
   }
   private planUrl(tenant: TenantItem, accountSlug: string): string { return tenantDashboardUrl(tenant, accountSlug).replace(/dashboard$/, 'plan'); }
   private async leaveComplimentaryBilling(): Promise<boolean> { return false; }

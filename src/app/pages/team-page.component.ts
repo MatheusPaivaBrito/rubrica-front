@@ -3,7 +3,6 @@ import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import Swal from 'sweetalert2';
 import { ApiService } from '../core/api.service';
 import { AuthService, tenantDashboardUrl } from '../core/auth.service';
 import { FeedbackService } from '../core/feedback.service';
@@ -52,10 +51,18 @@ interface BranchReview {
     .team-seat-option { display: inline-flex; align-items: center; gap: .5rem; font-size: .875rem; margin: 0; }
     .team-seat-option input.team-checkbox { inline-size: 1rem; block-size: 1rem; min-height: 0; flex: 0 0 1rem; padding: 0; margin: 0; }
     .team-manage { min-width: 0; padding: .45rem .65rem; justify-self: stretch; }
-    .team-permissions-dialog { margin: auto; width: min(37rem, calc(100% - 2rem)); max-height: min(85dvh, 48rem); border: 1px solid #e6ecf3; padding: 0; color: inherit; }
+    .team-permissions-dialog { margin: auto; width: min(37rem, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); overflow: hidden; border: 1px solid #e6ecf3; padding: 0; color: inherit; }
+    .team-permissions-dialog:not([open]) { display: none; }
+    .team-permissions-dialog[open] { display: flex; flex-direction: column; }
+    .team-permissions-dialog .modal-header, .team-permissions-dialog .modal-footer { flex: 0 0 auto; }
+    .team-permissions-dialog .modal-footer { position: static; margin: 0; flex-wrap: wrap; }
     .team-permissions-dialog::backdrop { background: rgb(22 34 52 / .5); }
     .team-permissions-dialog .modal-header p { margin: .3rem 0 0; overflow-wrap: anywhere; }
-    .team-member-settings { display: grid; gap: 1rem; }
+    .team-member-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem 1rem; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+    .team-member-settings > :not(.form-field) { grid-column: 1 / -1; }
+    @media (max-width: 540px) {
+      .team-member-settings { grid-template-columns: minmax(0, 1fr); }
+    }
     .team-member-settings .form-field small { line-height: 1.4; }
     .team-member-actions { border-top: 1px solid #e6ecf3; padding-top: .85rem; }
     .team-member-actions p { margin: .35rem 0 0; }
@@ -216,25 +223,7 @@ interface BranchReview {
             </article>
           }
           }
-          @if (state.can_manage && tenant()?.kind === 'business') {
-            <article class="card">
-              <h2>{{ closureLabel() }}</h2>
-              @if (state.export_until) {
-                <p role="status">{{ exportNotice(state.export_until) }}</p>
-              } @else {
-                @if (state.closure_requested_at) {
-                  <p role="status">{{ closurePendingText() }}</p>
-                  <button type="button" class="button" [disabled]="saving()" (click)="confirmClosure()">
-                    {{ confirmClosureLabel() }}
-                  </button>
-                }
-                <button type="button" class="button secondary" [disabled]="saving()"
-                  (click)="changeClosureRequest(!state.closure_requested_at)">
-                  {{ closureAction(!state.closure_requested_at) }}
-                </button>
-              }
-            </article>
-          }
+          @if (state.export_until) { <p class="notice" role="status">{{ exportNotice(state.export_until) }}</p> }
         } @else { <p class="notice">{{ copy().empty }}</p> }
       </section>
     </div>
@@ -477,68 +466,6 @@ export class TeamPageComponent implements OnInit {
       es: `Espacio cerrado. Descarga los PDF desde el panel antes del ${date}.`,
       'ja-JP': `ワークスペースは閉鎖されました。${date}までにダッシュボードからPDFをダウンロードしてください。`,
     });
-  }
-  confirmClosureLabel(): string {
-    return this.local({ 'pt-BR': 'Confirmar encerramento', en: 'Confirm closure', es: 'Confirmar el cierre', 'ja-JP': '閉鎖を確認する' });
-  }
-  async confirmClosure(): Promise<void> {
-    const tenant = this.tenant();
-    if (!tenant || this.saving()) return;
-    const result = await Swal.fire({
-      title: this.confirmClosureLabel(),
-      text: this.local({
-        'pt-BR': 'As solicitações em aberto serão canceladas. Administradores poderão baixar os PDFs por 30 dias.',
-        en: 'Open requests will be cancelled. Administrators can download PDFs for 30 days.',
-        es: 'Se cancelarán las solicitudes abiertas. Los administradores podrán descargar los PDF durante 30 días.',
-        'ja-JP': '進行中の署名依頼はキャンセルされます。管理者は30日間PDFをダウンロードできます。',
-      }),
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: this.confirmClosureLabel(),
-      cancelButtonText: this.i18n.text('cancel'),
-    });
-    if (!result.isConfirmed) return;
-    this.saving.set(true);
-    try {
-      this.setTeam(await firstValueFrom(this.api.post<TenantTeam>(`/tenants/${tenant.id}/close`, {})));
-    } catch (error) { await this.feedback.error(error); }
-    finally { this.saving.set(false); }
-  }
-  closureLabel(): string {
-    return this.local({ 'pt-BR': 'Encerramento do workspace', en: 'Workspace closure', es: 'Cierre del espacio', 'ja-JP': 'ワークスペースの閉鎖' });
-  }
-  closurePendingText(): string {
-    return this.local({
-      'pt-BR': 'A solicitação foi registrada. O workspace continua ativo.',
-      en: 'The request was recorded. The workspace remains active.',
-      es: 'La solicitud quedó registrada. El espacio sigue activo.',
-      'ja-JP': 'リクエストが記録されました。ワークスペースは引き続き利用できます。',
-    });
-  }
-  closureAction(requested: boolean): string {
-    return requested
-      ? this.local({ 'pt-BR': 'Solicitar encerramento', en: 'Request closure', es: 'Solicitar el cierre', 'ja-JP': '閉鎖を申請する' })
-      : this.local({ 'pt-BR': 'Retirar solicitação', en: 'Withdraw request', es: 'Retirar la solicitud', 'ja-JP': '申請を取り下げる' });
-  }
-  async changeClosureRequest(requested: boolean): Promise<void> {
-    const tenant = this.tenant();
-    if (!tenant || this.saving()) return;
-    const result = await Swal.fire({
-      title: this.closureAction(requested),
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: this.closureAction(requested),
-      cancelButtonText: this.i18n.text('cancel'),
-    });
-    if (!result.isConfirmed) return;
-    this.saving.set(true);
-    try {
-      const team = await firstValueFrom(this.api.put<TenantTeam>(
-        `/tenants/${tenant.id}/closure-request`, { requested },
-      ));
-      this.setTeam(team);
-    } catch (error) { await this.feedback.error(error); }
-    finally { this.saving.set(false); }
   }
   createBranchLabel(): string {
     return this.local({ 'pt-BR': 'Solicitar nova filial', en: 'Request a new branch', es: 'Solicitar una sucursal', 'ja-JP': '支店を申請する' });

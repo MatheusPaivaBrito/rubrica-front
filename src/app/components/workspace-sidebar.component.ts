@@ -6,10 +6,11 @@ import { AuthService, tenantDashboardUrl } from '../core/auth.service';
 import { I18nService } from '../core/i18n.service';
 import { BillingAccount, TenantItem } from '../core/models';
 import { teamCopy } from '../core/team-copy';
+import { RubricaSelectComponent, RubricaSelectOption } from './rubrica-select.component';
 import { LanguagePickerComponent } from './language-picker.component';
 
 @Component({
-  selector: 'app-workspace-sidebar', standalone: true, imports: [RouterLink, RouterLinkActive, LanguagePickerComponent],
+  selector: 'app-workspace-sidebar', standalone: true, imports: [RouterLink, RouterLinkActive, LanguagePickerComponent, RubricaSelectComponent],
   template: `@if (tenant) {
     <header class="mobile-workspace-topbar">
       <button type="button" class="mobile-sidebar-toggle" [attr.aria-label]="copy().openMenu" [attr.aria-expanded]="mobileOpen()" (click)="openMobile()">
@@ -38,17 +39,6 @@ import { LanguagePickerComponent } from './language-picker.component';
             </div>
           }
         </div>
-        @if (workspaces().length > 1) {
-          <label class="workspace-picker">
-            {{ workspaceLabel() }}
-            <select (change)="switchWorkspace($event)">
-              @if (!isSelectable(tenant.id)) { <option value="" selected disabled>{{ tenant.name }}</option> }
-              @for (workspace of workspaces(); track workspace.id) {
-                <option [value]="workspace.id" [selected]="workspace.id === tenant.id">{{ workspace.name }}</option>
-              }
-            </select>
-          </label>
-        }
         @if (needsPersonalWorkspace()) {
           <a class="sidebar-action" routerLink="/reactivate-account" (click)="closeMobile()">
             <i class="bi bi-person-plus" aria-hidden="true"></i><span>{{ createPersonalLabel() }}</span>
@@ -65,6 +55,13 @@ import { LanguagePickerComponent } from './language-picker.component';
               <div class="sidebar-settings-menu">
                 @if (tenant.role === 'admin') { <a [routerLink]="url('plan')" routerLinkActive="selected" ariaCurrentWhenActive="page" (click)="closeMobile()"><i class="bi bi-credit-card" aria-hidden="true"></i><span>{{ i18n.text('billing') }}</span></a> }
                 <button type="button" class="sidebar-action" [class.selected]="securityActive()" (click)="security()"><i class="bi bi-shield-lock" aria-hidden="true"></i><span>{{ i18n.text('dashboardSecurity') }}</span></button>
+                @if (workspaces().length > 1) {
+                  <div class="sidebar-settings-workspace">
+                    <span class="sidebar-workspace-label">{{ workspaceLabel() }}</span>
+                    <app-rubrica-select [ariaLabel]="workspaceLabel()" [value]="tenant.id"
+                      [options]="workspaceOptions(tenant)" (valueChange)="switchWorkspace($event)" />
+                  </div>
+                }
                 <div class="sidebar-settings-language"><app-language-picker /></div>
               </div>
             }
@@ -76,10 +73,7 @@ import { LanguagePickerComponent } from './language-picker.component';
       </div>
     </aside>
   }`,
-  styles: [`
-    .workspace-picker { display: grid; gap: .4rem; margin: 0 0 .75rem; color: white; }
-    .workspace-picker select { width: 100%; }
-  `],
+
 })
 export class WorkspaceSidebarComponent implements OnChanges {
   @Input() tenant?: TenantItem;
@@ -127,10 +121,15 @@ export class WorkspaceSidebarComponent implements OnChanges {
   workspaceLabel(): string {
     return ({ 'pt-BR': 'Trocar de workspace', en: 'Switch workspace', es: 'Cambiar de espacio', 'ja-JP': 'ワークスペースを切り替え' })[this.i18n.locale()];
   }
-  isSelectable(id: string): boolean { return this.workspaces().some(workspace => workspace.id === id); }
-  switchWorkspace(event: Event) {
-    const select = event.target as HTMLSelectElement;
-    const workspace = this.workspaces().find(item => item.id === select.value);
+  workspaceOptions(current: TenantItem): RubricaSelectOption[] {
+    const options: RubricaSelectOption[] = this.workspaces().map(workspace => ({ value: workspace.id, label: workspace.name }));
+    if (!options.some(option => option.value === current.id)) {
+      options.unshift({ value: current.id, label: current.name, disabled: true });
+    }
+    return options;
+  }
+  switchWorkspace(workspaceId: string) {
+    const workspace = this.workspaces().find(item => item.id === workspaceId);
     const slug = this.auth.context()?.account_public_slug;
     if (workspace && slug && workspace.id !== this.tenant?.id) {
       // Reload the dashboard so the previous workspace's documents cannot linger.
