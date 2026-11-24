@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -18,6 +18,9 @@ interface BranchReview {
   cnpj_masked: string;
   status: 'pending' | 'approved' | 'rejected';
   workspace_active?: boolean;
+  workspace_closed?: boolean;
+  business_tenant_id?: string | null;
+  member_count: number;
 }
 
 @Component({
@@ -47,21 +50,39 @@ interface BranchReview {
     .team-seat-option { display: inline-flex; align-items: center; gap: .5rem; font-size: .875rem; margin: 0; }
     .team-seat-option input.team-checkbox { inline-size: 1rem; block-size: 1rem; min-height: 0; flex: 0 0 1rem; padding: 0; margin: 0; }
     .team-manage { min-width: 0; padding: .45rem .65rem; justify-self: stretch; }
-    .team-member-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: .85rem 1.25rem; background: #f6f8fb; border-radius: .65rem; margin: 0 1.5rem .85rem; padding: 1rem; }
+    .team-permissions-dialog { margin: auto; width: min(37rem, calc(100% - 2rem)); max-height: min(85dvh, 48rem); border: 1px solid #e6ecf3; padding: 0; color: inherit; }
+    .team-permissions-dialog::backdrop { background: rgb(22 34 52 / .5); }
+    .team-permissions-dialog .modal-header p { margin: .3rem 0 0; overflow-wrap: anywhere; }
+    .team-member-settings { display: grid; gap: 1rem; }
+    .team-member-settings .form-field small { line-height: 1.4; }
+    .team-member-actions { border-top: 1px solid #e6ecf3; padding-top: .85rem; }
+    .team-member-actions p { margin: .35rem 0 0; }
     .team-member-actions { display: flex; flex-wrap: wrap; gap: .5rem; grid-column: 1 / -1; }
     .team-destructive { color: #a82035; }
+    .branch-section { display: grid; gap: 1rem; }
+    .branch-section h2, .branch-section p { margin: 0; }
+    .branch-form { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; align-items: end; gap: .75rem; }
+    .branch-card { border: 1px solid #e6ecf3; border-radius: .75rem; }
+    .branch-card-header { width: 100%; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem; padding: .85rem 1rem; }
+    button.branch-card-header { color: inherit; text-align: left; background: transparent; border: 0; cursor: pointer; }
+    .branch-card-name { display: grid; min-width: 0; gap: .2rem; overflow-wrap: anywhere; }
+    .branch-card-meta { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem; }
+    .branch-card-body { display: grid; gap: .75rem; padding: 1rem; border-top: 1px solid #e6ecf3; }
+    .branch-card-body[hidden] { display: none; }
+    .branch-card-body > .button { justify-self: start; }
+    .branch-card-body td:first-child { overflow-wrap: anywhere; }
     @media (max-width: 700px) {
+      .branch-form { grid-template-columns: 1fr; }
       .team-member-summary { grid-template-columns: 1fr auto; gap: .65rem; }
       .team-member-identity { grid-column: 1 / -1; }
       .team-manage { grid-column: 1 / -1; justify-self: start; }
-      .team-member-settings { grid-template-columns: 1fr; }
     }
   `],
   template: `<main class="shell">
     <div class="workspace-layout"><app-workspace-sidebar [tenant]="tenant()" />
       <section class="container dashboard-container team-container">
         <header class="dashboard-header"><div><p class="eyebrow">{{ tenant()?.name }}</p><h1>{{ copy().team }}</h1><p class="muted">{{ copy().help }}</p></div>
-          @if (team()?.can_manage && !team()?.export_until) { <button class="button" (click)="inviteOpen.set(true)"><i class="bi bi-person-plus" aria-hidden="true"></i> {{ inviteLabel() }}</button> }
+          @if (team()?.can_manage && !team()?.export_until) { <button class="button" (click)="openInvite()"><i class="bi bi-person-plus" aria-hidden="true"></i> {{ inviteLabel() }}</button> }
         </header>
         @if (loading()) { <p class="notice">{{ i18n.text('loading') }}</p> }
         @else if (team(); as state) {
@@ -70,7 +91,7 @@ interface BranchReview {
           @if (!state.can_manage) { <p class="notice">{{ copy().readonly }}</p> }
           <article class="card team-roster">
             <div class="team-roster-header">
-              <div><h2>{{ copy().choose }}</h2><p class="muted">{{ cycleHelp(state) }}</p></div>
+              <div><h2>{{ copy().choose }}</h2><p class="muted">{{ cycleHelp(state) }}</p><p class="muted">{{ permissionHelp('seat') }}</p></div>
               <div class="team-seat-count"><strong>{{ selected().size }} / {{ memberLimitLabel(state) }}</strong><small>{{ copy().selected }}</small></div>
             </div>
             <ul class="team-members">
@@ -89,45 +110,12 @@ interface BranchReview {
                     </label>
                     @if (state.can_manage && member.id !== state.current_member_id) {
                       <button type="button" class="button secondary team-manage"
-                        [attr.aria-expanded]="expandedMember() === member.id"
-                        (click)="expandedMember.set(expandedMember() === member.id ? null : member.id)">
+                        aria-haspopup="dialog"
+                        (click)="openPermissions(member.id)">
                         {{ manageLabel() }}
                       </button>
                     }
                   </div>
-                  @if (expandedMember() === member.id && state.can_manage && member.id !== state.current_member_id) {
-                    <div class="team-member-settings">
-                      <div class="form-field"><span class="field-label">{{ i18n.text('profile') }}</span>
-                        <app-rubrica-select [ariaLabel]="i18n.text('profile') + ' · ' + member.auth_user_id"
-                          [disabled]="saving()" [value]="member.role" [options]="workspaceRoleOptions(member)" (valueChange)="changeRole(member, $event)" />
-                      </div>
-                      <div class="form-field"><span class="field-label">{{ documentScopeLabel() }}</span>
-                        @if (member.role === 'admin') { <span>{{ documentScopeText('all') }}</span> }
-                        @else {
-                          <app-rubrica-select [ariaLabel]="documentScopeLabel() + ' · ' + member.auth_user_id"
-                            [disabled]="saving()" [value]="member.document_scope ?? 'own'" [options]="documentScopeOptions(member)"
-                            (valueChange)="changeDocumentScope(member, $event)" />
-                        }
-                      </div>
-                      @if (member.role !== 'admin') {
-                        @if (tenant()?.kind === 'business') {
-                          <label class="team-seat-option team-company-option">
-                            <input class="team-checkbox" type="checkbox" [checked]="member.sign_company_only ?? false" [disabled]="saving()"
-                              (change)="changeSigningPermission(member, $event)" />
-                            {{ companyOnlyLabel() }}
-                          </label>
-                        }
-                        <div class="team-member-actions">
-                          @if (member.status === 'offboarded') {
-                            <button type="button" class="button secondary" [disabled]="saving()" (click)="changeMemberAccess(member, 'restore')">{{ accessActionText('restore') }}</button>
-                            <button type="button" class="button secondary" [disabled]="saving()" (click)="changeMemberAccess(member, 'fresh')">{{ accessActionText('fresh') }}</button>
-                          } @else {
-                            <button type="button" class="button secondary team-destructive" [disabled]="saving()" (click)="changeMemberAccess(member, 'offboard')">{{ accessActionText('offboard') }}</button>
-                          }
-                        </div>
-                      }
-                    </div>
-                  }
                 </li>
               }
             </ul>
@@ -139,19 +127,55 @@ interface BranchReview {
             </footer>
           </article>
           @if (state.can_request_branch) {
-            <article class="card">
+            <article class="card branch-section">
               <h2>{{ branchLabel() }}</h2>
-              <form class="form" (ngSubmit)="requestBranch()">
+              <form class="form branch-form" (ngSubmit)="requestBranch()">
                 <label>{{ i18n.text('name') }}<input name="branchName" [(ngModel)]="branchName" maxlength="240" required /></label>
                 <label>CNPJ<input name="branchCnpj" [(ngModel)]="branchCnpj" inputmode="numeric" required /></label>
-                <button type="submit" class="button" [disabled]="saving() || !branchName.trim() || !branchCnpj.trim()">{{ i18n.text('save') }}</button>
+                <button type="submit" class="button" [disabled]="saving() || !branchName.trim() || !branchCnpj.trim()">{{ createBranchLabel() }}</button>
               </form>
               @for (branch of branches(); track branch.id) {
-                <p>{{ branch.legal_name }} · {{ branch.cnpj_masked }} · {{ branch.workspace_active ? copy().active : branchStatus(branch.status) }}
-                  @if (branch.status === 'approved' && !branch.workspace_active) {
-                    <button type="button" class="button secondary" [disabled]="saving()" (click)="checkoutBranch(branch)">{{ branchCheckoutLabel() }}</button>
+                <section class="branch-card">
+                  @if (branch.workspace_active && branch.business_tenant_id) {
+                    <button type="button" class="branch-card-header" [attr.aria-expanded]="expandedBranch() === branch.id"
+                      [attr.aria-controls]="'branch-members-' + branch.id" (click)="toggleBranch(branch)">
+                      <span class="branch-card-name"><strong>{{ branch.legal_name }}</strong><small class="muted">CNPJ {{ branch.cnpj_masked }}</small></span>
+                      <span class="branch-card-meta">{{ branchMemberCount(branch.member_count) }}
+                        <i class="bi" [class.bi-chevron-up]="expandedBranch() === branch.id"
+                          [class.bi-chevron-down]="expandedBranch() !== branch.id" aria-hidden="true"></i>
+                      </span>
+                    </button>
+                    <div class="branch-card-body" [id]="'branch-members-' + branch.id" [hidden]="expandedBranch() !== branch.id">
+                      @if (expandedBranch() === branch.id) {
+                        <button type="button" class="button secondary" (click)="openInvite(branch)"><i class="bi bi-person-plus" aria-hidden="true"></i> {{ inviteLabel() }}</button>
+                        @if (branchLoading() === branch.id) { <p role="status">{{ i18n.text('loading') }}</p> }
+                        @else if (branchMembers()[branch.id]; as members) {
+                          @if (!members.length) { <p class="muted">{{ emptyBranchLabel() }}</p> }
+                          @else {
+                            <div class="table-wrap"><table class="data-table"><thead><tr><th>{{ i18n.text('email') }}</th><th>{{ i18n.text('profile') }}</th><th>{{ i18n.text('status') }}</th></tr></thead>
+                              <tbody>
+                                @for (member of members; track member.id) {
+                                  <tr><td [attr.data-label]="i18n.text('email')">{{ member.auth_user_id }}</td>
+                                    <td [attr.data-label]="i18n.text('profile')">{{ roleLabel(member) }}</td>
+                                    <td [attr.data-label]="i18n.text('status')">{{ member.status === 'active' ? copy().active : member.status === 'offboarded' ? offboardedLabel() : withoutSeatLabel() }}</td></tr>
+                                }
+                              </tbody>
+                            </table></div>
+                          }
+                        }
+                      }
+                    </div>
+                  } @else {
+                    <div class="branch-card-header">
+                      <span class="branch-card-name"><strong>{{ branch.legal_name }}</strong><small class="muted">CNPJ {{ branch.cnpj_masked }}</small></span>
+                      <span class="branch-card-meta">{{ branch.workspace_closed ? closureLabel() : branchStatus(branch.status) }}
+                        @if (branch.status === 'approved' && !branch.workspace_closed) {
+                          <button type="button" class="button secondary" [disabled]="saving()" (click)="checkoutBranch(branch)">{{ branchCheckoutLabel() }}</button>
+                        }
+                      </span>
+                    </div>
                   }
-                </p>
+                </section>
               }
             </article>
           }
@@ -178,9 +202,51 @@ interface BranchReview {
         } @else { <p class="notice">{{ copy().empty }}</p> }
       </section>
     </div>
+    <dialog #permissionsDialog class="app-modal team-permissions-dialog" aria-labelledby="team-permissions-title"
+      (close)="expandedMember.set(null)">
+      @if (permissionMember(); as member) {
+        <header class="modal-header">
+          <div><h2 id="team-permissions-title">{{ manageLabel() }}</h2><p class="muted">{{ member.auth_user_id }}</p></div>
+          <button type="button" class="icon-button" [attr.aria-label]="i18n.text('close')" (click)="permissionsDialog.close()">×</button>
+        </header>
+                    <div class="modal-body team-member-settings">
+                      <div class="form-field"><span class="field-label">{{ i18n.text('profile') }}</span>
+                        <small class="muted">{{ permissionHelp('role') }}</small>
+                        <app-rubrica-select [ariaLabel]="i18n.text('profile') + ' · ' + member.auth_user_id"
+                          [disabled]="saving()" [value]="member.role" [options]="workspaceRoleOptions(member)" (valueChange)="changeRole(member, $event)" />
+                      </div>
+                      <div class="form-field"><span class="field-label">{{ documentScopeLabel() }}</span>
+                        <small class="muted">{{ permissionHelp('files') }}</small>
+                        @if (member.role === 'admin') { <span>{{ documentScopeText('all') }}</span> }
+                        @else {
+                          <app-rubrica-select [ariaLabel]="documentScopeLabel() + ' · ' + member.auth_user_id"
+                            [disabled]="saving()" [value]="member.document_scope ?? 'own'" [options]="documentScopeOptions(member)"
+                            (valueChange)="changeDocumentScope(member, $event)" />
+                        }
+                      </div>
+                      @if (member.role !== 'admin') {
+                        @if (tenant()?.kind === 'business') {
+                          <label class="team-seat-option team-company-option">
+                            <input class="team-checkbox" type="checkbox" [checked]="member.sign_company_only ?? false" [disabled]="saving()"
+                              (change)="changeSigningPermission(member, $event)" />
+                            {{ companyOnlyLabel() }}
+                          </label><small class="muted">{{ permissionHelp('sign') }}</small>
+                        }
+                        <div class="team-member-actions">
+                          @if (member.status === 'offboarded') {
+                            <div><button type="button" class="button secondary" [disabled]="saving()" (click)="changeMemberAccess(member, 'restore')">{{ accessActionText('restore') }}</button><p class="muted">{{ permissionHelp('restore') }}</p></div>
+                            <div><button type="button" class="button secondary" [disabled]="saving()" (click)="changeMemberAccess(member, 'fresh')">{{ accessActionText('fresh') }}</button><p class="muted">{{ permissionHelp('fresh') }}</p></div>
+                          } @else {
+                            <div><button type="button" class="button secondary team-destructive" [disabled]="saving()" (click)="changeMemberAccess(member, 'offboard')">{{ accessActionText('offboard') }}</button><p class="muted">{{ permissionHelp('offboard') }}</p></div>
+                          }
+                        </div>
+                      }
+                    </div>
+      }
+    </dialog>
     @if (inviteOpen()) {
       <div class="modal-backdrop" (click)="closeInvite($event)"><section class="app-modal" role="dialog" aria-modal="true" [attr.aria-label]="inviteLabel()" (click)="$event.stopPropagation()">
-        <header class="modal-header"><div><p class="eyebrow">{{ copy().team }}</p><h2>{{ inviteLabel() }}</h2></div><button type="button" class="icon-button" [attr.aria-label]="i18n.text('close')" (click)="inviteOpen.set(false)">×</button></header>
+        <header class="modal-header"><div><p class="eyebrow">{{ inviteBranch()?.legal_name ?? tenant()?.name }}</p><h2>{{ inviteLabel() }}</h2></div><button type="button" class="icon-button" [attr.aria-label]="i18n.text('close')" (click)="inviteOpen.set(false)">×</button></header>
         <form class="modal-body form" (ngSubmit)="invite()">
           <label>{{ i18n.text('name') }}<input name="memberName" [(ngModel)]="memberName" required autocomplete="name" /></label>
           <label>{{ documentLabel() }}<input name="memberDocument" [(ngModel)]="memberDocument" required inputmode="numeric" autocomplete="off" /></label>
@@ -201,6 +267,12 @@ export class TeamPageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly feedback = inject(FeedbackService);
   readonly expandedMember = signal<string | null>(null);
+  readonly permissionsDialogRef = viewChild<ElementRef<HTMLDialogElement>>('permissionsDialog');
+  readonly permissionMember = computed(() => this.team()?.members.find(member => member.id === this.expandedMember()));
+  openPermissions(memberId: string): void {
+    this.expandedMember.set(memberId);
+    this.permissionsDialogRef()?.nativeElement.showModal();
+  }
   readonly tenant = signal<TenantItem | undefined>(undefined);
   readonly team = signal<TenantTeam | null>(null);
   readonly selected = signal(new Set<string>());
@@ -209,6 +281,10 @@ export class TeamPageComponent implements OnInit {
   readonly saved = signal(false);
   readonly inviteOpen = signal(false);
   readonly branches = signal<BranchReview[]>([]);
+  readonly expandedBranch = signal<string | null>(null);
+  readonly branchLoading = signal<string | null>(null);
+  readonly branchMembers = signal<Record<string, TenantMember[]>>({});
+  readonly inviteBranch = signal<BranchReview | null>(null);
   branchName = '';
   branchCnpj = '';
   memberName = '';
@@ -216,6 +292,53 @@ export class TeamPageComponent implements OnInit {
   memberEmail = '';
   memberRole: 'member' | 'auditor' = 'member';
   copy() { return teamCopy[this.i18n.locale()]; }
+  permissionHelp(action: 'seat' | 'role' | 'files' | 'sign' | 'offboard' | 'restore' | 'fresh'): string {
+    const copy = {
+      seat: {
+        'pt-BR': 'Desmarque e salve para retirar o acesso na virada do ciclo. A pessoa continua no time e pode receber um assento em outro ciclo.',
+        en: 'Uncheck and save to remove access at the next cycle. The person stays on the team and can receive a seat in a later cycle.',
+        es: 'Desmarca y guarda para retirar el acceso en el próximo ciclo. La persona sigue en el equipo y puede recibir un asiento más adelante.',
+        'ja-JP': 'チェックを外して保存すると、次のサイクルでアクセスが停止します。メンバー登録は残り、後のサイクルで再割り当てできます。',
+      },
+      role: {
+        'pt-BR': 'Define o que a pessoa pode fazer no workspace, como administrar o time ou atuar como auditora.',
+        en: 'Controls what the person can do in this workspace, such as managing the team or auditing.',
+        es: 'Define lo que la persona puede hacer en el espacio, como administrar el equipo o auditar.',
+        'ja-JP': 'チームの管理や監査など、ワークスペースでできる操作を設定します。',
+      },
+      files: {
+        'pt-BR': 'Escolha se a pessoa vê os próprios arquivos, os adicionados desde a entrada no time ou todos os arquivos.',
+        en: 'Choose whether they see their own files, files added since they joined, or all files.',
+        es: 'Elige si puede ver sus archivos, los que se añadieron desde su incorporación o todos los archivos.',
+        'ja-JP': '本人のファイル、参加後に追加されたファイル、またはすべてのファイルから選びます。',
+      },
+      sign: {
+        'pt-BR': 'Ao marcar, a pessoa só pode assinar como representante da empresa neste workspace.',
+        en: 'When checked, the person can only sign as a company representative in this workspace.',
+        es: 'Al marcarlo, la persona solo puede firmar como representante de la empresa en este espacio.',
+        'ja-JP': '有効にすると、このワークスペースでは会社の代表者としてのみ署名できます。',
+      },
+      offboard: {
+        'pt-BR': 'Encerra o vínculo e corta o acesso agora, inclusive por links antigos. Os documentos ficam com a empresa.',
+        en: 'Ends the membership and revokes access now, including old links. Documents stay with the company.',
+        es: 'Termina el vínculo y revoca el acceso de inmediato, incluidos los enlaces anteriores. Los documentos quedan en la empresa.',
+        'ja-JP': 'メンバー資格を解除し、古いリンクを含むアクセスを即時停止します。文書は会社に残ります。',
+      },
+      restore: {
+        'pt-BR': 'Recupera a data de entrada e as permissões anteriores. O acesso depende de haver assento disponível.',
+        en: 'Restores the original join date and permissions. Access depends on an available seat.',
+        es: 'Recupera la fecha de incorporación y los permisos anteriores. El acceso depende de que haya un asiento disponible.',
+        'ja-JP': '以前の参加日と権限を復元します。アクセスには空きシートが必要です。',
+      },
+      fresh: {
+        'pt-BR': 'Cria uma nova entrada no time. A pessoa começa com acesso apenas aos próprios arquivos novos quando houver assento.',
+        en: 'Starts a new membership. With a seat, the person starts with access to their own new files only.',
+        es: 'Inicia un vínculo nuevo. Con un asiento, la persona empieza con acceso solo a sus propios archivos nuevos.',
+        'ja-JP': '新規メンバーとして登録します。空きシートがあれば、本人の新しいファイルにのみアクセスできます。',
+      },
+    };
+    return this.local(copy[action]);
+  }
   roleLabel(member: TenantMember): string {
     return member.role === 'admin' ? this.copy().admin : member.role === 'auditor' ? this.copy().auditor : this.copy().member;
   }
@@ -333,6 +456,41 @@ export class TeamPageComponent implements OnInit {
     } catch (error) { await this.feedback.error(error); }
     finally { this.saving.set(false); }
   }
+  createBranchLabel(): string {
+    return this.local({ 'pt-BR': 'Solicitar nova filial', en: 'Request a new branch', es: 'Solicitar una sucursal', 'ja-JP': '支店を申請する' });
+  }
+  branchMemberCount(count: number): string {
+    return new Intl.NumberFormat(this.i18n.locale()).format(count) + ' ' + (count === 1
+      ? this.local({ 'pt-BR': 'membro', en: 'member', es: 'miembro', 'ja-JP': '人' })
+      : this.local({ 'pt-BR': 'membros', en: 'members', es: 'miembros', 'ja-JP': '人' }));
+  }
+  emptyBranchLabel(): string {
+    return this.local({ 'pt-BR': 'Esta filial ainda não tem membros.', en: 'This branch has no members yet.', es: 'Esta sucursal aún no tiene miembros.', 'ja-JP': 'この支店にはまだメンバーがいません。' });
+  }
+  async toggleBranch(branch: BranchReview): Promise<void> {
+    if (this.expandedBranch() === branch.id) { this.expandedBranch.set(null); return; }
+    this.expandedBranch.set(branch.id);
+    try { await this.loadBranchMembers(branch); }
+    catch (error) { await this.feedback.error(error); }
+  }
+  private async loadBranchMembers(branch: BranchReview): Promise<void> {
+    if (!branch.business_tenant_id) return;
+    this.branchLoading.set(branch.id);
+    try {
+      const members = await firstValueFrom(this.api.get<TenantMember[]>(`/tenants/${branch.business_tenant_id}/members`));
+      this.branchMembers.update(current => ({ ...current, [branch.id]: members }));
+    } finally {
+      if (this.branchLoading() === branch.id) this.branchLoading.set(null);
+    }
+  }
+  openInvite(branch: BranchReview | null = null): void {
+    this.memberName = '';
+    this.memberDocument = '';
+    this.memberEmail = '';
+    this.memberRole = 'member';
+    this.inviteBranch.set(branch);
+    this.inviteOpen.set(true);
+  }
   branchLabel(): string {
     return this.local({ 'pt-BR': 'Filiais', en: 'Branches', es: 'Sucursales', 'ja-JP': '支店' });
   }
@@ -405,11 +563,17 @@ export class TeamPageComponent implements OnInit {
     finally { this.saving.set(false); }
   }
   async invite() {
+    const branch = this.inviteBranch();
+    const tenant = this.tenant();
+    const destination = branch ? branch.business_tenant_id : tenant?.id;
+    if (!tenant || !destination || this.saving()) return;
     this.saving.set(true);
     try {
-      await firstValueFrom(this.api.post(`/tenants/${this.tenant()!.id}/member-invitations`, { name: this.memberName.trim(), document: this.memberDocument.trim(), email: this.memberEmail.trim().toLowerCase(), role: this.memberRole }));
-      this.setTeam(await firstValueFrom(this.api.get<TenantTeam>(`/tenants/${this.tenant()!.id}/team`)));
-      this.inviteOpen.set(false); this.memberName = ''; this.memberDocument = ''; this.memberEmail = ''; this.memberRole = 'member';
+      await firstValueFrom(this.api.post(`/tenants/${destination}/member-invitations`, { name: this.memberName.trim(), document: this.memberDocument.trim(), email: this.memberEmail.trim().toLowerCase(), role: this.memberRole }));
+      this.inviteOpen.set(false);
+      if (branch) await Promise.all([this.loadBranchMembers(branch), this.loadBranches(tenant.id)]);
+      else this.setTeam(await firstValueFrom(this.api.get<TenantTeam>(`/tenants/${tenant.id}/team`)));
+      this.memberName = ''; this.memberDocument = ''; this.memberEmail = ''; this.memberRole = 'member';
       await this.feedback.success(this.inviteSentLabel());
     } catch (error) { await this.feedback.error(error); }
     finally { this.saving.set(false); }
@@ -430,13 +594,14 @@ export class TeamPageComponent implements OnInit {
   async changeMemberAccess(member: TenantMember, action: 'offboard' | 'restore' | 'fresh') {
     const tenant = this.tenant();
     if (!tenant || this.saving()) return;
-    if (!window.confirm(`${this.accessActionText(action)} — ${member.auth_user_id}?`)) return;
+    if (!window.confirm(`${this.accessActionText(action)} — ${member.auth_user_id}?\n\n${this.permissionHelp(action)}`)) return;
     this.saving.set(true);
     try {
       this.setTeam(await firstValueFrom(this.api.patch<TenantTeam>(
         `/tenants/${tenant.id}/team/${member.id}/access`, { action },
       )));
-    } catch (error) { await this.feedback.error(error); }
+    } catch (error) { this.permissionsDialogRef()?.nativeElement.close();
+      await this.feedback.error(error); }
     finally { this.saving.set(false); }
   }
   companyOnlyLabel() {
@@ -453,6 +618,7 @@ export class TeamPageComponent implements OnInit {
       )));
     } catch (error) {
       input.checked = member.sign_company_only ?? false;
+      this.permissionsDialogRef()?.nativeElement.close();
       await this.feedback.error(error);
     } finally { this.saving.set(false); }
   }
@@ -481,7 +647,8 @@ export class TeamPageComponent implements OnInit {
         `/tenants/${tenant.id}/team/${member.id}/document-scope`, { document_scope: scope },
       ));
       this.team.set(state);
-    } catch (error) { await this.feedback.error(error); }
+    } catch (error) { this.permissionsDialogRef()?.nativeElement.close();
+      await this.feedback.error(error); }
     finally { this.saving.set(false); }
   }
   async changeRole(member: TenantMember, value: string) {
@@ -490,6 +657,7 @@ export class TeamPageComponent implements OnInit {
     if (role === member.role) return;
     if (role === 'admin') {
       const result = await Swal.fire({
+        target: this.permissionsDialogRef()?.nativeElement,
         icon: 'warning',
         text: this.team()?.organization_root ? this.local({
           'pt-BR': 'Este membro poderá administrar e abrir os documentos da sede e de todas as filiais da organização.',
@@ -511,8 +679,10 @@ export class TeamPageComponent implements OnInit {
     this.saving.set(true);
     try {
       this.setTeam(await firstValueFrom(this.api.patch<TenantTeam>(`/tenants/${this.tenant()!.id}/team/${member.id}/role`, { role })));
+      this.permissionsDialogRef()?.nativeElement.close();
       await this.feedback.success(this.roleUpdatedLabel());
-    } catch (error) { await this.feedback.error(error); }
+    } catch (error) { this.permissionsDialogRef()?.nativeElement.close();
+      await this.feedback.error(error); }
     finally { this.saving.set(false); }
   }
   closeInvite(event: MouseEvent) { if (event.target === event.currentTarget) this.inviteOpen.set(false); }
