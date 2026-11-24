@@ -76,7 +76,15 @@ interface BranchReview {
     .branch-card-body { display: grid; gap: .75rem; padding: 1rem; border-top: 1px solid #e6ecf3; }
     .branch-card-body .team-roster { border: 0; border-radius: 0; box-shadow: none; }
     .branch-card-body .team-roster-header { padding: .25rem .5rem .85rem; }
-    .branch-card-body[hidden] { display: none; }
+    .branch-panel { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .22s ease; }
+    .branch-panel.is-open { grid-template-rows: 1fr; }
+    .branch-panel-clip { min-height: 0; overflow: hidden; }
+    .branch-chevron { transition: transform .22s ease; }
+    .branch-chevron.is-open { transform: rotate(180deg); }
+    @media (prefers-reduced-motion: reduce) {
+      .branch-panel, .branch-chevron { transition: none; }
+    }
+    .permission-feedback { margin: 0 1.25rem .5rem; }
     .branch-card-body > .button { justify-self: start; }
     .branch-card-body td:first-child { overflow-wrap: anywhere; }
     @media (max-width: 700px) {
@@ -159,12 +167,12 @@ interface BranchReview {
                       <span class="branch-card-meta">
                         {{ branch.workspace_active ? branchMemberCount(branch.member_count) : branchStatus(branch) }}
                         @if (branch.current_workspace) { <span class="muted">· {{ activeMemberCount(state.active_count) }}</span> }
-                        <i class="bi" [class.bi-chevron-up]="expandedBranch() === branch.id"
-                          [class.bi-chevron-down]="expandedBranch() !== branch.id" aria-hidden="true"></i>
+                        <i class="bi bi-chevron-down branch-chevron" [class.is-open]="expandedBranch() === branch.id" aria-hidden="true"></i>
                       </span>
                     </button>
-                    <div class="branch-card-body" [id]="'branch-members-' + branch.id" [hidden]="expandedBranch() !== branch.id">
-                      @if (expandedBranch() === branch.id) {
+                    <div class="branch-panel" [id]="'branch-members-' + branch.id"
+                      [class.is-open]="expandedBranch() === branch.id" [attr.inert]="expandedBranch() === branch.id ? null : ''">
+                      <div class="branch-panel-clip"><div class="branch-card-body">
                         @if (branch.current_workspace) {
                           <button type="button" class="button secondary" (click)="openInvite()"><i class="bi bi-person-plus" aria-hidden="true"></i> {{ inviteLabel() }}</button>
                           <ng-container [ngTemplateOutlet]="workspaceRoster" />
@@ -191,7 +199,7 @@ interface BranchReview {
                             <button type="button" class="button secondary" [disabled]="saving()" (click)="checkoutBranch(branch)">{{ branchCheckoutLabel() }}</button>
                           }
                         }
-                      }
+                      </div></div>
                     </div>
                 </section>
               } @empty {
@@ -231,35 +239,38 @@ interface BranchReview {
       </section>
     </div>
     <dialog #permissionsDialog class="app-modal team-permissions-dialog" aria-labelledby="team-permissions-title"
-      (close)="expandedMember.set(null)">
+      (close)="expandedMember.set(null)" (cancel)="saving() && $event.preventDefault()">
       @if (permissionMember(); as member) {
         <header class="modal-header">
           <div><h2 id="team-permissions-title">{{ manageLabel() }}</h2><p class="muted">{{ member.auth_user_id }}</p></div>
-          <button type="button" class="icon-button" [attr.aria-label]="i18n.text('close')" (click)="permissionsDialog.close()">×</button>
+          <button type="button" class="icon-button" [attr.aria-label]="i18n.text('close')" [disabled]="saving()" (click)="permissionsDialog.close()">×</button>
         </header>
                     <div class="modal-body team-member-settings">
                       <div class="form-field"><span class="field-label">{{ i18n.text('profile') }}</span>
                         <small class="muted">{{ permissionHelp('role') }}</small>
                         <app-rubrica-select [ariaLabel]="i18n.text('profile') + ' · ' + member.auth_user_id"
-                          [disabled]="saving()" [value]="member.role" [options]="workspaceRoleOptions(member)" (valueChange)="changeRole(member, $event)" />
+                          [disabled]="saving()" [value]="draftRole()" [options]="workspaceRoleOptions(member)" (valueChange)="setDraftRole($event)" />
                       </div>
                       <div class="form-field"><span class="field-label">{{ documentScopeLabel() }}</span>
                         <small class="muted">{{ permissionHelp('files') }}</small>
-                        @if (member.role === 'admin') { <span>{{ documentScopeText('all') }}</span> }
+                        @if (draftRole() === 'admin') { <span>{{ documentScopeText('all') }}</span> }
                         @else {
                           <app-rubrica-select [ariaLabel]="documentScopeLabel() + ' · ' + member.auth_user_id"
-                            [disabled]="saving()" [value]="member.document_scope ?? 'own'" [options]="documentScopeOptions(member)"
-                            (valueChange)="changeDocumentScope(member, $event)" />
+                            [disabled]="saving()" [value]="draftScope()" [options]="documentScopeOptions(member)"
+                            (valueChange)="setDraftScope($event)" />
                         }
                       </div>
-                      @if (member.role !== 'admin') {
-                        @if (tenant()?.kind === 'business') {
+                      @if (draftRole() === 'admin' && member.role !== 'admin') {
+                        <p class="notice warning">{{ administratorAccessNotice() }}</p>
+                      }
+                      @if (draftRole() !== 'admin' && tenant()?.kind === 'business') {
                           <label class="team-seat-option team-company-option">
-                            <input class="team-checkbox" type="checkbox" [checked]="member.sign_company_only ?? false" [disabled]="saving()"
-                              (change)="changeSigningPermission(member, $event)" />
+                            <input class="team-checkbox" type="checkbox" [checked]="draftCompanyOnly()" [disabled]="saving()"
+                              (change)="setDraftCompanyOnly($event)" />
                             {{ companyOnlyLabel() }}
                           </label><small class="muted">{{ permissionHelp('sign') }}</small>
-                        }
+                      }
+                      @if (member.role !== 'admin') {
                         <div class="team-member-actions">
                           @if (member.status === 'offboarded') {
                             <div><button type="button" class="button secondary" [disabled]="saving()" (click)="changeMemberAccess(member, 'restore')">{{ accessActionText('restore') }}</button><p class="muted">{{ permissionHelp('restore') }}</p></div>
@@ -270,6 +281,12 @@ interface BranchReview {
                         </div>
                       }
                     </div>
+        @if (permissionError()) { <p class="notice warning permission-feedback" role="alert">{{ permissionError() }}</p> }
+        @if (permissionsSaved()) { <p class="notice permission-feedback" role="status">{{ roleUpdatedLabel() }}</p> }
+        <footer class="modal-footer">
+          <button type="button" class="button secondary" [disabled]="saving()" (click)="permissionsDialog.close()">{{ i18n.text('close') }}</button>
+          <button type="button" class="button" [disabled]="saving() || !permissionsDirty(member)" (click)="savePermissions(member)">{{ savePermissionsLabel() }}</button>
+        </footer>
       }
     </dialog>
     @if (inviteOpen()) {
@@ -297,7 +314,19 @@ export class TeamPageComponent implements OnInit {
   readonly expandedMember = signal<string | null>(null);
   readonly permissionsDialogRef = viewChild<ElementRef<HTMLDialogElement>>('permissionsDialog');
   readonly permissionMember = computed(() => this.team()?.members.find(member => member.id === this.expandedMember()));
+  readonly draftRole = signal<TenantMember['role']>('member');
+  readonly draftScope = signal<DocumentScope | 'legacy'>('own');
+  readonly draftCompanyOnly = signal(false);
+  readonly permissionsSaved = signal(false);
+  readonly permissionError = signal('');
   openPermissions(memberId: string): void {
+    const member = this.team()?.members.find(item => item.id === memberId);
+    if (!member) return;
+    this.draftRole.set(member.role);
+    this.draftScope.set(member.document_scope ?? 'own');
+    this.draftCompanyOnly.set(member.sign_company_only ?? false);
+    this.permissionsSaved.set(false);
+    this.permissionError.set('');
     this.expandedMember.set(memberId);
     this.permissionsDialogRef()?.nativeElement.showModal();
   }
@@ -705,21 +734,6 @@ export class TeamPageComponent implements OnInit {
   companyOnlyLabel() {
     return this.local({ 'pt-BR': 'Assina só em nome da empresa', en: 'Sign only for the company', es: 'Firma solo en nombre de la empresa', 'ja-JP': '会社名義でのみ署名' });
   }
-  async changeSigningPermission(member: TenantMember, event: Event) {
-    const tenant = this.tenant();
-    if (!tenant || this.saving()) return;
-    const input = event.target as HTMLInputElement;
-    this.saving.set(true);
-    try {
-      this.team.set(await firstValueFrom(this.api.patch<TenantTeam>(
-        `/tenants/${tenant.id}/team/${member.id}/document-scope`, { sign_company_only: input.checked },
-      )));
-    } catch (error) {
-      input.checked = member.sign_company_only ?? false;
-      this.permissionsDialogRef()?.nativeElement.close();
-      await this.feedback.error(error);
-    } finally { this.saving.set(false); }
-  }
   documentScopeLabel() {
     return this.local({ 'pt-BR': 'Acesso aos arquivos', en: 'File access', es: 'Acceso a archivos', 'ja-JP': 'ファイルアクセス' });
   }
@@ -736,51 +750,57 @@ export class TeamPageComponent implements OnInit {
     if (member.document_scope === 'legacy') scopes.unshift('legacy');
     return scopes.map(value => ({ value, label: this.documentScopeText(value) }));
   }
-  async changeDocumentScope(member: TenantMember, scope: string) {
-    const tenant = this.tenant();
-    if (!tenant || this.saving() || !['own', 'all', 'since_joined'].includes(scope) || member.document_scope === scope) return;
-    this.saving.set(true);
-    try {
-      const state = await firstValueFrom(this.api.patch<TenantTeam>(
-        `/tenants/${tenant.id}/team/${member.id}/document-scope`, { document_scope: scope },
-      ));
-      this.team.set(state);
-    } catch (error) { this.permissionsDialogRef()?.nativeElement.close();
-      await this.feedback.error(error); }
-    finally { this.saving.set(false); }
+  setDraftRole(value: string): void {
+    if (value === 'admin' || value === 'member' || value === 'auditor') this.draftRole.set(value);
+    this.permissionsSaved.set(false);
   }
-  async changeRole(member: TenantMember, value: string) {
-    if (value !== 'admin' && value !== 'member' && value !== 'auditor') return;
-    const role = value;
-    if (role === member.role) return;
-    if (role === 'admin') {
-      const result = await Swal.fire({
-        target: this.permissionsDialogRef()?.nativeElement,
-        icon: 'warning',
-        text: this.team()?.organization_root ? this.local({
-          'pt-BR': 'Este membro poderá administrar e abrir os documentos da sede e de todas as filiais da organização.',
-          en: 'This member can manage and open documents in the main workspace and every branch.',
-          es: 'Este miembro podrá administrar y abrir documentos en la sede y todas las sucursales.',
-          'ja-JP': 'このメンバーは本部とすべての支店の文書を開き、管理できます。',
-        }) : this.local({
-          'pt-BR': 'Este membro terá acesso administrativo e poderá abrir todos os documentos deste workspace.',
-          en: 'This member will have administrator access and can open every document in this workspace.',
-          es: 'Este miembro tendrá acceso administrativo y podrá abrir todos los documentos de este espacio.',
-          'ja-JP': 'このメンバーは管理権限を取得し、このワークスペースのすべての文書を開けるようになります。',
-        }),
-        showCancelButton: true,
-        confirmButtonText: this.copy().admin,
-        cancelButtonText: this.i18n.text('cancel'),
-      });
-      if (!result.isConfirmed) return;
-    }
+  setDraftScope(value: string): void {
+    if (value === 'own' || value === 'all' || value === 'since_joined' || value === 'legacy') this.draftScope.set(value);
+    this.permissionsSaved.set(false);
+  }
+  setDraftCompanyOnly(event: Event): void {
+    this.draftCompanyOnly.set((event.target as HTMLInputElement).checked);
+    this.permissionsSaved.set(false);
+  }
+  permissionsDirty(member: TenantMember): boolean {
+    return this.draftRole() !== member.role || (this.draftRole() !== 'admin' && (
+      this.draftScope() !== (member.document_scope ?? 'own') || this.draftCompanyOnly() !== (member.sign_company_only ?? false)
+    ));
+  }
+  savePermissionsLabel(): string {
+    return this.local({ 'pt-BR': 'Salvar permissões', en: 'Save permissions', es: 'Guardar permisos', 'ja-JP': '権限を保存' });
+  }
+  administratorAccessNotice(): string {
+    return this.team()?.organization_root ? this.local({
+      'pt-BR': 'Ao salvar, este membro poderá administrar a sede e todas as filiais e acessar seus documentos.',
+      en: 'Saving gives this member administrative and document access to every workspace in the organization.',
+      es: 'Al guardar, este miembro podrá administrar la sede y todas las sucursales y acceder a sus documentos.',
+      'ja-JP': '保存すると、組織内のすべての拠点を管理し、文書にアクセスできるようになります。',
+    }) : this.local({
+      'pt-BR': 'Ao salvar, este membro poderá administrar o workspace e acessar todos os documentos.',
+      en: 'Saving gives this member administrative access and access to every document in this workspace.',
+      es: 'Al guardar, este miembro podrá administrar el espacio y acceder a todos sus documentos.',
+      'ja-JP': '保存すると、このワークスペースを管理し、すべての文書にアクセスできるようになります。',
+    });
+  }
+  async savePermissions(member: TenantMember): Promise<void> {
+    const tenant = this.tenant();
+    if (!tenant || this.saving() || !this.permissionsDirty(member)) return;
+    const role = this.draftRole();
+    const scope = this.draftScope();
+    const companyOnly = this.draftCompanyOnly();
     this.saving.set(true);
+    this.permissionError.set('');
+    this.permissionsSaved.set(false);
     try {
-      this.setTeam(await firstValueFrom(this.api.patch<TenantTeam>(`/tenants/${this.tenant()!.id}/team/${member.id}/role`, { role })));
-      this.permissionsDialogRef()?.nativeElement.close();
-      await this.feedback.success(this.roleUpdatedLabel());
-    } catch (error) { this.permissionsDialogRef()?.nativeElement.close();
-      await this.feedback.error(error); }
+      const result = await firstValueFrom(this.api.patch<TenantTeam>(`/tenants/${tenant.id}/team/${member.id}/role`, {
+        role,
+        document_scope: role !== 'admin' && scope !== 'legacy' && scope !== (member.document_scope ?? 'own') ? scope : undefined,
+        sign_company_only: role !== 'admin' && tenant.kind === 'business' && companyOnly !== (member.sign_company_only ?? false) ? companyOnly : undefined,
+      }));
+      this.team.set(result);
+      this.permissionsSaved.set(true);
+    } catch (error) { this.permissionError.set(this.feedback.message(error)); }
     finally { this.saving.set(false); }
   }
   closeInvite(event: MouseEvent) { if (event.target === event.currentTarget) this.inviteOpen.set(false); }
