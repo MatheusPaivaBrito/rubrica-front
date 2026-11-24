@@ -11,6 +11,12 @@ import { I18nService } from '../core/i18n.service';
 import { BillingAccount, BillingCheckout, BillingPortal, TenantItem } from '../core/models';
 import { WorkspaceSidebarComponent } from '../components/workspace-sidebar.component';
 
+interface BusinessUpgradeReview {
+  legal_name: string;
+  cnpj_masked: string;
+  status: 'pending' | 'approved' | 'rejected';
+}
+
 @Component({
   standalone: true,
   imports: [FormsModule, WorkspaceSidebarComponent],
@@ -41,12 +47,28 @@ import { WorkspaceSidebarComponent } from '../components/workspace-sidebar.compo
               </div>
               <div class="billing-interval"><button type="button" [class.selected]="billingInterval() === 'month'" (click)="billingInterval.set('month')">{{ monthlyLabel() }}</button><button type="button" [class.selected]="billingInterval() === 'year'" (click)="billingInterval.set('year')">{{ annualLabel() }}</button></div>
             }
+            @if (needsBusinessReview()) {
+              <section class="business-card">
+                <h2>{{ businessReviewLabel() }}</h2>
+                @if (businessReview() && businessReview()?.status !== 'rejected') {
+                  <p>{{ businessReview()?.legal_name }} · {{ businessReview()?.cnpj_masked }} · {{ businessReviewStatus() }}</p>
+                } @else {
+                  <form class="form business-registration-form" (ngSubmit)="submitBusinessReview()">
+                    <label>{{ legalNameLabel() }}<input name="reviewLegalName" [(ngModel)]="businessLegalName" required /></label>
+                    <label>CNPJ<input name="reviewCnpj" [(ngModel)]="businessCnpj" required inputmode="numeric" autocomplete="off" /></label>
+                    <button class="button" [disabled]="submitting() || !businessLegalName.trim() || !businessCnpj.trim()">
+                      {{ businessReviewLabel() }}
+                    </button>
+                  </form>
+                }
+              </section>
+            }
             <div class="actions">
-              @if (canSubscribe()) { <button class="button" [disabled]="submitting()" (click)="checkout()"><i class="bi bi-box-arrow-up-right"></i> {{ i18n.text('subscribe') }}</button> }
-              @if (showPortalAction()) { <button class="button" [disabled]="submitting()" (click)="portal()"><i class="bi bi-arrow-left-right"></i> {{ confirmChangeLabel() }}</button> }
+              @if (canSubscribe() || needsBusinessReview()) { <button class="button" [disabled]="submitting() || (needsBusinessReview() && businessReview()?.status !== 'approved')" (click)="checkout()"><i class="bi bi-box-arrow-up-right"></i> {{ i18n.text('subscribe') }}</button> }
+              @if (showPortalAction() && !needsBusinessReview()) { <button class="button" [disabled]="submitting()" (click)="portal()"><i class="bi bi-arrow-left-right"></i> {{ confirmChangeLabel() }}</button> }
             </div>
             @if (checkoutUrl()) { <div class="checkout-qr"><img [src]="checkoutQrCode()" [alt]="i18n.text('checkoutQrAlt')" /><div><strong>{{ i18n.text('checkoutFinalize') }}</strong><p>{{ i18n.text('checkoutScan') }}</p><button class="button" (click)="openCheckout()">{{ i18n.text('openStripe') }}</button></div></div> }
-            @if (selectedTenant()?.kind !== 'business' && businessEligible()) {
+            @if (selectedTenant()?.kind !== 'business' && businessEligible() && !needsBusinessReview()) {
               <section class="business-card business-registration"><div><p class="eyebrow">{{ businessEyebrow() }}</p><h2>{{ businessPendingTitle() }}</h2><p class="muted">{{ businessFormHelp() }}</p></div><span class="status" data-status="pending">{{ pendingLabel() }}</span>
                 <form class="form business-registration-form" (ngSubmit)="completeBusinessRegistration()">
                   <label>{{ legalNameLabel() }}<input name="businessLegalName" [(ngModel)]="businessLegalName" required autocomplete="organization" /></label>
@@ -78,6 +100,7 @@ export class BillingPageComponent implements OnInit {
   readonly checkoutQrCode = signal('');
   businessLegalName = '';
   businessCnpj = '';
+  readonly businessReview = signal<BusinessUpgradeReview | null>(null);
   readonly selectedTenantCurrency = computed(() => this.tenants().find(tenant => tenant.id === this.tenantId())?.currency ?? 'USD');
   readonly availability = computed(() => {
     const account = this.account();
@@ -213,6 +236,35 @@ export class BillingPageComponent implements OnInit {
   annualLabel(): string { return this.local({ 'pt-BR':'Anual', en:'Annual', es:'Anual', 'ja-JP':'年払い' }); }
   private local(values: Record<'pt-BR' | 'en' | 'es' | 'ja-JP', string>): string { return values[this.i18n.locale()]; }
 
+  needsBusinessReview(): boolean {
+    return this.selectedTenant()?.kind === 'personal' && this.selectedPlan() !== 'rubrica_base';
+  }
+
+  businessReviewLabel(): string {
+    return this.local({ 'pt-BR': 'Solicitar revisão do CNPJ', en: 'Request CNPJ review', es: 'Solicitar revisión del CNPJ', 'ja-JP': 'CNPJの審査を申請' });
+  }
+
+  businessReviewStatus(): string {
+    return this.businessReview()?.status === 'approved'
+      ? this.local({ 'pt-BR': 'Aprovado', en: 'Approved', es: 'Aprobado', 'ja-JP': '承認済み' })
+      : this.local({ 'pt-BR': 'Em análise', en: 'Under review', es: 'En revisión', 'ja-JP': '審査中' });
+  }
+
+  async submitBusinessReview(): Promise<void> {
+    const id = this.tenantId();
+    if (!id || this.submitting()) return;
+    this.submitting.set(true);
+    try {
+      const review = await firstValueFrom(this.api.post<BusinessUpgradeReview>(`/tenants/${id}/business-upgrade-review`, {
+        legal_name: this.businessLegalName.trim(), cnpj: this.businessCnpj.trim(),
+      }));
+      if (this.tenantId() === id) this.businessReview.set(review);
+      this.businessCnpj = '';
+      this.businessLegalName = '';
+    } catch (error) { await this.feedback.error(error); }
+    finally { this.submitting.set(false); }
+  }
+
   async checkout(): Promise<void> { this.submitting.set(true); try { const result = await firstValueFrom(this.api.post<BillingCheckout>(`/billing/tenants/${this.tenantId()}/checkout`, { product_code: this.selectedPlan(), billing_interval: this.billingInterval() })); this.checkoutUrl.set(result.checkout_url); this.checkoutQrCode.set(await QRCode.toDataURL(result.checkout_url, { width: 260, margin: 2 })); } catch (error) { await this.feedback.error(error); } finally { this.submitting.set(false); } }
   async completeBusinessRegistration(): Promise<void> {
     this.submitting.set(true);
@@ -227,7 +279,17 @@ export class BillingPageComponent implements OnInit {
   async portal(): Promise<void> { await this.redirect<BillingPortal>(`/billing/tenants/${this.tenantId()}/portal`, 'portal_url', { product_code: this.selectedPlan(), billing_interval: this.billingInterval() }); }
   openCheckout(): void { if (this.checkoutUrl()) window.location.assign(this.checkoutUrl()); }
 
-  private async loadAccount(): Promise<void> { const account = await firstValueFrom(this.api.get<BillingAccount>(`/billing/tenants/${this.tenantId()}/account`)); this.account.set(account); const selected = this.availablePlans()[0] ?? 'rubrica_base'; this.selectedPlan.set(selected); }
+  private async loadAccount(): Promise<void> {
+    const id = this.tenantId();
+    this.businessReview.set(null);
+    const account = await firstValueFrom(this.api.get<BillingAccount>(`/billing/tenants/${id}/account`));
+    if (id !== this.tenantId()) return;
+    this.account.set(account);
+    this.selectedPlan.set(this.availablePlans()[0] ?? 'rubrica_base');
+    if (this.selectedTenant()?.kind !== 'personal') return;
+    const review = await firstValueFrom(this.api.get<BusinessUpgradeReview | null>(`/tenants/${id}/business-upgrade-review`));
+    if (id === this.tenantId()) this.businessReview.set(review);
+  }
   private planUrl(tenant: TenantItem, accountSlug: string): string { return tenantDashboardUrl(tenant, accountSlug).replace(/dashboard$/, 'plan'); }
   private async leaveComplimentaryBilling(): Promise<boolean> { return false; }
   private fileLimit(account: BillingAccount): number | null { if (typeof account.files_limit === 'number') return account.files_limit; if (!['active', 'past_due'].includes(account.status)) return null; if (account.current_product_code === 'rubrica_base') return 20; if (account.current_product_code === 'rubrica_intermediate') return 80; if (account.current_product_code === 'rubrica_team') return 220; return null; }
