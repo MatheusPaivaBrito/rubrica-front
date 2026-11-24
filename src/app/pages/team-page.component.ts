@@ -1,4 +1,5 @@
 import { Component, ElementRef, OnInit, computed, inject, signal, viewChild } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -21,10 +22,11 @@ interface BranchReview {
   workspace_closed?: boolean;
   business_tenant_id?: string | null;
   member_count: number;
+  current_workspace?: boolean;
 }
 
 @Component({
-  standalone: true, imports: [WorkspaceSidebarComponent, FormsModule, RubricaSelectComponent],
+  standalone: true, imports: [WorkspaceSidebarComponent, FormsModule, NgTemplateOutlet, RubricaSelectComponent],
   styles: [`
     .team-roster { padding: 0; overflow: visible; }
     .team-roster-header, .team-roster-footer {
@@ -72,6 +74,8 @@ interface BranchReview {
     .branch-card-name { display: grid; min-width: 0; gap: .2rem; overflow-wrap: anywhere; }
     .branch-card-meta { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem; }
     .branch-card-body { display: grid; gap: .75rem; padding: 1rem; border-top: 1px solid #e6ecf3; }
+    .branch-card-body .team-roster { border: 0; border-radius: 0; box-shadow: none; }
+    .branch-card-body .team-roster-header { padding: .25rem .5rem .85rem; }
     .branch-card-body[hidden] { display: none; }
     .branch-card-body > .button { justify-self: start; }
     .branch-card-body td:first-child { overflow-wrap: anywhere; }
@@ -86,13 +90,14 @@ interface BranchReview {
     <div class="workspace-layout"><app-workspace-sidebar [tenant]="tenant()" />
       <section class="container dashboard-container team-container">
         <header class="dashboard-header"><div><p class="eyebrow">{{ tenant()?.name }}</p><h1>{{ copy().team }}</h1><p class="muted">{{ copy().help }}</p></div>
-          @if (team()?.can_manage && !team()?.export_until) { <button class="button" (click)="openInvite()"><i class="bi bi-person-plus" aria-hidden="true"></i> {{ inviteLabel() }}</button> }
+          @if (team()?.can_manage && !team()?.export_until && !team()?.can_request_branch) { <button class="button" (click)="openInvite()"><i class="bi bi-person-plus" aria-hidden="true"></i> {{ inviteLabel() }}</button> }
         </header>
         @if (loading()) { <p class="notice">{{ i18n.text('loading') }}</p> }
         @else if (team(); as state) {
           @if (!state.export_until) {
           @if (state.requires_selection) { <p class="notice warning" role="alert">{{ copy().overLimit }}</p> }
           @if (!state.can_manage) { <p class="notice">{{ copy().readonly }}</p> }
+          <ng-template #workspaceRoster>
           <article class="card team-roster">
             <div class="team-roster-header">
               <div><h2>{{ copy().choose }}</h2><p class="muted">{{ cycleHelp(state) }}</p><p class="muted">{{ permissionHelp('seat') }}</p></div>
@@ -130,6 +135,10 @@ interface BranchReview {
               }
             </footer>
           </article>
+          </ng-template>
+          @if (!state.can_request_branch) {
+            <ng-container [ngTemplateOutlet]="workspaceRoster" />
+          }
           @if (state.can_request_branch) {
             <article class="card branch-section">
               <h2>{{ branchLabel() }}</h2>
@@ -138,7 +147,6 @@ interface BranchReview {
                 <label>CNPJ<input name="branchCnpj" [(ngModel)]="branchCnpj" inputmode="numeric" required /></label>
                 <button type="submit" class="button" [disabled]="saving() || !branchName.trim() || !branchCnpj.trim()">{{ createBranchLabel() }}</button>
               </form>
-              @if (branches().length > 0) {
               <label class="branch-search">{{ branchCopy('search') }}
                 <input type="search" [value]="branchSearch()" (input)="setBranchSearch($event)" />
               </label>
@@ -147,15 +155,20 @@ interface BranchReview {
                 <section class="branch-card">
                     <button type="button" class="branch-card-header" [attr.aria-expanded]="expandedBranch() === branch.id"
                       [attr.aria-controls]="'branch-members-' + branch.id" (click)="toggleBranch(branch)">
-                      <span class="branch-card-name"><strong>{{ branch.legal_name }}</strong><small class="muted">CNPJ {{ branch.cnpj_masked }}</small></span>
-                      <span class="branch-card-meta">{{ branch.workspace_active ? branchMemberCount(branch.member_count) : branchStatus(branch) }}
+                      <span class="branch-card-name"><strong>{{ branch.legal_name }}</strong>@if (branch.cnpj_masked) { <small class="muted">CNPJ {{ branch.cnpj_masked }}</small> }</span>
+                      <span class="branch-card-meta">
+                        {{ branch.workspace_active ? branchMemberCount(branch.member_count) : branchStatus(branch) }}
+                        @if (branch.current_workspace) { <span class="muted">· {{ activeMemberCount(state.active_count) }}</span> }
                         <i class="bi" [class.bi-chevron-up]="expandedBranch() === branch.id"
                           [class.bi-chevron-down]="expandedBranch() !== branch.id" aria-hidden="true"></i>
                       </span>
                     </button>
                     <div class="branch-card-body" [id]="'branch-members-' + branch.id" [hidden]="expandedBranch() !== branch.id">
                       @if (expandedBranch() === branch.id) {
-                        @if (branch.workspace_active && branch.business_tenant_id) {
+                        @if (branch.current_workspace) {
+                          <button type="button" class="button secondary" (click)="openInvite()"><i class="bi bi-person-plus" aria-hidden="true"></i> {{ inviteLabel() }}</button>
+                          <ng-container [ngTemplateOutlet]="workspaceRoster" />
+                        } @else if (branch.workspace_active && branch.business_tenant_id) {
                         <button type="button" class="button secondary" (click)="openInvite(branch)"><i class="bi bi-person-plus" aria-hidden="true"></i> {{ inviteLabel() }}</button>
                         @if (branchLoading() === branch.id) { <p role="status">{{ i18n.text('loading') }}</p> }
                         @else if (branchMembers()[branch.id]; as members) {
@@ -191,7 +204,6 @@ interface BranchReview {
                   <span>{{ branchPage() + 1 }} / {{ branchPageCount() }}</span>
                   <button type="button" class="button secondary" [disabled]="branchPage() + 1 >= branchPageCount()" (click)="moveBranchPage(1)">{{ branchCopy('next') }}</button>
                 </nav>
-              }
               }
             </article>
           }
@@ -302,7 +314,21 @@ export class TeamPageComponent implements OnInit {
   private readonly branchesPerPage = 10;
   readonly filteredBranches = computed(() => {
     const query = this.branchSearch().trim().toLocaleLowerCase(this.i18n.locale());
-    return this.branches().filter(branch => branch.legal_name.toLocaleLowerCase(this.i18n.locale()).includes(query)
+    const workspace = this.tenant();
+    const team = this.team();
+    const branches = [...this.branches()];
+    if (workspace && team?.can_request_branch) {
+      branches.unshift({
+        id: workspace.id,
+        legal_name: workspace.legal_name || workspace.name,
+        cnpj_masked: workspace.registration_masked ?? '',
+        status: 'approved',
+        workspace_active: true,
+        current_workspace: true,
+        member_count: team.members.filter(member => member.status !== 'offboarded' && member.status !== 'pending').length,
+      });
+    }
+    return branches.filter(branch => branch.legal_name.toLocaleLowerCase(this.i18n.locale()).includes(query)
       || branch.cnpj_masked.includes(query));
   });
   readonly branchPageCount = computed(() => Math.ceil(this.filteredBranches().length / this.branchesPerPage));
@@ -493,13 +519,22 @@ export class TeamPageComponent implements OnInit {
       ? this.local({ 'pt-BR': 'membro', en: 'member', es: 'miembro', 'ja-JP': '人' })
       : this.local({ 'pt-BR': 'membros', en: 'members', es: 'miembros', 'ja-JP': '人' }));
   }
+  activeMemberCount(count: number): string {
+    const value = new Intl.NumberFormat(this.i18n.locale()).format(count);
+    return this.local({
+      'pt-BR': `${value} ${count === 1 ? 'ativo' : 'ativos'}`,
+      en: `${value} active`,
+      es: `${value} ${count === 1 ? 'activo' : 'activos'}`,
+      'ja-JP': `有効 ${value} 人`,
+    });
+  }
   emptyBranchLabel(): string {
     return this.local({ 'pt-BR': 'Esta filial ainda não tem membros.', en: 'This branch has no members yet.', es: 'Esta sucursal aún no tiene miembros.', 'ja-JP': 'この支店にはまだメンバーがいません。' });
   }
   async toggleBranch(branch: BranchReview): Promise<void> {
     if (this.expandedBranch() === branch.id) { this.expandedBranch.set(null); return; }
     this.expandedBranch.set(branch.id);
-    if (!branch.workspace_active) return;
+    if (branch.current_workspace || !branch.workspace_active) return;
     try { await this.loadBranchMembers(branch); }
     catch (error) { await this.feedback.error(error); }
   }
