@@ -29,7 +29,15 @@ interface IdentityOption { value: string; label: MessageKey }
         <form class="form" (ngSubmit)="register()">
           <label>{{ i18n.text('name') }} <input name="name" [(ngModel)]="name" required autocomplete="name" /></label>
           <label>{{ i18n.text('email') }} <input name="email" type="email" [(ngModel)]="email" required autocomplete="email" /></label>
-          <fieldset class="form identity-fieldset"><legend>{{ i18n.text('optionalIdentity') }}</legend><p class="field-help">{{ i18n.text('identityLater') }}</p>
+          <label>{{ i18n.text('registrationCountry') }}
+            <select name="accountCountry" [(ngModel)]="accountCountry" required autocomplete="country">
+              <option value="">{{ i18n.text('chooseCountry') }}</option>
+              @for (item of supportedCountries; track item.code) {
+                <option [value]="item.code">{{ i18n.text(item.nameKey) }}</option>
+              }
+            </select>
+          </label>
+          <fieldset class="form identity-fieldset"><legend>{{ i18n.text('registrationDocument') }}</legend>
             <span class="field-label">{{ i18n.text('documentCountry') }}</span>
             <details class="country-picker" #countryMenu (toggle)="pickerToggled($event)">
               <summary [attr.aria-label]="i18n.text('documentCountry')">
@@ -40,10 +48,6 @@ interface IdentityOption { value: string; label: MessageKey }
               </summary>
               <div class="country-options" role="listbox" [attr.aria-label]="i18n.text('documentCountry')">
                 <label class="country-search"><i class="bi bi-search" aria-hidden="true"></i><input name="countrySearch" [(ngModel)]="countrySearch" [placeholder]="i18n.text('searchCountry')" autocomplete="off" (click)="$event.stopPropagation()" (keydown.enter)="$event.preventDefault()" /></label>
-                <button type="button" role="option" [attr.aria-selected]="!country" [class.active]="!country" (click)="selectCountry('', countryMenu)">
-                  <span class="country-option-label"><strong>{{ i18n.text('doNotProvide') }}</strong></span>
-                  @if (!country) { <i class="bi bi-check2" aria-hidden="true"></i> }
-                </button>
                 @for (item of filteredCountries(); track item.code) {
                   <button type="button" role="option" [attr.aria-selected]="country === item.code" [class.active]="country === item.code" (click)="selectCountry(item.code, countryMenu)">
                     <span class="country-option-label"><strong>{{ i18n.text(item.nameKey) }}</strong></span>
@@ -73,7 +77,7 @@ interface IdentityOption { value: string; label: MessageKey }
               <label>{{ i18n.text('documentNumber') }} <input name="document" [ngModel]="documentValue" (ngModelChange)="documentValueChanged($event)" [placeholder]="documentPlaceholder()" [maxlength]="documentMaxLength()" [attr.inputmode]="documentInputMode()" minlength="4" required autocomplete="off" /></label>
             }
           </fieldset>
-          <button class="button" [disabled]="verificationBlocked()">{{ i18n.text('createAccount') }}</button>
+          <button class="button" [disabled]="verificationBlocked() || !accountCountry || !country || !documentValue.trim()">{{ i18n.text('createAccount') }}</button>
         </form>
       } @else if (mode === 'forgot-password') {
         <form class="form" (ngSubmit)="requestReset()"><label>{{ i18n.text('email') }} <input name="email" type="email" [(ngModel)]="email" required autocomplete="email" /></label><button class="button" [disabled]="verificationBlocked()">{{ i18n.text('sendRecovery') }}</button></form>
@@ -121,6 +125,7 @@ export class AccountPageComponent implements OnInit {
   readonly supportedCountries = SUPPORTED_COUNTRIES;
   titleKey: MessageKey = 'account';
   mode = '';
+  accountCountry = '';
   name = ''; email = ''; password = ''; passwordConfirmation = ''; country = ''; countrySearch = ''; documentType = 'PASSPORT'; documentValue = '';
   readonly turnstileToken = signal('');
   readonly verificationLoading = signal(true);
@@ -222,7 +227,11 @@ export class AccountPageComponent implements OnInit {
   passwordsMatch(): boolean { return this.password.length > 0 && this.password === this.passwordConfirmation; }
   async register(): Promise<void> {
     if (this.verificationBlocked()) return;
-    const accepted = await this.action('/auth/register', { name: this.name, email: this.email, preferred_locale: this.i18n.locale(), return_url: this.returnUrl, identity_document_type: this.country ? this.documentType : null, identity_document_country: this.country || null, identity_document_value: this.country ? this.documentValue : null, turnstile_token: this.turnstileToken() || null }, this.i18n.text('registrationSent'));
+    if (!this.accountCountry || !this.country || !this.documentValue.trim()) {
+      await this.feedback.error(this.i18n.text('reviewData'));
+      return;
+    }
+    const accepted = await this.action('/auth/register', { name: this.name, email: this.email, preferred_locale: this.i18n.locale(), return_url: this.returnUrl, country_code: this.accountCountry, identity_document_type: this.documentType, identity_document_country: this.country, identity_document_value: this.documentValue.trim(), turnstile_token: this.turnstileToken() || null }, this.i18n.text('registrationSent'));
     if (accepted) await this.router.navigate(['/']);
     else this.turnstile?.reset();
   }

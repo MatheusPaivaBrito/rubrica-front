@@ -135,7 +135,7 @@ test('preenche MFA em seis posições e envia automaticamente', async ({ page })
   await expect(page).toHaveURL(/\/tenant\/aiko\/dashboard$/);
 });
 
-test('cadastro usa o país emissor do documento e mostra a bandeira', async ({ page }) => {
+test('cadastro exige país da conta e documento em campos independentes', async ({ page }) => {
   let registration: Record<string, unknown> = {};
   await page.route('**/*', async route => {
     if (new URL(route.request().url()).pathname === '/auth/register') {
@@ -148,11 +148,16 @@ test('cadastro usa o país emissor do documento e mostra a bandeira', async ({ p
   await page.goto('/register');
   await page.locator('input[name="name"]').fill('山田 太郎');
   await page.locator('input[name="email"]').fill('aiko@example.jp');
-  await page.locator('input[name="country"]').fill('JP');
-  await expect(page.locator('.country-flag')).toHaveText('🇯🇵');
+  const submit = page.locator('form button.button');
+  await expect(submit).toBeDisabled();
+  await page.locator('select[name="accountCountry"]').selectOption('BR');
+  await page.locator('details.country-picker > summary').first().click();
+  await page.locator('input[name="countrySearch"]').fill('JP');
+  await page.locator('details.country-picker button[role="option"]').filter({ hasText: /Japan|Japão|Japón|日本/ }).click();
+  await expect(submit).toBeDisabled();
   await page.locator('input[name="document"]').fill('TR1234567');
-  await page.locator('form button').click();
+  await submit.click();
 
   await expect.poll(() => registration['identity_document_country']).toBe('JP');
-  expect(registration).not.toHaveProperty('country_code');
+  expect(registration['country_code']).toBe('BR');
 });
