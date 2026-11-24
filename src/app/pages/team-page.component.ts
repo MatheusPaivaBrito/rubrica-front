@@ -25,18 +25,41 @@ import { RubricaSelectComponent, RubricaSelectOption } from '../components/rubri
           @if (!state.can_manage) { <p class="notice">{{ copy().readonly }}</p> }
           <article class="card table-card">
             <div class="section-heading"><div><h2>{{ copy().limit }}: {{ memberLimitLabel(state) }}</h2><p class="muted">{{ cycleHelp(state) }}</p><p class="muted">{{ copy().choose }}: {{ selected().size }} {{ copy().selected }}</p></div></div>
-            <div class="table-wrap"><table class="data-table"><thead><tr><th>{{ i18n.text('email') }}</th><th>{{ i18n.text('profile') }}</th><th>{{ i18n.text('status') }}</th><th>{{ documentScopeLabel() }}</th><th>{{ copy().choose }}</th></tr></thead><tbody>
+            <div class="table-wrap"><table class="data-table"><thead><tr><th>{{ i18n.text('email') }}</th><th>{{ i18n.text('profile') }}</th><th>{{ i18n.text('status') }}</th><th>{{ documentScopeLabel() }}</th><th>{{ copy().choose }}</th>@if (state.can_manage) { <th>{{ accessActionLabel() }}</th> }</tr></thead><tbody>
               @for (member of state.members; track member.id) {
-                <tr><td>{{ member.auth_user_id }}</td><td [attr.data-label]="i18n.text('profile')">@if (member.role === 'admin') { {{ copy().admin }} } @else { <app-rubrica-select [ariaLabel]="i18n.text('profile') + ': ' + member.auth_user_id" [disabled]="saving()" [value]="member.role" [options]="roleOptions()" (valueChange)="changeRole(member, $event)" /> }</td><td [attr.data-label]="i18n.text('status')"><span class="badge" [class.complete]="member.status === 'active'">{{ member.status === 'active' ? copy().active : withoutSeatLabel() }}</span></td>
+                <tr><td>{{ member.auth_user_id }}</td><td [attr.data-label]="i18n.text('profile')">@if (member.role === 'admin') { {{ copy().admin }} } @else { <app-rubrica-select [ariaLabel]="i18n.text('profile') + ': ' + member.auth_user_id" [disabled]="saving()" [value]="member.role" [options]="roleOptions()" (valueChange)="changeRole(member, $event)" /> }</td><td [attr.data-label]="i18n.text('status')"><span class="badge" [class.complete]="member.status === 'active'">{{ member.status === 'active' ? copy().active : member.status === 'offboarded' ? offboardedLabel() : withoutSeatLabel() }}</span></td>
                   <td [attr.data-label]="documentScopeLabel()">
                     @if (member.role === 'admin') { {{ documentScopeText('all') }} }
                     @else if (state.can_manage) {
                       <app-rubrica-select [ariaLabel]="documentScopeLabel() + ': ' + member.auth_user_id"
                         [disabled]="saving()" [value]="member.document_scope ?? 'own'" [options]="documentScopeOptions(member)"
                         (valueChange)="changeDocumentScope(member, $event)" />
+                      @if (tenant()?.kind === 'business') {
+                        <label>
+                          <input type="checkbox" [checked]="member.sign_company_only ?? false" [disabled]="saving()"
+                            (change)="changeSigningPermission(member, $event)" />
+                          {{ companyOnlyLabel() }}
+                        </label>
+                      }
                     } @else { {{ documentScopeText(member.document_scope ?? 'own') }} }
                   </td>
-                  <td [attr.data-label]="copy().choose"><input class="team-checkbox" type="checkbox" [attr.aria-label]="copy().choose + ': ' + member.auth_user_id" [checked]="selected().has(member.id)" [disabled]="disabled(member)" (change)="toggle(member.id)" /></td></tr>
+                  <td [attr.data-label]="copy().choose"><input class="team-checkbox" type="checkbox" [attr.aria-label]="copy().choose + ': ' + member.auth_user_id" [checked]="selected().has(member.id)" [disabled]="disabled(member)" (change)="toggle(member.id)" /></td>
+                  @if (state.can_manage) {
+                    <td [attr.data-label]="accessActionLabel()">
+                      @if (member.role !== 'admin') {
+                        <details>
+                          <summary>{{ accessActionLabel() }}</summary>
+                          @if (member.status === 'offboarded') {
+                            <button type="button" class="button secondary" [disabled]="saving()" (click)="changeMemberAccess(member, 'restore')">{{ accessActionText('restore') }}</button>
+                            <button type="button" class="button secondary" [disabled]="saving()" (click)="changeMemberAccess(member, 'fresh')">{{ accessActionText('fresh') }}</button>
+                          } @else {
+                            <button type="button" class="button secondary" [disabled]="saving()" (click)="changeMemberAccess(member, 'offboard')">{{ accessActionText('offboard') }}</button>
+                          }
+                        </details>
+                      }
+                    </td>
+                  }
+                </tr>
               }
             </tbody></table></div>
             <div class="team-footer"><p class="muted">{{ copy().preserved }}</p>
@@ -117,6 +140,7 @@ export class TeamPageComponent implements OnInit {
   exceedsMemberLimit(team: TenantTeam): boolean { return team.member_limit !== null && this.selected().size > team.member_limit; }
   memberLimitLabel(team: TenantTeam): string | number { return team.member_limit ?? this.i18n.text('unlimited'); }
   disabled(member: TenantMember): boolean {
+    if (member.status === 'offboarded') return true;
     const team = this.team();
     return !team?.can_manage || this.saving() || member.id === team.current_member_id
       || (team.member_limit !== null && !this.selected().has(member.id) && this.selected().size >= team.member_limit);
@@ -147,6 +171,48 @@ export class TeamPageComponent implements OnInit {
       await this.feedback.success(this.inviteSentLabel());
     } catch (error) { await this.feedback.error(error); }
     finally { this.saving.set(false); }
+  }
+  accessActionLabel() {
+    return this.local({ 'pt-BR': 'Vínculo', en: 'Membership', es: 'Vínculo', 'ja-JP': '所属' });
+  }
+  offboardedLabel() {
+    return this.local({ 'pt-BR': 'Desligado', en: 'Offboarded', es: 'Desvinculado', 'ja-JP': '所属解除済み' });
+  }
+  accessActionText(action: 'offboard' | 'restore' | 'fresh') {
+    return {
+      offboard: this.local({ 'pt-BR': 'Desligar membro', en: 'Offboard member', es: 'Desvincular miembro', 'ja-JP': 'メンバーの所属を解除' }),
+      restore: this.local({ 'pt-BR': 'Restaurar vínculo anterior', en: 'Restore previous membership', es: 'Restaurar vínculo anterior', 'ja-JP': '以前の所属を復元' }),
+      fresh: this.local({ 'pt-BR': 'Readmitir sem histórico', en: 'Readmit without history', es: 'Readmitir sin historial', 'ja-JP': '履歴なしで再登録' }),
+    }[action];
+  }
+  async changeMemberAccess(member: TenantMember, action: 'offboard' | 'restore' | 'fresh') {
+    const tenant = this.tenant();
+    if (!tenant || this.saving()) return;
+    if (!window.confirm(`${this.accessActionText(action)} — ${member.auth_user_id}?`)) return;
+    this.saving.set(true);
+    try {
+      this.setTeam(await firstValueFrom(this.api.patch<TenantTeam>(
+        `/tenants/${tenant.id}/team/${member.id}/access`, { action },
+      )));
+    } catch (error) { await this.feedback.error(error); }
+    finally { this.saving.set(false); }
+  }
+  companyOnlyLabel() {
+    return this.local({ 'pt-BR': 'Assina só em nome da empresa', en: 'Sign only for the company', es: 'Firma solo en nombre de la empresa', 'ja-JP': '会社名義でのみ署名' });
+  }
+  async changeSigningPermission(member: TenantMember, event: Event) {
+    const tenant = this.tenant();
+    if (!tenant || this.saving()) return;
+    const input = event.target as HTMLInputElement;
+    this.saving.set(true);
+    try {
+      this.team.set(await firstValueFrom(this.api.patch<TenantTeam>(
+        `/tenants/${tenant.id}/team/${member.id}/document-scope`, { sign_company_only: input.checked },
+      )));
+    } catch (error) {
+      input.checked = member.sign_company_only ?? false;
+      await this.feedback.error(error);
+    } finally { this.saving.set(false); }
   }
   documentScopeLabel() {
     return this.local({ 'pt-BR': 'Acesso aos arquivos', en: 'File access', es: 'Acceso a archivos', 'ja-JP': 'ファイルアクセス' });

@@ -49,6 +49,11 @@ import { LanguagePickerComponent } from './language-picker.component';
             </select>
           </label>
         }
+        @if (needsPersonalWorkspace()) {
+          <a class="sidebar-action" routerLink="/reactivate-account" (click)="closeMobile()">
+            <i class="bi bi-person-plus" aria-hidden="true"></i><span>{{ createPersonalLabel() }}</span>
+          </a>
+        }
         <nav class="sidebar-navigation" [attr.aria-label]="copy().nav">
           <a [routerLink]="url('dashboard')" routerLinkActive="selected" ariaCurrentWhenActive="page" (click)="closeMobile()"><i class="bi bi-grid-1x2" aria-hidden="true"></i><span>{{ copy().dashboard }}</span></a>
           @if (showTeam()) { <a [routerLink]="url('team')" routerLinkActive="selected" ariaCurrentWhenActive="page" (click)="closeMobile()"><i class="bi bi-people" aria-hidden="true"></i><span>{{ copy().team }}</span></a> }
@@ -84,6 +89,7 @@ export class WorkspaceSidebarComponent implements OnChanges {
   private readonly api = inject(ApiService);
   readonly showTeam = signal(false);
   readonly workspaces = signal<TenantItem[]>([]);
+  readonly needsPersonalWorkspace = signal(false);
   private workspaceRequest = 0;
   readonly billingAccount = signal<BillingAccount | null>(null);
   readonly mobileOpen = signal(false);
@@ -94,12 +100,14 @@ export class WorkspaceSidebarComponent implements OnChanges {
     this.showTeam.set(false);
     this.billingAccount.set(null);
     this.workspaces.set([]);
+    this.needsPersonalWorkspace.set(false);
     if (!tenant) return;
 
     try {
       const workspaces = await firstValueFrom(this.api.get<TenantItem[]>('/tenants'));
       if (request !== this.workspaceRequest) return;
       this.workspaces.set(workspaces.filter(workspace => workspace.workspace_selectable === true));
+      this.needsPersonalWorkspace.set(workspaces.length > 0 && workspaces.every(workspace => workspace.kind === 'business'));
     } catch {
       if (request !== this.workspaceRequest) return;
     }
@@ -112,6 +120,9 @@ export class WorkspaceSidebarComponent implements OnChanges {
       this.billingAccount.set(account);
       this.showTeam.set(account.complimentary_lifetime || (paid && ['rubrica_intermediate', 'rubrica_team'].includes(account.current_product_code ?? '')));
     } catch { /* Leave billing navigation hidden when its account is unavailable. */ }
+  }
+  createPersonalLabel(): string {
+    return ({ 'pt-BR': 'Criar espaço pessoal', en: 'Create personal workspace', es: 'Crear espacio personal', 'ja-JP': '個人用ワークスペースを作成' })[this.i18n.locale()];
   }
   workspaceLabel(): string {
     return ({ 'pt-BR': 'Trocar de workspace', en: 'Switch workspace', es: 'Cambiar de espacio', 'ja-JP': 'ワークスペースを切り替え' })[this.i18n.locale()];

@@ -27,7 +27,7 @@ export interface TenantItem { id: string; workspace_selectable?: boolean; name: 
 export interface SuspendedTenantAccess { tenant_id: string; tenant_name: string; tenant_kind: 'personal' | 'business'; role: 'admin' | 'member' | 'auditor'; default_locale: 'pt-BR' | 'en' | 'es' | 'ja-JP'; country_code: string | null; currency: string; }
 export interface TenantAccessState { active_tenant_count: number; suspended_tenants: SuspendedTenantAccess[]; can_create_personal_tenant: boolean; }
 export type DocumentScope = 'own' | 'all' | 'since_joined';
-export interface TenantMember { id: string; auth_user_id: string; role: 'admin' | 'member' | 'auditor'; status: string; joined_at?: string | null; document_scope?: DocumentScope | 'legacy'; }
+export interface TenantMember { id: string; auth_user_id: string; role: 'admin' | 'member' | 'auditor'; status: string; joined_at?: string | null; document_scope?: DocumentScope | 'legacy'; sign_company_only?: boolean; }
 export interface BillingAccount {
   id: string;
   tenant_id: string;

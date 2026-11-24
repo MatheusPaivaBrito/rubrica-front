@@ -12,7 +12,7 @@ import { SUPPORTED_COUNTRIES } from '../core/countries';
 
 interface ReactivationCopy {
   loading: string; eyebrow: string; title: string; help: string; suspended: string;
-  noActiveWorkspace: string; invitation: string; personalInvitation: string; workspaceName: string; create: string; logout: string; personal: string;
+  noActiveWorkspace: string; noPersonalWorkspace: string; invitation: string; personalInvitation: string; workspaceName: string; create: string; logout: string; personal: string;
 }
 
 @Component({
@@ -25,7 +25,7 @@ interface ReactivationCopy {
       @else {
         <p class="eyebrow">{{ text().eyebrow }}</p>
         <h1>{{ text().title }}</h1>
-        <p class="muted">{{ state()?.suspended_tenants?.length ? text().help : text().noActiveWorkspace }}</p>
+        <p class="muted">{{ state()?.active_tenant_count ? text().noPersonalWorkspace : state()?.suspended_tenants?.length ? text().help : text().noActiveWorkspace }}</p>
         @if (state()?.suspended_tenants?.length) {
           <div class="suspended-list">
             @for (tenant of state()!.suspended_tenants; track tenant.tenant_id) {
@@ -87,7 +87,7 @@ export class AccountReactivationPageComponent implements OnInit {
     if (!context) { await this.router.navigate(['/login']); return; }
     try {
       const tenants = await firstValueFrom(this.api.get<TenantItem[]>('/tenants'));
-      if (tenants.length) { await this.router.navigateByUrl(await this.auth.dashboardUrl(), { replaceUrl: true }); return; }
+      if (tenants.some(tenant => tenant.kind !== 'business')) { await this.router.navigateByUrl(await this.auth.dashboardUrl(), { replaceUrl: true }); return; }
       const state = await firstValueFrom(this.api.get<TenantAccessState>('/tenants/access-state'));
       this.state.set(state);
       this.workspaceName = context.subject.split('@')[0] || this.text().personal;
@@ -116,10 +116,10 @@ export class AccountReactivationPageComponent implements OnInit {
 
   text(): ReactivationCopy {
     const copy: Record<Locale, ReactivationCopy> = {
-      'pt-BR': { loading:'Carregando sua conta…', eyebrow:'ACESSO À CONTA', title:'Escolha como continuar', help:'Seu acesso ao espaço empresarial foi suspenso após uma mudança de plano. Seus dados e o histórico desse espaço continuam preservados.', suspended:'Acesso suspenso', noActiveWorkspace:'Sua conta está sem um workspace ativo.', invitation:'Para voltar ao mesmo tenant ou entrar em outro, um administrador precisa reativar ou convidar esta conta.', personalInvitation:'Você também pode criar agora um espaço pessoal independente.', workspaceName:'Nome do novo espaço pessoal', create:'Criar meu espaço pessoal', logout:'Sair', personal:'Minha conta' },
-      en: { loading:'Loading your account…', eyebrow:'ACCOUNT ACCESS', title:'Choose how to continue', help:'Your access to the business workspace was suspended after a plan change. Its data and history remain preserved.', suspended:'Access suspended', noActiveWorkspace:'Your account has no active workspace.', invitation:'To return to the same tenant or join another one, an administrator must reactivate or invite this account.', personalInvitation:'You can also create an independent personal workspace now.', workspaceName:'New personal workspace name', create:'Create my personal workspace', logout:'Sign out', personal:'My account' },
-      es: { loading:'Cargando tu cuenta…', eyebrow:'ACCESO A LA CUENTA', title:'Elige cómo continuar', help:'Tu acceso al espacio empresarial fue suspendido después de un cambio de plan. Sus datos e historial se conservan.', suspended:'Acceso suspendido', noActiveWorkspace:'Tu cuenta no tiene un espacio de trabajo activo.', invitation:'Para volver al mismo tenant o entrar en otro, un administrador debe reactivar o invitar esta cuenta.', personalInvitation:'También puedes crear un espacio personal independiente.', workspaceName:'Nombre del nuevo espacio personal', create:'Crear mi espacio personal', logout:'Salir', personal:'Mi cuenta' },
-      'ja-JP': { loading:'アカウントを読み込んでいます…', eyebrow:'アカウントアクセス', title:'続行方法を選択', help:'プラン変更により企業ワークスペースへのアクセスが停止されました。データと履歴は保持されています。', suspended:'アクセス停止中', noActiveWorkspace:'有効なワークスペースがありません。', invitation:'同じテナントに戻るか別のテナントに参加するには、管理者による再有効化または招待が必要です。', personalInvitation:'個人ワークスペースを作成することもできます。', workspaceName:'新しい個人ワークスペース名', create:'個人ワークスペースを作成', logout:'ログアウト', personal:'マイアカウント' },
+      'pt-BR': { loading:'Carregando sua conta…', eyebrow:'ACESSO À CONTA', title:'Escolha como continuar', help:'Seu acesso ao espaço empresarial foi suspenso após uma mudança de plano. Seus dados e o histórico desse espaço continuam preservados.', suspended:'Acesso suspenso', noActiveWorkspace:'Sua conta está sem um workspace ativo.', noPersonalWorkspace:'Você pode criar seu workspace pessoal e manter o acesso à empresa.', invitation:'Para voltar ao mesmo tenant ou entrar em outro, um administrador precisa reativar ou convidar esta conta.', personalInvitation:'Você também pode criar agora um espaço pessoal independente.', workspaceName:'Nome do novo espaço pessoal', create:'Criar meu espaço pessoal', logout:'Sair', personal:'Minha conta' },
+      en: { loading:'Loading your account…', eyebrow:'ACCOUNT ACCESS', title:'Choose how to continue', help:'Your access to the business workspace was suspended after a plan change. Its data and history remain preserved.', suspended:'Access suspended', noActiveWorkspace:'Your account has no active workspace.', noPersonalWorkspace:'Create a personal workspace to use alongside your company workspace.', invitation:'To return to the same tenant or join another one, an administrator must reactivate or invite this account.', personalInvitation:'You can also create an independent personal workspace now.', workspaceName:'New personal workspace name', create:'Create my personal workspace', logout:'Sign out', personal:'My account' },
+      es: { loading:'Cargando tu cuenta…', eyebrow:'ACCESO A LA CUENTA', title:'Elige cómo continuar', help:'Tu acceso al espacio empresarial fue suspendido después de un cambio de plan. Sus datos e historial se conservan.', suspended:'Acceso suspendido', noActiveWorkspace:'Tu cuenta no tiene un espacio de trabajo activo.', noPersonalWorkspace:'Crea un espacio personal y conserva el acceso a la empresa.', invitation:'Para volver al mismo tenant o entrar en otro, un administrador debe reactivar o invitar esta cuenta.', personalInvitation:'También puedes crear un espacio personal independiente.', workspaceName:'Nombre del nuevo espacio personal', create:'Crear mi espacio personal', logout:'Salir', personal:'Mi cuenta' },
+      'ja-JP': { loading:'アカウントを読み込んでいます…', eyebrow:'アカウントアクセス', title:'続行方法を選択', help:'プラン変更により企業ワークスペースへのアクセスが停止されました。データと履歴は保持されています。', suspended:'アクセス停止中', noActiveWorkspace:'有効なワークスペースがありません。', noPersonalWorkspace:'会社のワークスペースへのアクセスを保持したまま、個人用スペースを作成できます。', invitation:'同じテナントに戻るか別のテナントに参加するには、管理者による再有効化または招待が必要です。', personalInvitation:'個人ワークスペースを作成することもできます。', workspaceName:'新しい個人ワークスペース名', create:'個人ワークスペースを作成', logout:'ログアウト', personal:'マイアカウント' },
     };
     return copy[this.i18n.locale()];
   }
