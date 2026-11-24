@@ -6,7 +6,7 @@ import { ApiService } from '../core/api.service';
 import { AuthService, tenantDashboardUrl } from '../core/auth.service';
 import { FeedbackService } from '../core/feedback.service';
 import { I18nService } from '../core/i18n.service';
-import { TenantItem, TenantMember, TenantTeam } from '../core/models';
+import { DocumentScope, TenantItem, TenantMember, TenantTeam } from '../core/models';
 import { teamCopy } from '../core/team-copy';
 import { WorkspaceSidebarComponent } from '../components/workspace-sidebar.component';
 import { RubricaSelectComponent, RubricaSelectOption } from '../components/rubrica-select.component';
@@ -25,9 +25,17 @@ import { RubricaSelectComponent, RubricaSelectOption } from '../components/rubri
           @if (!state.can_manage) { <p class="notice">{{ copy().readonly }}</p> }
           <article class="card table-card">
             <div class="section-heading"><div><h2>{{ copy().limit }}: {{ memberLimitLabel(state) }}</h2><p class="muted">{{ cycleHelp(state) }}</p><p class="muted">{{ copy().choose }}: {{ selected().size }} {{ copy().selected }}</p></div></div>
-            <div class="table-wrap"><table class="data-table"><thead><tr><th>{{ i18n.text('email') }}</th><th>{{ i18n.text('profile') }}</th><th>{{ i18n.text('status') }}</th><th>{{ copy().choose }}</th></tr></thead><tbody>
+            <div class="table-wrap"><table class="data-table"><thead><tr><th>{{ i18n.text('email') }}</th><th>{{ i18n.text('profile') }}</th><th>{{ i18n.text('status') }}</th><th>{{ documentScopeLabel() }}</th><th>{{ copy().choose }}</th></tr></thead><tbody>
               @for (member of state.members; track member.id) {
                 <tr><td>{{ member.auth_user_id }}</td><td [attr.data-label]="i18n.text('profile')">@if (member.role === 'admin') { {{ copy().admin }} } @else { <app-rubrica-select [ariaLabel]="i18n.text('profile') + ': ' + member.auth_user_id" [disabled]="saving()" [value]="member.role" [options]="roleOptions()" (valueChange)="changeRole(member, $event)" /> }</td><td [attr.data-label]="i18n.text('status')"><span class="badge" [class.complete]="member.status === 'active'">{{ member.status === 'active' ? copy().active : withoutSeatLabel() }}</span></td>
+                  <td [attr.data-label]="documentScopeLabel()">
+                    @if (member.role === 'admin') { {{ documentScopeText('all') }} }
+                    @else if (state.can_manage) {
+                      <app-rubrica-select [ariaLabel]="documentScopeLabel() + ': ' + member.auth_user_id"
+                        [disabled]="saving()" [value]="member.document_scope ?? 'own'" [options]="documentScopeOptions(member)"
+                        (valueChange)="changeDocumentScope(member, $event)" />
+                    } @else { {{ documentScopeText(member.document_scope ?? 'own') }} }
+                  </td>
                   <td [attr.data-label]="copy().choose"><input class="team-checkbox" type="checkbox" [attr.aria-label]="copy().choose + ': ' + member.auth_user_id" [checked]="selected().has(member.id)" [disabled]="disabled(member)" (change)="toggle(member.id)" /></td></tr>
               }
             </tbody></table></div>
@@ -137,6 +145,34 @@ export class TeamPageComponent implements OnInit {
       this.setTeam(await firstValueFrom(this.api.get<TenantTeam>(`/tenants/${this.tenant()!.id}/team`)));
       this.inviteOpen.set(false); this.memberName = ''; this.memberDocument = ''; this.memberEmail = ''; this.memberRole = 'member';
       await this.feedback.success(this.inviteSentLabel());
+    } catch (error) { await this.feedback.error(error); }
+    finally { this.saving.set(false); }
+  }
+  documentScopeLabel() {
+    return this.local({ 'pt-BR': 'Acesso aos arquivos', en: 'File access', es: 'Acceso a archivos', 'ja-JP': 'ファイルアクセス' });
+  }
+  documentScopeText(scope: DocumentScope | 'legacy'): string {
+    return {
+      all: this.local({ 'pt-BR': 'Todos os arquivos', en: 'All files', es: 'Todos los archivos', 'ja-JP': 'すべてのファイル' }),
+      own: this.local({ 'pt-BR': 'Somente próprios', en: 'Own files only', es: 'Solo archivos propios', 'ja-JP': '自分のファイルのみ' }),
+      since_joined: this.local({ 'pt-BR': 'Desde a entrada', en: 'Since joining', es: 'Desde su incorporación', 'ja-JP': '参加日以降' }),
+      legacy: this.local({ 'pt-BR': 'Acesso anterior', en: 'Previous access', es: 'Acceso anterior', 'ja-JP': '従来のアクセス' }),
+    }[scope];
+  }
+  documentScopeOptions(member: TenantMember): RubricaSelectOption[] {
+    const scopes: (DocumentScope | 'legacy')[] = ['own', 'all', 'since_joined'];
+    if (member.document_scope === 'legacy') scopes.unshift('legacy');
+    return scopes.map(value => ({ value, label: this.documentScopeText(value) }));
+  }
+  async changeDocumentScope(member: TenantMember, scope: string) {
+    const tenant = this.tenant();
+    if (!tenant || this.saving() || !['own', 'all', 'since_joined'].includes(scope) || member.document_scope === scope) return;
+    this.saving.set(true);
+    try {
+      const state = await firstValueFrom(this.api.patch<TenantTeam>(
+        `/tenants/${tenant.id}/team/${member.id}/document-scope`, { document_scope: scope },
+      ));
+      this.team.set(state);
     } catch (error) { await this.feedback.error(error); }
     finally { this.saving.set(false); }
   }
