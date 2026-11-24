@@ -159,7 +159,11 @@ export class TeamPageComponent implements OnInit {
   withoutSeatLabel() { return this.local({ 'pt-BR':'Sem cadeira', en:'No seat', es:'Sin asiento', 'ja-JP':'シートなし' }); }
   cycleHelp(team: TenantTeam) {
     if (!team.next_cycle_starts_at) return this.local({ 'pt-BR':'A composição atual permanece vigente.', en:'The current roster remains active.', es:'La composición actual sigue vigente.', 'ja-JP':'現在の構成が有効です。' });
-    const date = new Intl.DateTimeFormat(this.i18n.locale()).format(new Date(team.next_cycle_starts_at));
+    const showTime = typeof window !== 'undefined' && window.location.hostname === 'staging.rubricasignature.com';
+    const options: Intl.DateTimeFormatOptions | undefined = showTime
+      ? { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }
+      : undefined;
+    const date = new Intl.DateTimeFormat(this.i18n.locale(), options).format(new Date(team.next_cycle_starts_at));
     return this.local({ 'pt-BR':`Escolha os ocupantes do próximo ciclo, válido a partir de ${date}. A lista atual permanece travada até lá.`, en:`Choose next cycle's occupants, effective ${date}. The current roster stays locked until then.`, es:`Elige los ocupantes del próximo ciclo, vigente desde ${date}. La lista actual queda bloqueada hasta entonces.`, 'ja-JP':`${date}からの次回サイクル利用者を選択します。現在の一覧はそれまで固定されます。` });
   }
   private local(values: Record<'pt-BR' | 'en' | 'es' | 'ja-JP', string>) { return values[this.i18n.locale()]; }
