@@ -36,7 +36,11 @@ test('mostra a bandeira de cada idioma suportado', async ({ page }) => {
   await page.goto('/login');
   await page.locator('.language-picker summary').click();
 
-  await expect(page.locator('.language-options .language-flag')).toHaveText(['🇺🇸', '🇧🇷', '🇪🇸', '🇯🇵']);
+  const flags = page.locator('.language-options .language-flag');
+  await expect(flags).toHaveCount(4);
+  for (const [index, country] of ['us', 'br', 'es', 'jp'].entries()) {
+    await expect(flags.nth(index)).toHaveAttribute('src', `icons/flags/${country}.svg`);
+  }
 });
 
 test('mostra apenas os três cartões de planos desta release', async ({ page }) => {
@@ -61,7 +65,7 @@ test('exibe arquivo no painel e na assinatura sem leitor nativo', async ({ page 
     status: 'open', expires_at: '2027-01-01T00:00:00Z', created_at: document.created_at,
     created_by: 'tester', completed_at: null, signer_count: 1, signed_count: 0,
   };
-  const signer = { id: 'signer-1', name: 'João', email: 'joao@example.com', status: 'viewed', signed_at: null };
+  const signer = { id: 'signer-1', name: 'João', email: 'joao@example.com', status: 'viewed', signed_at: null, identity_document_country: 'JP', identity_document_type: 'PASSPORT', identity_document_masked: '••••1234' };
 
   await page.addInitScript(({ legacy }) => {
     if (legacy) {
@@ -74,20 +78,24 @@ test('exibe arquivo no painel e na assinatura sem leitor nativo', async ({ page 
     const path = new URL(route.request().url()).pathname;
     const json = (value: unknown) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(value) });
     if (path === '/auth/refresh') return json({ access_token: 'e2e-token' });
-    if (path === '/access-control/context') return json({ version: 1, subject: 'tester', preferred_locale: 'pt-BR', mfa_enabled: true, mfa_setup_required: false, roles: ['signature_operator'], permission_keys: ['documents:read', 'documents:write', 'signature_requests:read', 'signature_requests:write', 'signing:read', 'signing:write'] });
-    if (path === '/tenants') return json([{ id: 'tenant-1', name: 'Teste', slug: 'teste', role: 'operator', currency: 'BRL' }]);
+    if (path === '/access-control/context') return json({ version: 2, account_public_slug: 'tester', subject: 'tester', preferred_locale: 'pt-BR', mfa_enabled: true, mfa_setup_required: false, roles: ['signature_operator'], permission_keys: ['documents:read', 'documents:write', 'signature_requests:read', 'signature_requests:write', 'signing:read', 'signing:write'] });
+    if (path === '/tenants') return json([{ id: 'tenant-1', name: 'Teste', slug: 'teste', kind: 'business', role: 'member', currency: 'BRL' }]);
     if (path === '/documents') return json([document]);
     if (path === '/signature-requests') return json([]);
     if (path === '/signing/links/token-1') return json({ request, signer, document_title: document.title, original_filename: scenario.filename, account_country: 'JP', stamp: null, viewer_mode: 'signer' });
     if (path === '/signing/links/token-1/view') return json(signer);
+    if (path === '/users/me/identifiers') return json([{ id: 'passport', issuing_country: 'JP', identifier_type: 'PASSPORT', masked_display: '••••1234', verification_status: 'format_valid', is_preferred: true }]);
     if (path === '/documents/doc-1/preview' || path === '/signing/links/token-1/document') {
       return route.fulfill({ status: 200, contentType: 'application/pdf', headers: { 'content-disposition': `inline; filename="documento.pdf"; filename*=UTF-8''${encodeURIComponent(scenario.filename)}` }, body: pdf });
     }
     return route.continue();
   });
 
-  await page.goto('/tenant/teste/dashboard');
-  await page.locator('tr').filter({ hasText: 'Documento teste' }).locator('button').first().click();
+  await page.goto('/t/teste/a/tester/dashboard');
+  await expect(page.getByText('Documento teste', { exact: true }).filter({ visible: true }).first()).toBeVisible();
+  const mobileSummary = page.locator('.document-mobile-summary:visible');
+  if (await mobileSummary.count()) await mobileSummary.click();
+  await page.getByRole('button', { name: 'Visualizar', exact: true }).click();
   await expect(page.locator('.pdf-modal canvas')).toHaveCount(scenario.pages);
   await expect.poll(() => page.locator('.pdf-modal canvas').first().evaluate(canvas => (canvas as HTMLCanvasElement).width)).toBeGreaterThan(0);
   await expect.poll(() => page.locator('.pdf-modal canvas').last().evaluate(canvas => (canvas as HTMLCanvasElement).getContext('2d')!.getImageData(10, 10, 1, 1).data[3])).toBe(255);
@@ -103,6 +111,8 @@ test('exibe arquivo no painel e na assinatura sem leitor nativo', async ({ page 
   await page.locator('.signing-document-pane .pdf-page').first().click({ position: { x: 80, y: 80 } });
   await expect(page.locator('.signature-stamp')).toBeVisible();
   await expect(page.locator('.signature-stamp .stamp-country')).toHaveText('🇯🇵');
+  const mobileSigning = page.locator('.signing-mobile-menu:visible');
+  if (await mobileSigning.count()) await mobileSigning.click();
   await expect(page.locator('.signing-actions .button').first()).toBeEnabled();
   await expect.poll(() => page.evaluate(() => typeof Promise.withResolvers)).toBe('function');
   await expect.poll(() => page.evaluate(() => typeof AbortSignal.any)).toBe('function');

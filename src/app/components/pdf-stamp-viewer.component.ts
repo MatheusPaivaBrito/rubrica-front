@@ -178,14 +178,14 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
     const signer = this.placementSigner(placement);
     return signer?.identity_document_masked
       ? `${(signer.identity_document_type || '').replace('BR_', '')}: ${signer.identity_document_masked}`
-      : placement.signer_id === this.activeSignerId ? this.signerIdentity : 'CPF/CNPJ confirmado no momento da assinatura';
+      : this.isActivePlacement(placement) ? this.signerIdentity : 'CPF/CNPJ confirmado no momento da assinatura';
   }
   placementSignerRepresentation(placement: StampPosition): string {
     const signer = this.placementSigner(placement);
     const organization = signer?.representation_snapshot;
     return organization
       ? [organization.legal_name || organization.name, organization.registration_masked].filter(Boolean).join(' · CNPJ: ')
-      : placement.signer_id === this.activeSignerId ? this.signerRepresentation : '';
+      : this.isActivePlacement(placement) ? this.signerRepresentation : '';
   }
   placementSignerFlag(placement: StampPosition): string { return countryFlag(this.placementSignerCountry(placement)); }
   placementSignedByLabel(placement: StampPosition): string {
@@ -211,7 +211,7 @@ export class PdfStampViewerComponent implements AfterViewInit, OnChanges, OnDest
     const signer = this.placementSigner(placement);
     if (signer?.identity_document_country) return signer.identity_document_country.toUpperCase();
     if (/^BR_/.test(signer?.identity_document_type || '')) return 'BR';
-    return placement.signer_id === this.activeSignerId ? this.effectiveSignerCountry() : '';
+    return this.isActivePlacement(placement) ? this.effectiveSignerCountry() : '';
   }
 
   private async loadDocument(): Promise<void> {

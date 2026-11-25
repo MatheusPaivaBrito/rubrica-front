@@ -32,7 +32,7 @@ test('configura posições, replica páginas e salva o padrão empresarial', asy
   };
   const signer = { id: 'signer-1', name: 'Maria', email: 'maria@example.com', status: 'pending', signed_at: null, participant_role: 'company_representative' };
   let savedDefault: unknown;
-  let savedConfiguration: { placements: Array<{ page: number; signer_id: string }>; customization: { template: string } } | undefined;
+  let savedConfiguration: { placements: Array<{ page: number; signer_id: string }>; customization: null } | undefined;
 
   await page.route('**/*', async route => {
     const requestUrl = new URL(route.request().url());
@@ -46,7 +46,7 @@ test('configura posições, replica páginas e salva o padrão empresarial', asy
     if (path === '/signature-requests' && route.request().method() === 'GET') return json([request]);
     if (path === '/signature-requests/request-1') return json(request);
     if (path === '/signature-requests/request-1/signers') return json([signer]);
-    if (path === '/signature-requests/signer-contacts') return json([]);
+    if (path === '/tenants/tenant-1/signer-contacts') return json([]);
     if (path === '/billing/tenants/tenant-1/account') return json({ tenant_id: 'tenant-1', status: 'active', current_product_code: 'rubrica_intermediate', signatures_used: 0, free_signatures_limit: 5, signatures_remaining: 80, custom_stamp_placement: true, custom_stamp_branding: true, email_invitations: true });
     if (path === '/signature-requests/request-1/stamp-configuration' && route.request().method() === 'GET') return json({ placements: [], customization: null });
     if (path === '/signature-requests/request-1/stamp-configuration' && route.request().method() === 'PUT') { savedConfiguration = route.request().postDataJSON(); return json(savedConfiguration); }
@@ -56,20 +56,29 @@ test('configura posições, replica páginas e salva o padrão empresarial', asy
     return route.continue();
   });
 
-  await page.goto('/empresa/empresa/dashboard');
+  await page.goto('/t/empresa/a/empresa/dashboard');
+  await expect(page.getByText('Contrato empresarial', { exact: true }).filter({ visible: true }).first()).toBeVisible();
+  const mobileSummary = page.locator('.request-mobile-summary:visible');
+  if (await mobileSummary.count()) await mobileSummary.click();
   await page.getByRole('button', { name: /detalhes/i }).click();
-  await page.getByRole('button', { name: /posicionar carimbos/i }).click();
+  await page.getByRole('button', { name: /organizar carimbo/i }).click();
   const pages = page.locator('.pdf-page');
   await expect(pages).toHaveCount(2);
   await pages.first().click({ position: { x: 160, y: 180 } });
+  const mobileOptions = page.locator('.stamp-mobile-controls-trigger:visible');
+  if (await mobileOptions.count()) await mobileOptions.click();
   await page.getByRole('button', { name: /repetir em todas as páginas/i }).click();
   await expect(page.locator('.signature-stamp')).toHaveCount(2);
-  await page.getByRole('button', { name: /salvar como padrão da empresa/i }).click();
-  await expect.poll(() => savedDefault).toBeTruthy();
-  await expect(page.locator('.swal2-container')).toBeHidden({ timeout: 3_000 });
-  await page.getByRole('button', { name: /^salvar$/i }).click();
+  await page.locator('.stamp-editor-modal input[type=file]').setInputFiles({
+    name: 'logo.png', mimeType: 'image/png',
+    buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'),
+  });
+  await page.getByRole('button', { name: /salvar identidade visual da empresa/i }).click();
+  await expect.poll(() => savedDefault).toMatchObject({ show_logo: true, logo_png_data_url: expect.stringMatching(/^data:image\/png;base64,/) });
+  await expect(page.locator('.swal2-container')).toHaveCount(0);
+  await page.locator('.stamp-sidebar-actions button').filter({ hasText: /^\s*Salvar\s*$/i }).click();
   await expect.poll(() => savedConfiguration?.placements.length).toBe(2);
   expect(savedConfiguration?.placements.map(item => item.page)).toEqual([1, 2]);
   expect(savedConfiguration?.placements.every(item => item.signer_id === 'signer-1')).toBe(true);
-  expect(savedConfiguration?.customization.template).toBe('business');
+  expect(savedConfiguration?.customization).toBeNull();
 });

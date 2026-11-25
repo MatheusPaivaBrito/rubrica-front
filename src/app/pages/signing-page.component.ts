@@ -34,7 +34,7 @@ import { LanguagePickerComponent } from '../components/language-picker.component
             [documentEndpoint]="documentEndpoint()"
             [signerName]="context()!.signer.name"
             [signerIdentity]="identityLabel()"
-            [signerCountry]="context()!.signer.identity_document_country || context()!.account_country || ''"
+            [signerCountry]="signerCountry()"
             [stampDate]="context()!.signer.signed_at || stampPreviewDate"
             [placement]="placement()"
             [placements]="context()!.stamp_positions || []"
@@ -89,7 +89,7 @@ import { LanguagePickerComponent } from '../components/language-picker.component
           @if (!administrativeView() && !identityEligible()) { <p class="error">{{ identityRequiredLabel() }}</p> }
           @if (message()) { <p class="notice">{{ message() }}</p> }
 
-          @if (identifiers().length && !completed() && !administrativeView()) {
+          @if (identifiers().length && signatureMode() !== 'serproid' && !completed() && !administrativeView()) {
             <label>{{ i18n.text('documentType') }}
               <select [value]="selectedIdentifier()" (change)="selectIdentifier($event)">
                 @for (item of identifiers(); track item.id) {
@@ -155,7 +155,7 @@ export class SigningPageComponent implements OnInit {
     try {
       const context = await firstValueFrom(this.api.get<SigningContext>(`/signing/links/${this.token}`));
       this.applyContext(context);
-      if (context.viewer_mode === 'signer' && context.signer.status !== 'signed' && context.signer.signature_mode !== 'serproid') {
+      if (context.viewer_mode === 'signer' && context.signer.status !== 'signed') {
         try {
           const identifiers = await firstValueFrom(this.api.get<AccountIdentifier[]>('/users/me/identifiers'));
           const eligible = identifiers.filter(item => item.verification_status !== 'legacy' && (
@@ -322,8 +322,26 @@ export class SigningPageComponent implements OnInit {
   }
 
   administrativeView(): boolean { return this.context()?.viewer_mode === 'administrator'; }
-  identityEligible(): boolean { return ['BR_CPF', 'BR_CNPJ'].includes(this.context()?.signer.identity_document_type ?? ''); }
+  signerCountry(): string {
+    const context = this.context();
+    const selected = this.identifiers().find(item => item.id === this.selectedIdentifier());
+    return (!this.completed() && !this.administrativeView() ? selected?.issuing_country : null)
+      || context?.signer.identity_document_country || context?.account_country || '';
+  }
+  identityEligible(): boolean {
+    const selected = this.identifiers().find(item => item.id === this.selectedIdentifier());
+    const type = selected?.identifier_type ?? this.context()?.signer.identity_document_type;
+    return this.signatureMode() === 'evidence' ? Boolean(type) : ['BR_CPF', 'BR_CNPJ'].includes(type ?? '');
+  }
   identityRequiredLabel(): string {
+    if (this.signatureMode() === 'evidence') {
+      return ({
+        'pt-BR': 'Para assinar, cadastre um documento de identidade em Segurança.',
+        en: 'To sign, add an identity document in Security.',
+        es: 'Para firmar, añade un documento de identidad en Seguridad.',
+        'ja-JP': '署名するには、セキュリティ設定で本人確認書類を追加してください。',
+      })[this.i18n.locale()];
+    }
     return ({ 'pt-BR': 'Para assinar, ative sua conta Rubrica e cadastre seu CPF. Depois, volte a este documento.', en: 'To sign, activate your Rubrica account and register your Brazilian CPF. Then return to this document.', es: 'Para firmar, activa tu cuenta Rubrica y registra tu CPF brasileño. Luego vuelve a este documento.', 'ja-JP': '署名するには Rubrica アカウントを有効化し、ブラジルの CPF を登録してからこの文書に戻ってください。' } as Record<string, string>)[this.i18n.locale()];
   }
   signatureMode(): 'evidence' | 'serpro_timestamp' | 'serproid' { return this.context()?.signer.signature_mode ?? this.context()?.request.signature_mode ?? 'evidence'; }
