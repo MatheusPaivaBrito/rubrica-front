@@ -123,32 +123,37 @@ test('preenche MFA em seis posições e envia automaticamente', async ({ page })
   await page.route('**/*', async route => {
     const path = new URL(route.request().url()).pathname;
     const json = (value: unknown) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(value) });
+    if (path === '/auth/turnstile/config') return json({ site_key: '', required: false });
     if (path === '/auth/login') return json({ mfa_required: true, mfa_ticket: 'mfa-ticket-for-browser-test-1234567890', expires_in: 300 });
     if (path === '/auth/mfa/challenge') {
       submittedCode = JSON.parse(route.request().postData() || '{}').code;
       return json({ access_token: 'e2e-token' });
     }
-    if (path === '/access-control/context') return json({ version: 2, subject: 'aiko@example.jp', preferred_locale: 'ja-JP', mfa_enabled: true, mfa_setup_required: false, roles: ['signature_admin'], permission_keys: ['*'] });
-    if (path === '/tenants') return json([{ id: 'tenant-jp', name: 'Aiko', slug: 'aiko', role: 'admin', currency: 'JPY' }]);
+    if (path === '/access-control/context') return json({ version: 2, subject: 'aiko@example.jp', account_public_slug: 'aiko', preferred_locale: 'ja-JP', mfa_enabled: true, mfa_setup_required: false, roles: ['signature_admin'], permission_keys: ['*'] });
+    if (path === '/tenants') return json([{ id: 'tenant-jp', name: 'Aiko', slug: 'aiko', kind: 'personal', role: 'admin', currency: 'JPY' }]);
     return route.continue();
   });
 
   await page.goto('/login');
   await page.locator('input[name="email"]').fill('aiko@example.jp');
-  await page.locator('input[name="password"]').fill('correct-password');
-  await page.locator('form button').click();
+  await page.locator('input[autocomplete="current-password"]').fill('correct-password');
+  await page.locator('form button[type="submit"], form button:not([type])').click();
   const digits = page.locator('app-one-time-code input');
   await expect(digits).toHaveCount(6);
   for (const [index, digit] of [...'123456'].entries()) await digits.nth(index).fill(digit);
 
   await expect.poll(() => submittedCode).toBe('123456');
-  await expect(page).toHaveURL(/\/tenant\/aiko\/dashboard$/);
+  await expect(page).toHaveURL(/\/a\/aiko\/dashboard$/);
 });
 
 test('cadastro exige país da conta e documento em campos independentes', async ({ page }) => {
   let registration: Record<string, unknown> = {};
   await page.route('**/*', async route => {
-    if (new URL(route.request().url()).pathname === '/auth/register') {
+    const path = new URL(route.request().url()).pathname;
+    if (path === '/auth/turnstile/config') {
+      return route.fulfill({ json: { site_key: '', required: false } });
+    }
+    if (path === '/auth/register') {
       registration = JSON.parse(route.request().postData() || '{}');
       return route.fulfill({ status: 200, contentType: 'application/json', body: '{"accepted":true}' });
     }

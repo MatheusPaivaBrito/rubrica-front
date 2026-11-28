@@ -20,8 +20,7 @@ startxref
   return Buffer.from(body);
 }
 
-test('configura posições, replica páginas e salva o padrão empresarial', async ({ page }, testInfo) => {
-  test.skip(!['android-novo', 'pc'].includes(testInfo.project.name), 'Cobertura representativa de toque e desktop');
+test('configura posições, replica páginas e salva o padrão empresarial', async ({ page }) => {
   const pdf = twoPagePdf();
   const request = {
     id: 'request-1', document_id: 'doc-1', document_version: 1,

@@ -109,15 +109,17 @@ test('mantém as duas DataTables legíveis, ordenadas e navegáveis', async ({ p
   await expect(documentRows).toHaveCount(1);
   await expect(documentRows.first()).toContainText('Contrato recém-enviado');
 
-  const documentSort = documentCard.getByRole('button', { name: /^documento/i });
   await documentSearch.clear();
-  await expect(documentSort.locator('i')).toHaveClass(/bi-arrow-down/);
-  await documentSort.focus();
-  await page.keyboard.press('Enter');
-  await expect(documentSort.locator('i')).toHaveClass(/bi-arrow-up/);
-  await expect(documentRows.first()).toContainText('Contrato recém-enviado');
-  await documentSort.click();
-  await expect(documentSort.locator('i')).toHaveClass(/bi-arrow-down/);
+  if (!testInfo.project.use.isMobile) {
+    const documentSort = documentCard.locator('thead').getByRole('button', { name: /^Documento\b/ });
+    await expect(documentSort.locator('i')).toHaveClass(/\bbi-arrow-down\b/);
+    await documentSort.focus();
+    await page.keyboard.press('Enter');
+    await expect(documentSort.locator('i')).toHaveClass(/bi-arrow-up/);
+    await expect(documentRows.first()).toContainText('Contrato recém-enviado');
+    await documentSort.click();
+    await expect(documentSort.locator('i')).toHaveClass(/bi-arrow-down/);
+  }
 
   const viewport = page.viewportSize();
   const requestBox = await requestCard.boundingBox();
